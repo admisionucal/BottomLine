@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bottom Line - Unificar IDs</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: #f5f7fa;
+        }
+        .header {
+            background: white;
+            padding: 12px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .header h1 {
+            font-size: 20px;
+            color: #1a237e;
+        }
+        .header h1 span {
+            color: #ff6f00;
+        }
+        .header .back {
+            color: #1a237e;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        .header .back:hover {
+            text-decoration: underline;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .user-badge {
+            background: #e8eaf6;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            color: #1a237e;
+            font-weight: 500;
+        }
+        .user-badge .rol {
+            background: #1a237e;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            margin-left: 8px;
+            font-size: 11px;
+        }
+        .user-badge .rol.admin {
+            background: #ff6f00;
+        }
+        .btn-logout {
+            background: none;
+            border: none;
+            color: #d32f2f;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px 32px;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e8eaf6;
+            margin-bottom: 16px;
+        }
+        .search-box {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .search-box select,
+        .search-box input {
+            padding: 8px 14px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+        }
+        .search-box select:focus,
+        .search-box input:focus {
+            outline: none;
+            border-color: #1a237e;
+        }
+        .search-box button {
+            padding: 8px 24px;
+            background: #1a237e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .search-box button:hover {
+            opacity: 0.8;
+        }
+        .resultado-item {
+            background: white;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .resultado-item.marcado {
+            border-color: #1a237e;
+            background: #f3f6ff;
+        }
+        .resultado-item .check {
+            width: 20px;
+            height: 20px;
+            accent-color: #1a237e;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .resultado-item .info {
+            flex: 1;
+            min-width: 200px;
+        }
+        .resultado-item .meta {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
+        }
+        .badge-estado {
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-estado.activo {
+            background: #c8e6c9;
+            color: #1b5e20;
+        }
+        .badge-estado.huerfano {
+            background: #ffe0b2;
+            color: #bf360c;
+        }
+        .seleccion-resumen {
+            background: #fff8e1;
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            font-size: 13px;
+            color: #555;
+        }
+        .seleccion-resumen strong {
+            color: #1a237e;
+        }
+        .campo-predominante {
+            padding: 16px;
+            background: #f8f9fc;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            margin-top: 12px;
+        }
+        .campo-predominante h4 {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 12px;
+        }
+        .campo-predominante .row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .campo-predominante .row label {
+            font-weight: 500;
+            font-size: 13px;
+            color: #333;
+            min-width: 160px;
+        }
+        .campo-predominante .row select {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+            min-width: 220px;
+        }
+
+        .btn-unificar-final {
+            padding: 10px 32px;
+            background: #ff6f00;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+        .btn-unificar-final:hover {
+            background: #e65100;
+        }
+        .btn-unificar-final:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .btn-cancelar {
+            padding: 10px 32px;
+            background: #777;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+        .btn-cancelar:hover {
+            background: #555;
+        }
+        .error-validacion {
+            background: #ffebee;
+            border-left: 4px solid #d32f2f;
+            color: #b71c1c;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #888;
+        }
+        .campaña-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .campaña-selector select {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+        }
+        @media (max-width: 768px) {
+            .container {
+                padding: 12px;
+            }
+            .search-box {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .campo-predominante .row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+            .campo-predominante .row label {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== HEADER ===== -->
+    <div class="header">
+        <a href="#" class="back" onclick="volver()">← Volver al Dashboard</a>
+        <h1>Bottom <span>Line</span></h1>
+        <div class="header-right">
+            <span class="user-badge" id="userBadge">👤 Admin <span class="rol admin">ADMIN</span></span>
+            <button class="btn-logout" onclick="logout()">Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <!-- ===== CAMPAÑA ===== -->
+        <div class="campaña-selector">
+            <label>CAMPAÑA</label>
+            <select id="selectCampana"></select>
+        </div>
+
+        <!-- ===== BÚSQUEDA ===== -->
+        <div class="card">
+            <h3 style="margin-bottom:12px;">🔍 Buscar leads</h3>
+            <div class="search-box">
+                <select id="searchType">
+                    <option value="celular">Teléfono / Celular</option>
+                    <option value="nombre">Nombre</option>
+                    <option value="dni">DNI</option>
+                </select>
+                <input type="text" id="searchValue" placeholder="Escribe el valor a buscar...">
+                <button onclick="buscar()">Buscar</button>
+            </div>
+            <div id="resultadosContainer" style="margin-top:12px; display:grid; gap:8px;">
+                <div class="loading">Realiza una búsqueda para encontrar leads</div>
+            </div>
+        </div>
+
+        <!-- ===== SELECCIÓN Y CONFIRMACIÓN ===== -->
+        <div class="card" id="seleccionCard" style="display:none;">
+            <h3 style="margin-bottom:12px;">📌 Confirmar unificación</h3>
+            <div class="seleccion-resumen" id="resumenSeleccion"></div>
+            <div id="errorValidacion"></div>
+
+            <div class="campo-predominante" id="predominanteContainer" style="display:none;">
+                <h4>⚙️ Datos predominantes</h4>
+                <div class="row">
+                    <label>Comentarios/Historial:</label>
+                    <select id="comentariosSelect">
+                        <option value="ambos" selected>Combinar todos los historiales</option>
+                        <option value="id1">Solo historial del Principal (activo)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <button class="btn-unificar-final" id="btnUnificar" onclick="unificarIDs()" disabled>🔗 Unificar seleccionados</button>
+                <button class="btn-cancelar" onclick="cancelarSeleccion()">Cancelar</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/unificar-ids.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', initUnificar);
+    </script>
+
+</body>
+</html>
