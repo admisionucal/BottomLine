@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bottom Line - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: #f5f7fa;
+        }
+        .header {
+            background: white;
+            padding: 12px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .header h1 {
+            font-size: 20px;
+            color: #1a237e;
+        }
+        .header h1 span {
+            color: #ff6f00;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .user-badge {
+            background: #e8eaf6;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            color: #1a237e;
+            font-weight: 500;
+        }
+        .user-badge .rol {
+            background: #1a237e;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            margin-left: 8px;
+            font-size: 11px;
+        }
+        .user-badge .rol.admin {
+            background: #ff6f00;
+        }
+        .btn-logout {
+            background: none;
+            border: none;
+            color: #d32f2f;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .container {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 24px 32px;
+        }
+        .search-bar {
+            background: white;
+            padding: 12px 16px;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            margin-bottom: 16px;
+        }
+        .search-bar input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .search-bar input:focus {
+            outline: none;
+            border-color: #1a237e;
+        }
+        .filters {
+            background: white;
+            padding: 16px 20px;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 16px 20px;
+            margin-bottom: 24px;
+            position: relative;
+            z-index: 5;
+        }
+        .filters.cols-4 {
+            grid-template-columns: repeat(4, minmax(170px, 1fr));
+        }
+        .filters label {
+            display: block;
+            font-size: 11px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 6px;
+        }
+        .filters select,
+        .filters input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+        }
+        .filters select:focus,
+        .filters input:focus {
+            outline: none;
+            border-color: #1a237e;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .campaña-selector {
+            display: flex;
+            flex-direction: column;
+        }
+        .campaña-selector select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+        }
+        .campaña-selector select {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+        }
+
+        /* ===== MULTI-SELECT (dropdown con checkboxes) ===== */
+        .multiselect {
+            position: relative;
+        }
+        .multiselect-btn {
+            width: 100%;
+            text-align: left;
+            padding: 8px 32px 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+            cursor: pointer;
+            position: relative;
+            color: #000;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .multiselect-btn::after {
+            content: '⌵';
+            position: absolute;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #000;
+            font-size: 13px;
+        }
+        .multiselect-btn:hover {
+            border-color: #1a237e;
+        }
+        .multiselect-btn.has-selection {
+            border-color: #1a237e;
+            background: #f5f6ff;
+            color: #1a237e;
+            font-weight: 600;
+        }
+        .multiselect-btn:disabled {
+            cursor: not-allowed;
+            color: #aaa;
+            background: #fafafa;
+        }
+        .multiselect-panel {
+            display: none;
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            min-width: 100%;
+            width: max-content;
+            max-width: 450px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+            z-index: 40;
+            overflow: hidden;
+        }
+        .multiselect-panel.open {
+            display: block;
+        }
+        .multiselect-search {
+            padding: 8px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .multiselect-search input {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        .multiselect-actions {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 10px;
+            border-bottom: 1px solid #f0f0f0;
+            background: #fafbff;
+        }
+        .ms-link {
+            background: none;
+            border: none;
+            color: #1a237e;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 2px 4px;
+        }
+        .ms-link:hover {
+            text-decoration: underline;
+        }
+        .multiselect-options {
+            max-height: 220px;
+            overflow-y: auto;
+            padding: 4px 0;
+        }
+        .multiselect-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0px 7px;
+            font-size: 13px;
+            color: #000;
+            cursor: pointer;
+        }
+        .multiselect-option:hover {
+            background: #fafbff;
+        }
+        .multiselect-option input[type="checkbox"] {
+            width: 12px;
+            height: 12px;
+            accent-color: #1a237e;
+            cursor: pointer;
+            flex-shrink: 0;
+            margin: 2px;
+        }
+        .multiselect-option span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .table-wrapper {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+        }
+        .table-toolbar {
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .table-toolbar .left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .table-toolbar .left .badge {
+            background: #e8eaf6;
+            padding: 4px 14px;
+            border-radius: 16px;
+            font-size: 13px;
+            color: #1a237e;
+        }
+        .btn-export {
+            padding: 6px 16px;
+            border: 1px solid #1a237e;
+            background: white;
+            color: #1a237e;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-export:hover {
+            background: #1a237e;
+            color: white;
+        }
+        .btn-unificar {
+            padding: 6px 16px;
+            background: #ff6f00;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .btn-unificar:hover {
+            background: #e65100;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        table thead {
+            background: #f8f9fc;
+        }
+        table th {
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 600;
+            color: #444;
+            border-bottom: 2px solid #e8eaf6;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+        table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #333;
+        }
+        table tr:hover {
+            background: #fafbff;
+        }
+        table td .checkbox {
+            width: 18px;
+            height: 18px;
+            accent-color: #1a237e;
+            cursor: pointer;
+        }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-block;
+        }
+        .status-vp {
+            background: #c8e6c9;
+            color: #1b5e20;
+        }
+        .status-pp {
+            background: #bbdefb;
+            color: #0d47a1;
+        }
+        .status-pago {
+            background: #ffecb3;
+            color: #e65100;
+        }
+        .status-perdido {
+            background: #ffcdd2;
+            color: #b71c1c;
+        }
+        .status-sin {
+            background: #f5f5f5;
+            color: #616161;
+        }
+        .status-vll {
+            background: #ffe0b2;
+            color: #bf360c;
+        }
+        .status-black {
+            background: #212121;
+            color: white;
+        }
+        .id-link {
+            color: #1a237e;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .id-link:hover {
+            text-decoration: underline;
+        }
+        .beneficio-tag {
+            background: #e8f5e9;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #1b5e20;
+        }
+        .bottom-check {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .bottom-check.completo { background: #fff176; color: #6d4c00; }
+        .bottom-check.parcial  { background: #ffe0b2; color: #bf360c; }
+        .bottom-check.vacio    { background: #f5f5f5; color: #9e9e9e; }
+
+        .admin-badge {
+            background: #fff3e0;
+            color: #e65100;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .btn-aprobar {
+            padding: 2px 12px;
+            border: none;
+            background: #1a237e;
+            color: white;
+            border-radius: 12px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .btn-aprobar.rechazar {
+            background: #d32f2f;
+        }
+        .btn-aprobar:hover {
+            opacity: 0.8;
+        }
+
+        .pagination {
+            padding: 14px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-top: 1px solid #eee;
+        }
+        .pagination .pages {
+            display: flex;
+            gap: 6px;
+        }
+        .pagination .pages button {
+            padding: 6px 14px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .pagination .pages button.active {
+            background: #1a237e;
+            color: white;
+            border-color: #1a237e;
+        }
+        .pagination .pages button:hover:not(.active) {
+            background: #f0f0f0;
+        }
+        .pagination .info {
+            color: #777;
+            font-size: 13px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 12px;
+            }
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .campaña-selector {
+                margin-left: 0;
+            }
+            .table-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            table {
+                font-size: 12px;
+            }
+            table th,
+            table td {
+                padding: 6px 8px;
+            }
+            .multiselect-panel {
+                left: 0;
+                right: 0;
+                max-width: none;
+                width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== HEADER ===== -->
+    <div class="header">
+        <h1>Bottom <span>Line</span></h1>
+        <div class="header-right">
+            <span class="user-badge" id="userBadge">👤 Usuario <span class="rol" id="userRol">ADMIN</span></span>
+            <button class="btn-logout" onclick="logout()">Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <!-- ===== BÚSQUEDA ===== -->
+        <div class="search-bar">
+            <input type="text" id="filterBusqueda" placeholder="🔎 Buscar por ID Prometeo o Nombre" oninput="onBusquedaInput()">
+        </div>
+
+        <!-- ===== FILTROS ===== -->
+        <div class="filters" id="filtersContainer">
+            <div class="filter-group">
+                <label>CARRERA</label>
+                <div class="multiselect" id="filterCarrera"></div>
+            </div>
+            <div class="filter-group">
+                <label>TIPO DE INGRESO</label>
+                <div class="multiselect" id="filterIngreso"></div>
+            </div>
+            <div class="filter-group">
+                <label>TIPO DE BECA</label>
+                <div class="multiselect" id="filterBeneficio"></div>
+            </div>
+            <div class="filter-group">
+                <label>MODALIDAD DE ESTUDIO</label>
+                <div class="multiselect" id="filterModalidad"></div>
+            </div>
+            <div class="filter-group" id="filterAsesorGroup">
+                <label>ASESOR</label>
+                <div class="multiselect" id="filterAsesor"></div>
+            </div>
+            <div class="filter-group" id="filterStatusGroup">
+                <label>STATUS DE GESTIÓN</label>
+                <div class="multiselect" id="filterStatus"></div>
+            </div>
+            <div class="filter-group campaña-selector">
+                <label>CAMPAÑA</label>
+                <select id="selectCampana" onchange="cargarLeads()"></select>
+            </div>
+        </div>
+
+        <!-- ===== TABLA ===== -->
+        <div class="table-wrapper">
+            <div class="table-toolbar">
+                <div class="left">
+                    <span class="badge" id="leadCount">0 leads</span>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn-unificar" id="btnUnificar" onclick="irAUnificar()" style="display:none;">🔗 Unificar IDs</button>
+                    <button class="btn-export" onclick="exportarCSV()">📥 Exportar</button>
+                </div>
+            </div>
+
+            <div id="tableContainer">
+                <div class="loading">Cargando leads...</div>
+            </div>
+
+            <div class="pagination">
+                <div class="pages" id="paginationPages">
+                    <button onclick="cambiarPagina('prev')">«</button>
+                    <button class="active">1</button>
+                    <button onclick="cambiarPagina('next')">»</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="lastUpdate" style="position:fixed;bottom:14px;right:20px;background:white;padding:6px 14px;border-radius:20px;font-size:12px;color:#888;box-shadow:0 1px 4px rgba(0,0,0,0.08);z-index:20;opacity:0;pointer-events:none;transition:opacity 0.4s ease;">
+        Última actualización: --
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+
+</body>
+</html>
