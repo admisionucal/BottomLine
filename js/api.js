@@ -104,14 +104,14 @@ async function unifyIds(idPrincipal, idsSecundarios, campana, datosPredominantes
 // SOLICITUDES DE CAMBIO DE BOLETA ============================
 
 /** Crea una solicitud de cambio de escala */
-async function createSolicitud(idPrometeo, campana, boletaActual, montoSolicitado, asesorEmail) {
-  return await callAPI('createSolicitud', { 
-    idPrometeo, 
-    campana, 
-    boletaActual, 
-    montoSolicitado, 
-    asesorEmail 
-  });
+/** Crea una solicitud de cambio de escala.
+ *  Recibe el payload ya armado por lead-detail.js (idPrometeo, campana, asesorEmail,
+ *  asesorNombre, boletaActual, beneficioActual, boletaConBecaActual, boletaSolicitada,
+ *  beneficioSolicitado, boletaConBecaSolicitada) y lo reenvía tal cual — antes esta
+ *  función esperaba parámetros posicionales que no coincidían con cómo se la llamaba,
+ *  por lo que ID_PROMETEO y CAMPANA llegaban corruptos/vacíos al backend. */
+async function createSolicitud(payload) {
+  return await callAPI('createSolicitud', payload);
 }
 
 /** Resuelve una solicitud (APROBADO/RECHAZADO) */
