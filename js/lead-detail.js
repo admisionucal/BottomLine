@@ -5,6 +5,7 @@ let currentCampana = '';
 let historialAsesores = null;
 let ultimoCalculoMonto = {};
 let solicitudPendiente = null;
+let solicitudVerificada = false; 
 
 // Busca un valor en el objeto lead probando varias claves posibles,
 // y si ninguna calza exactamente, busca de forma flexible (sin tildes,
@@ -85,8 +86,13 @@ function initLeadDetail() {
 function cargarSolicitudPendiente(id) {
     getSolicitudPendiente(id, currentCampana).then(r => {
         solicitudPendiente = (r && r.success) ? (r.data || null) : null;
+        solicitudVerificada = true;               
         if (currentLead) renderFicha(currentLead);
-    }).catch(err => console.error('Error cargando solicitud pendiente:', err));
+    }).catch(err => {
+        console.error('Error cargando solicitud pendiente:', err);
+        solicitudVerificada = true;               
+        if (currentLead) renderFicha(currentLead);
+    });
 }
 
 function ocultarLoading() {
@@ -193,6 +199,7 @@ function renderFicha(lead) {
     const boletaProcedenciaActual = obtenerCampo(lead, 'BOLETA_PROCEDENCIA', 'BOLETA DE PROCEDENCIA') || '';
     const tiempoOfrecidoActual = obtenerCampo(lead, 'TIEMPO_OFRECIDO', 'TIEMPO OFRECIDO') || '';
     const boletaFinal = obtenerCampo(lead, 'BOLETA_FINAL', 'BOLETA FINAL') || '-';
+    const boletaColegio = obtenerCampo(lead, 'BOLETA DE COLEGIO') || '-';
 
     function campo(label, value) {
         const safe = (value !== undefined && value !== null && String(value).trim() !== '') ? value : '-';
@@ -230,10 +237,10 @@ function renderFicha(lead) {
     // ===== BLOQUE 1: DATOS NO EDITABLES (se jalan de la hoja de campaña) =====
     let camposHTML = '';
     camposHTML += campo('Campaña', currentCampana);
-    camposHTML += campo('Nombre', nombres);
     camposHTML += campo('Carrera', carrera);
-    camposHTML += campo('Colegio', colegio);
     camposHTML += campo('Modalidad', modalidad);
+    camposHTML += campo('Colegio', colegio);
+    camposHTML += campo('Boleta del Colegio', boletaColegio || '-')
     camposHTML += campo('Tipo Ingreso', tipoIngreso || '-');
 
     // ===== BLOQUE 2: DATOS EDITABLES POR EL ASESOR (dropdowns) =====
@@ -305,7 +312,7 @@ function renderFicha(lead) {
 
     // ===== SOLICITUD DE ESCALA MENOR (requiere aprobación del admin) =====
     // No aplica en Colegio Aliado (fila fija sin rango) ni en Virtual (precio fijo por carrera).
-    const permiteSolicitarEscalaMenor = !esColegioAliadoEspecial && boletaVirtualFija === null;
+    const permiteSolicitarEscalaMenor = !esColegioAliadoEspecial && boletaVirtualFija === null && boletaActual !== '';
     const opcionesRangoInferior = permiteSolicitarEscalaMenor
         ? opcionesBoletaBeneficioCatalogo(filasCatalogoRangosInferiores(catalogoBoletas, tipoIngresoCatalogo, boletaReferencia))
         : [];
@@ -314,7 +321,7 @@ function renderFicha(lead) {
         const user = getCurrentUser();
         if (!user) return '';
 
-        if (solicitudPendiente) {
+        if (solicitudPendiente && solicitudPendiente['STATUS'] === 'PENDIENTE') {
             const boletaSol = solicitudPendiente['BOLETA_SOLICITADA'];
             const beneficioSol = solicitudPendiente['BENEFICIO_SOLICITADO'] || 'Sin beca';
             const asesorNombreSol = solicitudPendiente['ASESOR_NOMBRE'] || solicitudPendiente['ASESOR_EMAIL'] || 'Asesor';
@@ -324,9 +331,9 @@ function renderFicha(lead) {
                     <div style="background:#fff8e1; border:1px solid #ffca28; padding:18px 20px; border-radius:8px; margin-top:20px;">
                         <strong style="color:#e65100;">🔔 Solicitud de escala menor pendiente</strong>
                         <p style="margin:8px 0; font-size:14px; color:#555;">
-                            <strong>${asesorNombreSol}</strong> solicita cambiar la boleta de
-                            <strong>S/ ${solicitudPendiente['BOLETA_ACTUAL']}</strong> a
-                            <strong>S/ ${boletaSol}</strong> (${beneficioSol}).
+                            <strong>${escapeHtml(asesorNombreSol)}</strong> solicita cambiar la boleta de
+                            <strong>S/ ${escapeHtml(solicitudPendiente['BOLETA_ACTUAL'])}</strong> a
+                            <strong>S/ ${escapeHtml(boletaSol)}</strong> (${escapeHtml(beneficioSol)}).
                         </p>
                         <div style="display:flex; gap:10px;">
                             <button class="btn-guardar" style="background:#2e7d32;" onclick="resolverSolicitud('${solicitudPendiente['ID_SOLICITUD']}', 'APROBADO')">✅ Aprobar</button>
@@ -337,20 +344,40 @@ function renderFicha(lead) {
 
             return `
                 <div style="background:#e3f2fd; border:1px solid #64b5f6; padding:16px 20px; border-radius:8px; margin-top:20px; font-size:14px; color:#0d47a1;">
-                    🕓 Tienes una solicitud pendiente: Boleta S/ ${boletaSol} (${beneficioSol}) — esperando aprobación del admin.
+                    🕓 Tienes una solicitud pendiente: Boleta S/ ${escapeHtml(boletaSol)} (${escapeHtml(beneficioSol)}) — esperando aprobación del admin.
+                    La ficha queda bloqueada hasta que se resuelva.
+                    <div style="margin-top:10px;">
+                        <button class="btn-guardar" style="background:#777;" onclick="cancelarSolicitudPendiente('${solicitudPendiente['ID_SOLICITUD']}')">Cancelar solicitud</button>
+                    </div>
                 </div>`;
         }
 
-        if (user.rol === 'ADMIN' || !permiteSolicitarEscalaMenor || opcionesRangoInferior.length === 0) return '';
+        if (solicitudPendiente && solicitudPendiente['STATUS'] === 'RECHAZADO' && user.rol !== 'ADMIN') {
+            return `
+                <div style="background:#ffebee; border:1px solid #ef9a9a; padding:16px 20px; border-radius:8px; margin-top:20px; font-size:14px; color:#b71c1c;">
+                    ❌ Solicitud de recategorización a Boleta S/ ${escapeHtml(solicitudPendiente['BOLETA_SOLICITADA'])} Rechazada.
+                </div>`;
+        }
+
+        if (user.rol === 'ADMIN') return '';
+
+        if (!permiteSolicitarEscalaMenor) {
+            if (boletaActual === '' && !esColegioAliadoEspecial && boletaVirtualFija === null) {
+                return `<div style="background:#fff3e0; border:1px solid #ffb74d; padding:14px 18px; border-radius:8px; margin-top:20px; font-size:13px; color:#e65100;">
+                    ⚠️ Debes guardar la boleta del lead ("💾 Guardar cambios") antes de poder solicitar una recategorización.
+                </div>`;
+            }
+            return '';
+        }
+
+        if (opcionesRangoInferior.length === 0) return '';
 
         return `
             <div style="background:white; padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); margin-top:20px;">
                 <strong style="color:#555; font-size:14px;">¿Necesitas ofrecer una boleta más baja?</strong>
                 <p style="font-size:12px; color:#999; margin:4px 0 10px;">Requiere aprobación del administrador.</p>
                 <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
-                    <div style="flex:1; min-width:220px;">
-                        ${selectConValor('selectEscalaMenor', opcionesRangoInferior, '')}
-                    </div>
+                    <div style="flex:1; min-width:220px;">${selectConValor('selectEscalaMenor', opcionesRangoInferior, '')}</div>
                     <button class="btn-guardar" onclick="solicitarEscalaMenor('${idPrometeo}')">📨 Solicitar aprobación</button>
                 </div>
                 <span id="solicitudMsg" style="display:block; margin-top:8px; font-size:13px; color:#1b5e20;"></span>
@@ -372,7 +399,7 @@ function renderFicha(lead) {
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:20px;" id="bloqueEditableFicha">
                     ${editablesHTML}
                 </div>
-                <button class="btn-guardar" onclick="guardarFicha('${idPrometeo}')">💾 Guardar cambios</button>
+                <button class="btn-guardar" id="btnGuardarFicha" onclick="guardarFicha('${idPrometeo}')">💾 Guardar cambios</button>
                 <span id="fichaGuardadoMsg" style="margin-left:12px; font-size:13px; color:#1b5e20;"></span>
             </div>
 
@@ -394,6 +421,22 @@ function renderFicha(lead) {
             currentLead['BOLETA_PROCEDENCIA'] = inputProcedencia.value;
             renderFicha(currentLead);
         });
+    }
+
+    const userActual = getCurrentUser();
+    const bloqueadoPorSolicitud = userActual && userActual.rol !== 'ADMIN'
+        && (!solicitudVerificada || (solicitudPendiente && solicitudPendiente['STATUS'] === 'PENDIENTE'));
+
+    if (bloqueadoPorSolicitud) {
+        document.querySelectorAll('#bloqueEditableFicha input, #bloqueEditableFicha select')
+            .forEach(el => el.disabled = true);
+        const btnGuardarFicha = document.getElementById('btnGuardarFicha');
+        if (btnGuardarFicha) {
+            btnGuardarFicha.disabled = true;
+            btnGuardarFicha.title = !solicitudVerificada
+                ? 'Verificando solicitudes pendientes...'
+                : 'Bloqueado: tienes una solicitud de recategorización pendiente';
+        }
     }
 
     actualizarMontoAPagar();
@@ -670,6 +713,21 @@ async function solicitarEscalaMenor(idPrometeo) {
     }
 }
 
+async function cancelarSolicitudPendiente(idSolicitud) {
+    if (!confirm('¿Confirmas cancelar tu solicitud pendiente? Podrás volver a editar la boleta.')) return;
+    try {
+        const result = await cancelarSolicitud(idSolicitud);
+        if (result && result.success) {
+            solicitudPendiente = null;
+            renderFicha(currentLead);
+        } else {
+            alert('Error al cancelar: ' + (result?.error || 'Error desconocido'));
+        }
+    } catch (error) {
+        alert('Error de conexión: ' + error.message);
+    }
+}
+
 async function resolverSolicitud(idSolicitud, status) {
     const user = getCurrentUser();
     const confirmMsg = status === 'APROBADO'
@@ -723,6 +781,18 @@ function sincronizarCacheDetalle(idPrometeo) {
 }
 
 async function guardarFicha(idPrometeo) {
+    const user0 = getCurrentUser();
+    
+    if (user0 && user0.rol !== 'ADMIN' && solicitudPendiente && solicitudPendiente['STATUS'] === 'PENDIENTE') {
+        alert('No puedes editar la ficha mientras tengas una solicitud pendiente.');
+        return;
+    }
+
+    if (user0 && user0.rol !== 'ADMIN' && solicitudPendiente && solicitudPendiente['STATUS'] === 'PENDIENTE') {
+        alert('No puedes editar la ficha mientras tengas una solicitud pendiente.');
+        return;
+    }
+
     const data = {};
 
     const getVal = id => {

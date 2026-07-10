@@ -1,7 +1,7 @@
 // CONFIGURACIÓN  - BOTTOM LINE ===============================
 
 // ===== URL DE LA API (Google Apps Script) =====
-const API_URL = 'https://script.google.com/macros/s/AKfycbxY4AtOE5MPQybmX6uNa5Qke7MA05LScPeBU19UiOmPd7ugYReKSycmQXoGKXZDWr2qcg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbz2RKb-BWZzk0ImTJ1R4ELGgGZT-G93ajHd_IKFgaJj4bNocLV8zXjjZODnDs6HaZFK/exec';
 
 // ===== HOJAS EN GOOGLE SHEETS =====
 const SHEET_NAMES = {

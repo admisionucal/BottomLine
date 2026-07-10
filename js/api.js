@@ -1,4 +1,4 @@
-// CLIENTE HTTP ===============================================
+// API ===============================================
 
 /** Ejecuta una acción en el backend. Adjunta automáticamente el token de sesión
  *  (si existe) para que el backend pueda validar quién hace la llamada. */
@@ -129,4 +129,8 @@ async function getSolicitudesPendientesCampana(campana) {
  *  sin que existiera, por lo que cargarSolicitudPendiente() nunca funcionaba. */
 async function getSolicitudPendiente(idPrometeo, campana) {
   return await callAPI('getSolicitudPendiente', { idPrometeo, campana });
+}
+
+async function cancelarSolicitud(idSolicitud) {
+  return await callAPI('cancelarSolicitud', { id: idSolicitud });
 }
