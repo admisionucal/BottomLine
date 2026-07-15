@@ -7,6 +7,10 @@ const PAGE_SIZE = 15;
 const PAGES_PER_BLOCK = 20;
 let lastUpdateTimeout = null;
 let solicitudesPendientesDashboard = [];
+let mapaPPVivas = {};
+let calendarioMesActual = new Date();
+let diaCalendarioSeleccionado = null;
+let vistaCalendarioActual = 'mes'; // 'mes' | 'ano'
 
 // ===== Búsqueda por texto libre (ID PROMETEO / NOMBRE / TELÉFONO) =====
 let terminoBusqueda = '';
@@ -18,6 +22,7 @@ function onBusquedaInput() {
         const input = document.getElementById('filterBusqueda');
         terminoBusqueda = input ? input.value.trim().toLowerCase() : '';
         aplicarFiltros();
+        poblarFiltros(); // la búsqueda libre también acota qué opciones tiene sentido mostrar en los dropdowns
     }, 250); // pequeño debounce para no re-renderizar en cada tecla
 }
 
@@ -115,6 +120,7 @@ async function cargarLeads(forceRefresh = false) {
             poblarFiltros();
             aplicarFiltros();
             actualizarUltimaActualizacion(cached.timestamp);
+            actualizarCalendarioPP();
             return;
         }
     }
@@ -133,6 +139,7 @@ async function cargarLeads(forceRefresh = false) {
             poblarFiltros();
             aplicarFiltros();
             actualizarUltimaActualizacion(timestamp);
+            actualizarCalendarioPP();
         } else {
             container.innerHTML = '<div class="loading">Error: ' + (result.error || 'No se pudieron cargar los leads') + '</div>';
         }
@@ -148,7 +155,74 @@ function resetearFiltrosMultiSelect() {
     if (inputBusqueda) inputBusqueda.value = '';
 }
 
+// Fuerza traer los leads frescos del backend (ignora el caché de sessionStorage),
+// con feedback visual en el botón mientras dura la recarga.
+async function actualizarManual() {
+    const btn = document.getElementById('btnActualizar');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Actualizando...';
+    }
+    try {
+        await cargarLeads(true);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '🔄 Actualizar';
+        }
+    }
+}
+
 // escapeHtml ahora vive en config.js (compartido entre dashboard.js, lead-detail.js y unificar-ids.js)
+
+// ===== FILTROS INTERDEPENDIENTES =====
+// Un lead "pasa" un set de filtros si cumple con TODAS las condiciones activas
+// en ese set. Esta función es la ÚNICA fuente de verdad para decidir si un lead
+// matchea — la usan tanto aplicarFiltros() (con TODOS los filtros activos, para
+// la tabla) como poblarFiltros() (con "todos menos uno", para calcular qué
+// opciones tienen sentido mostrar en cada dropdown).
+function leadPasaFiltros(lead, filtrosActivos, esAdmin) {
+    const carreraValue = String(lead['CARRERA'] || lead['PROGRAMA'] || '').trim();
+    const ingresoValue = String(lead['MODALIDAD INGRESO'] || '').trim();
+    const modalidadValue = String(lead['MODALIDAD'] || '').trim();
+    const statusValue = String(lead['STATUS DE GESTION'] || '').trim();
+    const beneficioValue = String(lead['BENEFICIO'] || '').trim();
+    const asesorValue = String(lead['ASESOR ULT TIP DF SN CONTC'] || '').trim();
+
+    if (filtrosActivos.carrera && filtrosActivos.carrera.length > 0 && !filtrosActivos.carrera.includes(carreraValue)) return false;
+    if (filtrosActivos.ingreso && filtrosActivos.ingreso.length > 0 && !filtrosActivos.ingreso.includes(ingresoValue)) return false;
+    if (filtrosActivos.modalidad && filtrosActivos.modalidad.length > 0 && !filtrosActivos.modalidad.includes(modalidadValue)) return false;
+    if (filtrosActivos.beneficio && filtrosActivos.beneficio.length > 0 && !filtrosActivos.beneficio.includes(beneficioValue)) return false;
+    if (esAdmin && filtrosActivos.asesor && filtrosActivos.asesor.length > 0 && !filtrosActivos.asesor.includes(asesorValue)) return false;
+    if (esAdmin && filtrosActivos.status && filtrosActivos.status.length > 0 && !filtrosActivos.status.includes(statusValue)) return false;
+
+    // Búsqueda por texto libre: ID PROMETEO o NOMBRE (aplica siempre, no es "excluible" por filtro)
+    if (terminoBusqueda) {
+        const idValue = String(lead['ID PROMETEO'] || '').toLowerCase();
+        const nombreValue = String(lead['NOMBRES'] || '').toLowerCase();
+        if (!idValue.includes(terminoBusqueda) && !nombreValue.includes(terminoBusqueda)) return false;
+    }
+
+    return true;
+}
+
+// Devuelve una copia de filtrosMultiSelect con la clave "filtroKeyExcluido" vacía
+// (sin restringir por ese campo), y con asesor/status vacíos si el usuario no es
+// ADMIN (esos filtros no aplican para ASESOR). Se usa para calcular, por cada
+// dropdown, qué valores tienen sentido mostrar dado el resto de filtros activos.
+function filtrosExcluyendo(filtroKeyExcluido, esAdmin) {
+    const resultado = {};
+    Object.keys(filtrosMultiSelect).forEach(key => {
+        if (key === filtroKeyExcluido) {
+            resultado[key] = [];
+        } else if ((key === 'asesor' || key === 'status') && !esAdmin) {
+            resultado[key] = [];
+        } else {
+            resultado[key] = filtrosMultiSelect[key];
+        }
+    });
+    return resultado;
+}
 
 // ===== FILTROS MULTI-SELECCIÓN (dropdown con checkboxes) =====
 
@@ -157,12 +231,22 @@ function crearMultiSelect(filtroKey, containerId, valores) {
     if (!container) return;
     const config = MS_CONFIG[filtroKey];
 
+    // Preserva el estado visual del panel (abierto + término de búsqueda interno)
+    // antes de reconstruir el HTML, porque poblarFiltros() puede llamar a esta
+    // función mientras el usuario sigue interactuando con ESTE mismo dropdown
+    // (por ejemplo, marcando varios checkboxes seguidos).
+    const panelPrevio = container.querySelector('.multiselect-panel');
+    const estabaAbierto = !!(panelPrevio && panelPrevio.classList.contains('open'));
+    const searchInputPrevio = container.querySelector('.multiselect-search input');
+    const terminoBusquedaPanelPrevio = searchInputPrevio ? searchInputPrevio.value : '';
+
     const unicos = [...new Set(
         valores.filter(v => v !== undefined && v !== null && String(v).trim() !== '')
                .map(v => String(v).trim())
     )].sort();
 
-    // Conserva la selección previa, descartando valores que ya no existan (p.ej. tras cambiar de campaña)
+    // Conserva la selección previa, descartando valores que ya no existan (p.ej. tras
+    // cambiar de campaña, o porque otro filtro ya los dejó fuera de combinación posible)
     filtrosMultiSelect[filtroKey] = filtrosMultiSelect[filtroKey].filter(v => unicos.includes(v));
 
     if (unicos.length === 0) {
@@ -212,6 +296,7 @@ function crearMultiSelect(filtroKey, containerId, valores) {
             }
             actualizarBotonMultiSelect(filtroKey, containerId);
             aplicarFiltros();
+            poblarFiltros(); // recalcula qué opciones tienen sentido en los DEMÁS dropdowns
         });
     });
 
@@ -223,6 +308,7 @@ function crearMultiSelect(filtroKey, containerId, valores) {
             container.querySelectorAll('.multiselect-options input[type=checkbox]').forEach(c => c.checked = true);
             actualizarBotonMultiSelect(filtroKey, containerId);
             aplicarFiltros();
+            poblarFiltros();
         });
     }
 
@@ -234,6 +320,7 @@ function crearMultiSelect(filtroKey, containerId, valores) {
             container.querySelectorAll('.multiselect-options input[type=checkbox]').forEach(c => c.checked = false);
             actualizarBotonMultiSelect(filtroKey, containerId);
             aplicarFiltros();
+            poblarFiltros();
         });
     }
 
@@ -248,6 +335,21 @@ function crearMultiSelect(filtroKey, containerId, valores) {
                 opt.style.display = texto.includes(term) ? 'flex' : 'none';
             });
         });
+    }
+
+    // Restaura el estado que tenía este panel antes de la reconstrucción
+    if (estabaAbierto) {
+        const panelNuevo = container.querySelector('.multiselect-panel');
+        if (panelNuevo) panelNuevo.classList.add('open');
+        // El listener de "click afuera" es sobre document y es idempotente
+        // (mismo callback ya registrado no se duplica), pero lo re-afirmamos
+        // por si el panel se abrió recién al restaurar este estado.
+        setTimeout(() => document.addEventListener('click', cerrarMultiSelectFuera), 0);
+
+        if (searchInput && terminoBusquedaPanelPrevio) {
+            searchInput.value = terminoBusquedaPanelPrevio;
+            searchInput.dispatchEvent(new Event('input'));
+        }
     }
 }
 
@@ -311,61 +413,47 @@ function cerrarMultiSelectFuera(e) {
     }
 }
 
+// Recalcula y repinta las opciones de CADA dropdown en base a los leads que
+// pasan todos los DEMÁS filtros activos (excluyendo el propio filtro del
+// dropdown que se está poblando). Esto es lo que hace que los filtros se
+// afecten entre sí: si ya no hay leads que combinen con la selección actual,
+// esa opción simplemente no aparece en el dropdown correspondiente.
 function poblarFiltros() {
     const user = getCurrentUser();
+    const esAdmin = user.rol === 'ADMIN';
 
-    crearMultiSelect('carrera', 'filterCarrera', currentLeadsRaw.map(l => l['CARRERA'] || l['PROGRAMA']));
-    crearMultiSelect('ingreso', 'filterIngreso', currentLeadsRaw.map(l => l['MODALIDAD INGRESO']));
-    crearMultiSelect('beneficio', 'filterBeneficio', currentLeadsRaw.map(l => l['BENEFICIO']));
-    crearMultiSelect('modalidad', 'filterModalidad', currentLeadsRaw.map(l => l['MODALIDAD']));
+    function valoresDisponibles(filtroKey, extractor) {
+        const filtrosSinEste = filtrosExcluyendo(filtroKey, esAdmin);
+        return currentLeadsRaw
+            .filter(lead => leadPasaFiltros(lead, filtrosSinEste, esAdmin))
+            .map(extractor);
+    }
 
-    if (user.rol === 'ADMIN') {
-        crearMultiSelect('asesor', 'filterAsesor', currentLeadsRaw.map(l => l['ASESOR ULT TIP DF SN CONTC']));
-        crearMultiSelect('status', 'filterStatus', currentLeadsRaw.map(l => l['STATUS DE GESTION']));
+    crearMultiSelect('carrera', 'filterCarrera', valoresDisponibles('carrera', l => l['CARRERA'] || l['PROGRAMA']));
+    crearMultiSelect('ingreso', 'filterIngreso', valoresDisponibles('ingreso', l => l['MODALIDAD INGRESO']));
+    crearMultiSelect('beneficio', 'filterBeneficio', valoresDisponibles('beneficio', l => l['BENEFICIO']));
+    crearMultiSelect('modalidad', 'filterModalidad', valoresDisponibles('modalidad', l => l['MODALIDAD']));
+
+    if (esAdmin) {
+        crearMultiSelect('asesor', 'filterAsesor', valoresDisponibles('asesor', l => l['ASESOR ULT TIP DF SN CONTC']));
+        crearMultiSelect('status', 'filterStatus', valoresDisponibles('status', l => l['STATUS DE GESTION']));
     }
 }
 
 function aplicarFiltros() {
     const user = getCurrentUser();
+    const esAdmin = user.rol === 'ADMIN';
 
-    const filtros = {
+    const filtrosActivos = {
         carrera: filtrosMultiSelect.carrera,
         ingreso: filtrosMultiSelect.ingreso,
         beneficio: filtrosMultiSelect.beneficio,
         modalidad: filtrosMultiSelect.modalidad,
-        asesor: user.rol === 'ADMIN' ? filtrosMultiSelect.asesor : [],
-        status: user.rol === 'ADMIN' ? filtrosMultiSelect.status : []
+        asesor: esAdmin ? filtrosMultiSelect.asesor : [],
+        status: esAdmin ? filtrosMultiSelect.status : []
     };
 
-    currentLeads = currentLeadsRaw.filter(lead => {
-        const carreraValue = String(lead['CARRERA'] || lead['PROGRAMA'] || '').trim();
-        const ingresoValue = String(lead['MODALIDAD INGRESO'] || '').trim();
-        const modalidadValue = String(lead['MODALIDAD'] || '').trim();
-        const statusValue = String(lead['STATUS DE GESTION'] || '').trim();
-        const beneficioValue = String(lead['BENEFICIO'] || '').trim();
-        const asesorValue = String(lead['ASESOR ULT TIP DF SN CONTC'] || '').trim();
-
-        // Array vacío = sin filtro aplicado para ese campo (equivalente al "Todos" anterior)
-        if (filtros.carrera.length > 0 && !filtros.carrera.includes(carreraValue)) return false;
-        if (filtros.ingreso.length > 0 && !filtros.ingreso.includes(ingresoValue)) return false;
-        if (filtros.modalidad.length > 0 && !filtros.modalidad.includes(modalidadValue)) return false;
-        if (filtros.beneficio.length > 0 && !filtros.beneficio.includes(beneficioValue)) return false;
-        if (user.rol === 'ADMIN' && filtros.asesor.length > 0 && !filtros.asesor.includes(asesorValue)) return false;
-        if (user.rol === 'ADMIN' && filtros.status.length > 0 && !filtros.status.includes(statusValue)) return false;
-
-        // Búsqueda por texto libre: ID PROMETEO, NOMBRE o TELÉFONO
-        if (terminoBusqueda) {
-            const idValue = String(lead['ID PROMETEO'] || '').toLowerCase();
-            const nombreValue = String(lead['NOMBRES'] || '').toLowerCase();
-
-            const coincide = idValue.includes(terminoBusqueda)
-                || nombreValue.includes(terminoBusqueda)
-
-            if (!coincide) return false;
-        }
-
-        return true;
-    });
+    currentLeads = currentLeadsRaw.filter(lead => leadPasaFiltros(lead, filtrosActivos, esAdmin));
 
     currentPage = 1;
     renderTabla();
@@ -669,4 +757,510 @@ function renderCampanaNotificaciones() {
 
     const panel = document.getElementById('panelNotificaciones');
     if (panel && panel.style.display === 'block') renderPanelNotificaciones();
+}
+
+// ===== CALENDARIO DE PPs (PP Viva, PP Muerta, Pago Completo, Pago Fraccionado) =====
+// Solo ADMIN ve las 4 categorías (Pago Completo/Fraccionado son exclusivas de
+// ADMIN, ya vienen "chanceadas" desde el backend contra la hoja de pagos).
+// El ASESOR sigue viendo únicamente PP Viva, sin cambios de comportamiento.
+
+// Config de categorías: color, label, de qué status viene, y qué campo de fecha usar.
+const CATEGORIAS_CALENDARIO = {
+    viva: {
+        label: 'PP Viva',
+        color: '#1a237e',
+        status: 'VALORES_PROMESA_DE_PAGO_VIVA',
+        campoFecha: 'FECHA COMPROMISO DE PAGO'
+    },
+    muerta: {
+        label: 'PP Muerta',
+        color: '#5e35b1',
+        status: 'VALORES_PROMESA_DE_PAGO_MUERTA',
+        campoFecha: 'FECHA COMPROMISO DE PAGO'
+    },
+    pagoCompleto: {
+        label: 'Pago Completo',
+        color: '#2e7d32',
+        status: 'PAGO COMPLETO',
+        campoFecha: 'FECHA DE PAGO COMPLETO'
+    },
+    pagoFraccionado: {
+        label: 'Pago Fraccionado',
+        color: '#f9a825',
+        status: 'PAGO FRACCIONADO',
+        campoFecha: 'FECHA DE PROMESA DE PAGO'
+    }
+};
+
+// Qué categorías están visibles ahora mismo (togglea desde la leyenda del popup).
+// Por defecto solo "PP Viva" viene marcada; el admin activa las demás si lo necesita.
+// Se resetea a este mismo default cada vez que se recarga la campaña.
+let categoriasVisibles = { viva: true, muerta: false, pagoCompleto: false, pagoFraccionado: false };
+
+function actualizarCalendarioPP() {
+    const user = getCurrentUser();
+    const esAdmin = user && user.rol === 'ADMIN';
+
+    categoriasVisibles = { viva: true, muerta: false, pagoCompleto: false, pagoFraccionado: false };
+    vistaCalendarioActual = 'mes';
+    mapaPPVivas = esAdmin ? construirMapaCalendarioAdmin() : construirMapaPPVivasAsesor();
+    calendarioMesActual = new Date(); // vuelve al mes actual cada vez que se recarga la campaña
+    actualizarBadgeCalendarioTrigger();
+    renderCalendarioPP(); // no-op si el popup del calendario está cerrado (el contenedor no existe)
+}
+
+// Badge sobre el botón "Calendario de PPs" con el total del MES ACTUAL,
+// contando solo las categorías visibles ahora mismo.
+function actualizarBadgeCalendarioTrigger() {
+    const badge = document.getElementById('calTriggerBadge');
+    if (!badge) return;
+    const hoy = new Date();
+    const prefijoMesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+    let total = 0;
+    Object.keys(mapaPPVivas).forEach(clave => {
+        if (!clave.startsWith(prefijoMesActual)) return;
+        total += itemsVisiblesDelDia(clave).length;
+    });
+    if (total > 0) {
+        badge.textContent = total > 99 ? '99+' : String(total);
+        badge.style.display = 'inline-block';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+// Abre el calendario como popup (no se mantiene fijo en el layout)
+function abrirCalendarioPopup() {
+    if (document.getElementById('calCalendarioPopupOverlay')) return; // ya está abierto
+
+    const user = getCurrentUser();
+    const esAdmin = user && user.rol === 'ADMIN';
+
+    vistaCalendarioActual = 'mes'; // siempre arranca en vista mensual
+
+    const modalHtml = `
+        <div class="cal-modal-overlay" id="calCalendarioPopupOverlay" onclick="cerrarCalendarioPopup(event)">
+            <div class="cal-modal cal-modal-calendario ${esAdmin ? 'con-leyenda' : ''}" onclick="event.stopPropagation()">
+                <div class="cal-modal-header">
+                    <strong>📅 Calendario de PPs</strong>
+                    <div class="cal-view-toggle">
+                        <button data-vista="mes" class="activo" onclick="cambiarVistaCalendario('mes')">Mes</button>
+                        <button data-vista="ano" onclick="cambiarVistaCalendario('ano')">Año</button>
+                    </div>
+                    <button class="cal-modal-close" onclick="cerrarCalendarioPopup()">✕</button>
+                </div>
+                <div class="cal-modal-content">
+                    <div class="cal-modal-body" id="calendarioPPContainer"></div>
+                    ${esAdmin ? '<div class="cal-leyenda" id="calLeyenda"></div>' : ''}
+                </div>
+            </div>
+        </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    if (esAdmin) renderLeyendaCalendario();
+    renderCalendarioPP();
+}
+
+// Cambia entre la vista mensual y la vista de los 12 meses del año a la vez.
+function cambiarVistaCalendario(vista) {
+    vistaCalendarioActual = vista;
+    const modal = document.querySelector('.cal-modal-calendario');
+    if (modal) modal.classList.toggle('vista-anio', vista === 'ano');
+    document.querySelectorAll('.cal-view-toggle button').forEach(btn => {
+        btn.classList.toggle('activo', btn.dataset.vista === vista);
+    });
+    renderCalendarioPP();
+}
+
+function cerrarCalendarioPopup(e) {
+    if (e && e.target && e.target.id !== 'calCalendarioPopupOverlay') return;
+    const overlay = document.getElementById('calCalendarioPopupOverlay');
+    if (overlay) overlay.remove();
+}
+
+// Leyenda con checkboxes: togglea qué categorías se ven en el grid, en el
+// detalle del día, y en el Excel exportado (todo lee categoriasVisibles).
+function renderLeyendaCalendario() {
+    const cont = document.getElementById('calLeyenda');
+    if (!cont) return;
+
+    let html = '<div class="cal-leyenda-items">';
+    Object.keys(CATEGORIAS_CALENDARIO).forEach(key => {
+        const cat = CATEGORIAS_CALENDARIO[key];
+        const checked = categoriasVisibles[key] ? 'checked' : '';
+        // El label se parte en 2 líneas ("Pago" / "Fraccionado") para que entre
+        // cómodo en la columna angosta sin recortarse ni verse apretado.
+        const [linea1, ...resto] = cat.label.split(' ');
+        const linea2 = resto.join(' ');
+        html += `
+            <label class="cal-leyenda-item ${checked ? 'activo' : ''}" data-categoria="${key}" style="--cat-color:${cat.color};">
+                <input type="checkbox" data-categoria="${key}" ${checked} onchange="toggleCategoriaCalendario('${key}', this.checked)">
+                <span class="cal-leyenda-badge">
+                    <span class="cal-leyenda-badge-linea">${escapeHtml(linea1)}</span>
+                    ${linea2 ? `<span class="cal-leyenda-badge-linea">${escapeHtml(linea2)}</span>` : ''}
+                </span>
+            </label>`;
+    });
+    html += '</div>';
+    cont.innerHTML = html;
+}
+
+function toggleCategoriaCalendario(key, visible) {
+    categoriasVisibles[key] = visible;
+    renderCalendarioPP();
+    renderLeyendaCalendario();
+    actualizarBadgeCalendarioTrigger();
+    // Si el popup de detalle del día está abierto, se refresca respetando la nueva selección
+    if (diaCalendarioSeleccionado && document.getElementById('calModalOverlay')) {
+        abrirDetalleDia(diaCalendarioSeleccionado);
+    }
+}
+
+// Intenta parsear fechas en varios formatos posibles (ISO, DD/MM/YYYY, etc.)
+function parsearFechaFlexible(valor) {
+    if (!valor) return null;
+    if (valor instanceof Date) return isNaN(valor.getTime()) ? null : valor;
+    const str = String(valor).trim();
+    if (!str) return null;
+
+    let m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) {
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (m) {
+        const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    const fallback = new Date(str);
+    return isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function fechaAClaveISO(date) {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+// Arma el "background" inline de una celda con datos: si hay una sola
+// categoría ese día, la celda entera se pinta de su color; si hay varias,
+// se reparte el ancho en partes iguales para que compartan el color.
+function construirFondoCelda(categorias) {
+    if (!categorias || categorias.length === 0) return '';
+    const colores = categorias.map(key => (CATEGORIAS_CALENDARIO[key] ? CATEGORIAS_CALENDARIO[key].color : '#1a237e'));
+    if (colores.length === 1) return `background:${colores[0]};`;
+
+    const paso = 100 / colores.length;
+    const stops = colores.map((color, i) =>
+        `${color} ${(i * paso).toFixed(2)}%, ${color} ${((i + 1) * paso).toFixed(2)}%`
+    ).join(', ');
+    return `background: linear-gradient(to right, ${stops});`;
+}
+
+// ASESOR: mismo comportamiento de siempre — solo PP Viva, un array plano por día.
+function construirMapaPPVivasAsesor() {
+    const mapa = {};
+    currentLeadsRaw.forEach(lead => {
+        const status = String(lead['STATUS DE GESTION'] || '').trim();
+        if (status !== 'VALORES_PROMESA_DE_PAGO_VIVA') return;
+
+        const fecha = parsearFechaFlexible(lead['FECHA COMPROMISO DE PAGO']);
+        if (!fecha) return;
+
+        const clave = fechaAClaveISO(fecha);
+        if (!mapa[clave]) mapa[clave] = [];
+        mapa[clave].push(lead);
+    });
+    return mapa;
+}
+
+// ADMIN: 4 categorías por día. Cada día guarda { viva: [...], muerta: [...],
+// pagoCompleto: [...], pagoFraccionado: [...] } — cada lead se clasifica según
+// su STATUS DE GESTION (ya viene "chanceado" desde el backend) y se grafica
+// en la fecha correspondiente a esa categoría (ver CATEGORIAS_CALENDARIO).
+function construirMapaCalendarioAdmin() {
+    const mapa = {};
+    currentLeadsRaw.forEach(lead => {
+        const status = String(lead['STATUS DE GESTION'] || '').trim();
+        const catKey = Object.keys(CATEGORIAS_CALENDARIO).find(k => CATEGORIAS_CALENDARIO[k].status === status);
+        if (!catKey) return;
+
+        const campoFecha = CATEGORIAS_CALENDARIO[catKey].campoFecha;
+        const fecha = parsearFechaFlexible(lead[campoFecha]);
+        if (!fecha) return;
+
+        const clave = fechaAClaveISO(fecha);
+        if (!mapa[clave]) mapa[clave] = { viva: [], muerta: [], pagoCompleto: [], pagoFraccionado: [] };
+        mapa[clave][catKey].push(lead);
+    });
+    return mapa;
+}
+
+// Devuelve los leads de un día respetando categoriasVisibles, cada uno con
+// su categoría anotada (para poder colorear/etiquetar en el detalle del día).
+// Funciona tanto para el formato de ADMIN (objeto por categoría) como el
+// formato plano de ASESOR (array simple, siempre categoría "viva").
+function itemsVisiblesDelDia(claveDia) {
+    const datosDia = mapaPPVivas[claveDia];
+    if (!datosDia) return [];
+
+    if (Array.isArray(datosDia)) {
+        // Formato ASESOR: siempre PP Viva, siempre visible (no hay leyenda para asesor)
+        return datosDia.map(lead => ({ lead, categoria: 'viva' }));
+    }
+
+    // Formato ADMIN: objeto con las 4 categorías
+    let items = [];
+    Object.keys(CATEGORIAS_CALENDARIO).forEach(key => {
+        if (!categoriasVisibles[key]) return;
+        (datosDia[key] || []).forEach(lead => items.push({ lead, categoria: key }));
+    });
+    return items;
+}
+
+function renderCalendarioPP() {
+    const cont = document.getElementById('calendarioPPContainer');
+    if (!cont) return;
+
+    if (vistaCalendarioActual === 'ano') {
+        renderCalendarioAnio(cont);
+        return;
+    }
+
+    const year = calendarioMesActual.getFullYear();
+    const month = calendarioMesActual.getMonth();
+
+    const nombreMes = calendarioMesActual.toLocaleDateString('es-PE', { month: 'long', year: 'numeric' });
+    const primerDiaSemana = new Date(year, month, 1).getDay();
+    const diasEnMes = new Date(year, month + 1, 0).getDate();
+    const prefijoMes = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+    let totalMes = 0;
+    Object.keys(mapaPPVivas).forEach(clave => {
+        if (clave.startsWith(prefijoMes)) totalMes += itemsVisiblesDelDia(clave).length;
+    });
+
+    const hoyClave = fechaAClaveISO(new Date());
+
+    let celdas = '';
+    for (let i = 0; i < primerDiaSemana; i++) celdas += `<div class="cal-celda vacia"></div>`;
+
+    for (let dia = 1; dia <= diasEnMes; dia++) {
+        const claveDia = `${prefijoMes}-${String(dia).padStart(2, '0')}`;
+        const items = itemsVisiblesDelDia(claveDia);
+        const cantidad = items.length;
+        const esHoy = claveDia === hoyClave;
+
+        // El día entero se pinta del color de su categoría (o repartido entre
+        // colores si hay más de una categoría ese día) — cada filtro "es" su color.
+        const categoriasDelDia = [...new Set(items.map(it => it.categoria))];
+        const estiloFondo = cantidad > 0 ? construirFondoCelda(categoriasDelDia) : '';
+
+        celdas += `
+            <div class="cal-celda ${cantidad > 0 ? 'con-datos' : ''} ${esHoy ? 'hoy' : ''}"
+                 style="${estiloFondo}"
+                 ${cantidad > 0 ? `onclick="abrirDetalleDia('${claveDia}')"` : ''}
+                 title="${cantidad > 0 ? cantidad + ' registro(s)' : ''}">
+                <span class="cal-numero">${dia}</span>
+                ${cantidad > 0 ? `<span class="cal-badge">${cantidad}</span>` : ''}
+            </div>`;
+    }
+
+    cont.innerHTML = `
+        <div class="cal-header">
+            <button class="cal-nav" onclick="cambiarMesCalendario(-1)">‹</button>
+            <div class="cal-titulo">
+                <strong style="text-transform:capitalize;">${nombreMes}</strong>
+                <span class="cal-total">${totalMes} registro${totalMes === 1 ? '' : 's'}</span>
+            </div>
+            <button class="cal-nav" onclick="cambiarMesCalendario(1)">›</button>
+        </div>
+        <div class="cal-dias-semana"><span>D</span><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span></div>
+        <div class="cal-grid">${celdas}</div>
+    `;
+}
+
+function cambiarMesCalendario(delta) {
+    calendarioMesActual = new Date(calendarioMesActual.getFullYear(), calendarioMesActual.getMonth() + delta, 1);
+    renderCalendarioPP();
+}
+
+// Vista de año: 12 mini-calendarios a la vez, para ver toda la campaña de un
+// vistazo en vez de navegar mes a mes. Cada mini-día con datos abre el mismo
+// popup de detalle del día que la vista mensual.
+function renderCalendarioAnio(cont) {
+    const year = calendarioMesActual.getFullYear();
+    const hoyClave = fechaAClaveISO(new Date());
+
+    let totalAnio = 0;
+    Object.keys(mapaPPVivas).forEach(clave => {
+        if (clave.startsWith(String(year))) totalAnio += itemsVisiblesDelDia(clave).length;
+    });
+
+    let mesesHtml = '';
+    for (let m = 0; m < 12; m++) {
+        const nombreMes = new Date(year, m, 1).toLocaleDateString('es-PE', { month: 'long' });
+        const primerDiaSemana = new Date(year, m, 1).getDay();
+        const diasEnMes = new Date(year, m + 1, 0).getDate();
+        const prefijoMes = `${year}-${String(m + 1).padStart(2, '0')}`;
+
+        let totalMes = 0;
+        let celdas = '';
+        for (let i = 0; i < primerDiaSemana; i++) celdas += `<div class="cal-mini-celda vacia"></div>`;
+
+        for (let dia = 1; dia <= diasEnMes; dia++) {
+            const claveDia = `${prefijoMes}-${String(dia).padStart(2, '0')}`;
+            const itemsDia = itemsVisiblesDelDia(claveDia);
+            const cantidad = itemsDia.length;
+            totalMes += cantidad;
+            const esHoy = claveDia === hoyClave;
+            const categoriasDia = [...new Set(itemsDia.map(it => it.categoria))];
+            const estiloFondo = cantidad > 0 ? construirFondoCelda(categoriasDia) : '';
+
+            celdas += `
+                <div class="cal-mini-celda ${cantidad > 0 ? 'con-datos' : ''} ${esHoy ? 'hoy' : ''}"
+                     style="${estiloFondo}"
+                     ${cantidad > 0 ? `onclick="abrirDetalleDia('${claveDia}')"` : ''}
+                     title="${cantidad > 0 ? cantidad + ' registro(s)' : ''}">${dia}</div>`;
+        }
+
+        mesesHtml += `
+            <div class="cal-mini-mes">
+                <div class="cal-mini-header" onclick="irAMes(${year}, ${m})" title="Ver ${nombreMes} en detalle" style="text-transform:capitalize;">${nombreMes}</div>
+                <div class="cal-mini-dias-semana"><span>D</span><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span></div>
+                <div class="cal-mini-grid">${celdas}</div>
+                <div class="cal-mini-total">${totalMes > 0 ? totalMes + ' reg.' : '—'}</div>
+            </div>`;
+    }
+
+    cont.innerHTML = `
+        <div class="cal-header">
+            <button class="cal-nav" onclick="cambiarAnioCalendario(-1)">‹</button>
+            <div class="cal-titulo">
+                <strong>${year}</strong>
+                <span class="cal-total">${totalAnio} registro${totalAnio === 1 ? '' : 's'}</span>
+            </div>
+            <button class="cal-nav" onclick="cambiarAnioCalendario(1)">›</button>
+        </div>
+        <div class="cal-anio-grid">${mesesHtml}</div>
+    `;
+}
+
+function cambiarAnioCalendario(delta) {
+    calendarioMesActual = new Date(calendarioMesActual.getFullYear() + delta, calendarioMesActual.getMonth(), 1);
+    renderCalendarioPP();
+}
+
+// Salta de la vista de año a la vista mensual, ya ubicado en el mes elegido.
+function irAMes(year, month) {
+    calendarioMesActual = new Date(year, month, 1);
+    cambiarVistaCalendario('mes');
+}
+
+function abrirDetalleDia(claveDia) {
+    diaCalendarioSeleccionado = claveDia;
+    const items = itemsVisiblesDelDia(claveDia);
+    const [yyyy, mm, dd] = claveDia.split('-');
+    const fechaLegible = `${dd}/${mm}/${yyyy}`;
+
+    const user = getCurrentUser();
+    const esAdmin = user && user.rol === 'ADMIN';
+
+    let filas = '';
+    items.forEach(({ lead, categoria }) => {
+        const id = lead['ID PROMETEO'] || '-';
+        const carrera = lead['CARRERA'] || lead['PROGRAMA'] || '-';
+        const modalidadIngreso = lead['MODALIDAD INGRESO'] || '-';
+        const modalidad = lead['MODALIDAD'] || '-';
+        const boletaFinal = lead['BOLETA_FINAL'] || lead['BOLETA FINAL'] || '-';
+        const asesor = lead['ASESOR ULT TIP DF SN CONTC'] || '-';
+        const cat = CATEGORIAS_CALENDARIO[categoria];
+        filas += `
+            <tr>
+                ${esAdmin ? `<td><span class="cal-dot" style="background:${cat.color};"></span> ${escapeHtml(cat.label)}</td>` : ''}
+                <td><a href="#" class="id-link" onclick="verDetalleDesdeCalendario('${escapeHtml(id)}'); return false;">${escapeHtml(id)}</a></td>
+                <td>${escapeHtml(carrera)}</td>
+                <td>${escapeHtml(modalidadIngreso)}</td>
+                <td>${escapeHtml(modalidad)}</td>
+                <td>S/ ${escapeHtml(boletaFinal)}</td>
+                ${esAdmin ? `<td>${escapeHtml(asesor)}</td>` : ''}
+            </tr>`;
+    });
+
+    const colspan = esAdmin ? 7 : 5;
+
+    const modalHtml = `
+        <div class="cal-modal-overlay cal-modal-overlay-top" id="calModalOverlay" onclick="cerrarDetalleDia(event)">
+            <div class="cal-modal" onclick="event.stopPropagation()">
+                <div class="cal-modal-header">
+                    <strong>📅 ${fechaLegible}</strong>
+                    <button class="cal-modal-close" onclick="cerrarDetalleDia()">✕</button>
+                </div>
+                <div class="cal-modal-toolbar">
+                    <span>${items.length} registro${items.length === 1 ? '' : 's'}</span>
+                    <button class="btn-export" onclick="exportarDiaExcel()">📥 Exportar Excel</button>
+                </div>
+                <div class="cal-modal-body">
+                    <table>
+                        <thead><tr>
+                            ${esAdmin ? '<th>CATEGORÍA</th>' : ''}<th>ID</th><th>CARRERA</th><th>MODALIDAD INGRESO</th><th>MODALIDAD</th><th>BOLETA FINAL</th>${esAdmin ? '<th>ASESOR</th>' : ''}
+                        </tr></thead>
+                        <tbody>${filas || `<tr><td colspan="${colspan}" style="text-align:center;color:#888;padding:20px;">Sin registros</td></tr>`}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function cerrarDetalleDia(e) {
+    if (e && e.target && e.target.id !== 'calModalOverlay') return;
+    const overlay = document.getElementById('calModalOverlay');
+    if (overlay) overlay.remove();
+    diaCalendarioSeleccionado = null;
+}
+
+function verDetalleDesdeCalendario(id) {
+    const campana = document.getElementById('selectCampana')?.value || '26.2';
+    const lead = currentLeadsRaw.find(l => String(l['ID PROMETEO']) === String(id));
+    if (lead) sessionStorage.setItem(`bl_selected_${id}_${campana}`, JSON.stringify(lead));
+    window.location.href = `lead-detail.html?id=${encodeURIComponent(id)}&campana=${encodeURIComponent(campana)}`;
+}
+
+// El export respeta exactamente lo que está visible en el detalle del día
+// (mismas categorías toggleadas en la leyenda).
+function exportarDiaExcel() {
+    if (!diaCalendarioSeleccionado) return;
+    const items = itemsVisiblesDelDia(diaCalendarioSeleccionado);
+    if (items.length === 0) {
+        alert('No hay datos para exportar');
+        return;
+    }
+
+    const user = getCurrentUser();
+    const esAdmin = user && user.rol === 'ADMIN';
+
+    const filasExport = items.map(({ lead, categoria }) => {
+        const fila = {};
+        if (esAdmin) fila['CATEGORÍA'] = CATEGORIAS_CALENDARIO[categoria].label;
+        fila['ID PROMETEO'] = lead['ID PROMETEO'] || '';
+        fila['CARRERA'] = lead['CARRERA'] || lead['PROGRAMA'] || '';
+        fila['MODALIDAD INGRESO'] = lead['MODALIDAD INGRESO'] || '';
+        fila['MODALIDAD'] = lead['MODALIDAD'] || '';
+        fila['BOLETA FINAL'] = lead['BOLETA_FINAL'] || lead['BOLETA FINAL'] || '';
+        if (esAdmin) fila['ASESOR'] = lead['ASESOR ULT TIP DF SN CONTC'] || '';
+        return fila;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(filasExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Calendario');
+
+    const campana = document.getElementById('selectCampana')?.value || 'Campana';
+    XLSX.writeFile(wb, `Calendario_${diaCalendarioSeleccionado}_${campana}.xlsx`);
 }

@@ -158,7 +158,7 @@ async function unificarIDs() {
     if (!confirm(`¿Confirmas la unificación definitiva?\n\nPrincipal (se mantiene): ${activo.id} (${activo.nombre})\n\nSe fusionará y archivará el historial de:\n${listaHuerfanos}`)) return;
 
     const datosPredominantes = {
-        comentarios: document.getElementById('comentariosSelect')?.value || 'ambos'
+        historial: document.getElementById('historialSelect')?.value || 'ambos'
     };
 
     const campana = document.getElementById('selectCampana').value;

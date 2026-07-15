@@ -1,7 +1,7 @@
 // CONFIGURACIÓN  - BOTTOM LINE ===============================
 
 // ===== URL DE LA API (Google Apps Script) =====
-const API_URL = 'https://script.google.com/macros/s/AKfycbz2RKb-BWZzk0ImTJ1R4ELGgGZT-G93ajHd_IKFgaJj4bNocLV8zXjjZODnDs6HaZFK/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyhNdOPpzugT_YsH5pWSqPGjLQ6tyQ5wDm04Hy2gRfnyedLvzbFUVqoG_fLeNTyPZ09Tg/exec';
 
 // ===== HOJAS EN GOOGLE SHEETS =====
 const SHEET_NAMES = {
@@ -21,6 +21,12 @@ const SHEET_NAMES = {
 const PRECIOS_BASE = { matricula: 475, admision: 250 };
 
 // ===== STATUS DE GESTIÓN =====
+// "PAGO COMPLETO" y "PAGO FRACCIONADO" son status sintéticos: no vienen de la
+// columna STATUS DE GESTION de la hoja de campaña, sino que el backend los
+// asigna cuando "chanca" un lead PP Muerta contra la hoja de pagos (ver
+// getLeads() en code.gs). Una vez chancado, ESE es el status real del lead
+// en toda la app (tabla, filtros, badge del detalle) — reemplaza a
+// VALORES_PROMESA_DE_PAGO_MUERTA.
 const STATUS_MAP = {
   'VALORES_VALORACIONES_POSITIVAS_VIVA':   'status-vp-viva',
   'VALORES_VALORACIONES_POSITIVAS_MUERTA': 'status-vp',
@@ -29,7 +35,9 @@ const STATUS_MAP = {
   'VALORES_PERDIDO':                       'status-perdido',
   'VALORES_SIN_CONTACTO':                  'status-sc',
   'VALORES_VOLVER_A_LLAMAR':               'status-vll',
-  'VALORES_BLACK_LIST':                    'status-bl'
+  'VALORES_BLACK_LIST':                    'status-bl',
+  'PAGO COMPLETO':                         'status-pago',
+  'PAGO FRACCIONADO':                      'status-pago'
 };
 
 const STATUS_LABELS = {
@@ -40,7 +48,9 @@ const STATUS_LABELS = {
   'VALORES_PERDIDO':                       'Perdido',
   'VALORES_SIN_CONTACTO':                  'Sin Contacto',
   'VALORES_VOLVER_A_LLAMAR':               'Volver a Llamar',
-  'VALORES_BLACK_LIST':                    'Black List'
+  'VALORES_BLACK_LIST':                    'Black List',
+  'PAGO COMPLETO':                         'Pago Completo',
+  'PAGO FRACCIONADO':                      'Pago Fraccionado'
 };
 
 // ===== UTILIDADES COMPARTIDAS =====

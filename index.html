@@ -11,29 +11,42 @@
             box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+        html, body {
+            height: 100%;
+        }
         body {
-            background: #f0f2f5;
+            background: #ffffff;
+        }
+
+        .split {
             display: flex;
-            justify-content: center;
+            min-height: 100vh;
+        }
+
+        /* ===== PANEL IZQUIERDO — FORMULARIO ===== */
+        .panel-form {
+            flex: 1;
+            display: flex;
             align-items: center;
-            height: 100vh;
-        }
-        .login-container {
-            background: white;
+            justify-content: center;
+            background: #ffffff;
             padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            width: 380px;
         }
+
+        .login-container {
+            width: 100%;
+            max-width: 380px;
+        }
+
         .login-container h1 {
             color: #1a237e;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 28px;
+            margin-bottom: 8px;
+            font-size: 32px;
         }
         .login-container h1 span {
             color: #ff6f00;
         }
+
         .form-group {
             margin-bottom: 20px;
         }
@@ -67,6 +80,7 @@
             font-weight: 600;
             cursor: pointer;
             transition: background 0.3s;
+            margin-top: 4px;
         }
         .btn-login:hover {
             background: #0d1555;
@@ -79,35 +93,49 @@
             color: #d32f2f;
             font-size: 13px;
             text-align: center;
-            margin-top: 10px;
+            margin-top: 12px;
             display: none;
         }
-        .rol-indicator {
-            text-align: center;
-            margin-top: 15px;
-            font-size: 13px;
-            color: #888;
+
+        /* ===== PANEL DERECHO — IMAGEN ===== */
+        .panel-image {
+            flex: 1.2;
+            background: transparent url('assets/logo.png') center center / 500px auto no-repeat;
         }
-        .rol-indicator strong {
-            color: #1a237e;
+
+        @media (max-width: 900px) {
+            .panel-image {
+                display: none;
+            }
+            .panel-form {
+                padding: 24px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <h1>Bottom <span>Line</span></h1>
-        <form id="loginForm" onsubmit="return handleLogin(event)">
-            <div class="form-group">
-                <label>Correo UCAL</label>
-                <input type="email" id="email" placeholder="usuario@ucal.pe" required>
+
+    <div class="split">
+        <div class="panel-form">
+            <div class="login-container">
+                <h1>Bottom <span>Line</span></h1>
+
+                <form id="loginForm" onsubmit="return handleLogin(event)">
+                    <div class="form-group">
+                        <label>Usuario</label>
+                        <input type="text" id="usuario" placeholder="Ingrese su usuario" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña</label>
+                        <input type="password" id="password" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn-login" id="loginBtn">Ingresar</button>
+                    <div class="error-msg" id="errorMsg">Credenciales incorrectas</div>
+                </form>
             </div>
-            <div class="form-group">
-                <label>Contraseña</label>
-                <input type="password" id="password" placeholder="••••••••" required>
-            </div>
-            <button type="submit" class="btn-login" id="loginBtn">Ingresar</button>
-            <div class="error-msg" id="errorMsg">Credenciales incorrectas</div>
-        </form>
+        </div>
+
+        <div class="panel-image"></div>
     </div>
 
     <script src="js/config.js"></script>
@@ -117,7 +145,7 @@
         // ===== MANEJAR LOGIN =====
         async function handleLogin(e) {
             e.preventDefault();
-            const email = document.getElementById('email').value.trim();
+            const usuario = document.getElementById('usuario').value.trim();
             const password = document.getElementById('password').value.trim();
             const btn = document.getElementById('loginBtn');
             const errorMsg = document.getElementById('errorMsg');
@@ -127,7 +155,7 @@
             errorMsg.style.display = 'none';
 
             try {
-                const result = await login(email, password);
+                const result = await login(usuario, password);
 
                 if (result.success) {
                     setUser(result.user);

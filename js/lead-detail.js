@@ -5,7 +5,12 @@ let currentCampana = '';
 let historialAsesores = null;
 let ultimoCalculoMonto = {};
 let solicitudPendiente = null;
-let solicitudVerificada = false; 
+let solicitudVerificada = false;
+// Snapshots de perfilamiento indexados en el orden en que se renderizaron en el
+// tab Historial (mezclados con comentarios). Cada entrada guarda también a qué
+// asesor pertenece esa fila, para que restaurar apunte siempre a la fila correcta
+// (importante para ADMIN: puede haber varios asesores, no solo el "más reciente").
+let historialSnapshotsIndexados = [];
 
 // Busca un valor en el objeto lead probando varias claves posibles,
 // y si ninguna calza exactamente, busca de forma flexible (sin tildes,
@@ -26,6 +31,19 @@ function obtenerCampo(lead, ...posiblesNombres) {
         }
     }
     return '';
+}
+
+// Parsea el campo COMENTARIOS_HISTORIAL (array JSON con entradas tipo
+// 'comentario' o 'perfil_snapshot'). Si el valor no es JSON válido o está
+// vacío, devuelve un array vacío en vez de romper el render.
+function parsearHistorial(raw) {
+    if (!raw) return [];
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+        return [];
+    }
 }
 
 function initLeadDetail() {
@@ -86,11 +104,11 @@ function initLeadDetail() {
 function cargarSolicitudPendiente(id) {
     getSolicitudPendiente(id, currentCampana).then(r => {
         solicitudPendiente = (r && r.success) ? (r.data || null) : null;
-        solicitudVerificada = true;               
+        solicitudVerificada = true;
         if (currentLead) renderFicha(currentLead);
     }).catch(err => {
         console.error('Error cargando solicitud pendiente:', err);
-        solicitudVerificada = true;               
+        solicitudVerificada = true;
         if (currentLead) renderFicha(currentLead);
     });
 }
@@ -165,15 +183,6 @@ function renderEncabezadosYFicha(lead) {
     renderFicha(lead);
 }
 
-function campoFicha(label, value, colorClass) {
-    const safeValue = (value !== undefined && value !== null && String(value).trim() !== '') ? value : '-';
-    return `
-        <div class="ficha-campo ${colorClass}">
-            <span class="ficha-label">${escapeHtml(label)}</span>
-            <strong class="ficha-valor">${escapeHtml(safeValue)}</strong>
-        </div>`;
-}
-
 function renderFicha(lead) {
     const containerV1 = document.getElementById('vista1Content');
     if (!containerV1) return;
@@ -200,6 +209,10 @@ function renderFicha(lead) {
     const tiempoOfrecidoActual = obtenerCampo(lead, 'TIEMPO_OFRECIDO', 'TIEMPO OFRECIDO') || '';
     const boletaFinal = obtenerCampo(lead, 'BOLETA_FINAL', 'BOLETA FINAL') || '-';
     const boletaColegio = obtenerCampo(lead, 'BOLETA DE COLEGIO') || '-';
+    const celular1 = obtenerCampo(lead, 'TELEFONO 2') || '';
+    const celular2 = obtenerCampo(lead, 'TELEFONO 3') || '';
+    const celularesTexto = [celular1, celular2].filter(Boolean).join(' / ') || '-';
+    const correo = obtenerCampo(lead, 'EMAIL') || '-';
 
     function campo(label, value) {
         const safe = (value !== undefined && value !== null && String(value).trim() !== '') ? value : '-';
@@ -240,7 +253,7 @@ function renderFicha(lead) {
     camposHTML += campo('Carrera', carrera);
     camposHTML += campo('Modalidad', modalidad);
     camposHTML += campo('Colegio', colegio);
-    camposHTML += campo('Boleta del Colegio', boletaColegio || '-')
+    camposHTML += campo('Boleta del Colegio', boletaColegio || '-');
     camposHTML += campo('Tipo Ingreso', tipoIngreso || '-');
 
     // ===== BLOQUE 2: DATOS EDITABLES POR EL ASESOR (dropdowns) =====
@@ -387,7 +400,11 @@ function renderFicha(lead) {
     containerV1.innerHTML = `
         <div style="background:white; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05)">
             <h2 style="color:#1a237e; margin-bottom:4px; font-size:22px;">${nombres}</h2>
-            <p style="color:#666; margin-bottom:20px;"><strong>ID Prometeo:</strong> ${idPrometeo}</p>
+            <p style="color:#666; margin-bottom:20px;">
+                <strong>ID Prometeo:</strong> ${idPrometeo} &nbsp;|&nbsp;
+                <strong>Celular:</strong> ${escapeHtml(celularesTexto)} &nbsp;|&nbsp;
+                <strong>Correo:</strong> ${escapeHtml(correo)}
+            </p>
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:20px;">
                 ${camposHTML}
             </div>
@@ -782,11 +799,6 @@ function sincronizarCacheDetalle(idPrometeo) {
 
 async function guardarFicha(idPrometeo) {
     const user0 = getCurrentUser();
-    
-    if (user0 && user0.rol !== 'ADMIN' && solicitudPendiente && solicitudPendiente['STATUS'] === 'PENDIENTE') {
-        alert('No puedes editar la ficha mientras tengas una solicitud pendiente.');
-        return;
-    }
 
     if (user0 && user0.rol !== 'ADMIN' && solicitudPendiente && solicitudPendiente['STATUS'] === 'PENDIENTE') {
         alert('No puedes editar la ficha mientras tengas una solicitud pendiente.');
@@ -837,8 +849,17 @@ async function guardarFicha(idPrometeo) {
     const msgEl = document.getElementById('fichaGuardadoMsg');
     if (msgEl) msgEl.textContent = 'Guardando...';
 
+    // FIX: si quien guarda es ADMIN, debe actualizar la fila del asesor DUEÑO del lead
+    // (currentLead['ASESOR_EMAIL'], que viene de la fila 'masReciente' en getLeadDetail),
+    // no la suya propia. De lo contrario se crea una fila nueva y separada bajo el email
+    // del admin, con el resto de columnas en blanco, y esa fila "fantasma" termina
+    // tapando los datos reales del asesor la próxima vez que se recarga el lead.
+    const asesorPropietario = (user && user.rol === 'ADMIN')
+        ? (currentLead['ASESOR_EMAIL'] || user.email)
+        : (user ? user.email : '');
+
     try {
-        const result = await saveBottom(idPrometeo, currentCampana, data, user ? user.email : '');
+        const result = await saveBottom(idPrometeo, currentCampana, data, asesorPropietario);
         if (result && result.success) {
             Object.assign(currentLead, data);
             sincronizarCacheDetalle(idPrometeo);
@@ -879,18 +900,14 @@ function renderBoletaElectronica(boleta, beneficio, beneficioAdicional, benefici
         </div>`;
 }
 
-function campoPerfil(label, value, full) {
-    const safeValue = (value !== undefined && value !== null && String(value).trim() !== '') ? value : 'Sin registrar';
-    return `
-        <div class="perfil-campo ficha-campo color-verde ${full ? 'campo-full' : ''}">
-            <span class="ficha-label">${escapeHtml(label)}</span>
-            <strong class="ficha-valor">${escapeHtml(safeValue)}</strong>
-        </div>`;
-}
+// ============================================================
+// PERFILAMIENTO — render, guardado, historial de versiones y restauración
+// ============================================================
 
 function renderPerfilamiento() {
     const container = document.getElementById('vista2Content');
     if (!container || !currentLead) return;
+    const user = getCurrentUser();
 
     const idPrometeo = obtenerCampo(currentLead, 'ID PROMETEO');
     const statusGestion = currentLead['STATUS DE GESTION'] || '';
@@ -911,6 +928,14 @@ function renderPerfilamiento() {
         // Un textarea también puede "romperse" con </textarea><script>...; hay que escapar igual.
         return `<textarea id="${id}" class="campo-editable-input" style="width:100%; min-height:60px; padding:10px 12px; border:1px solid #e0e0e0; border-radius:6px; font-size:14px; font-family:inherit; resize:vertical;">${escapeHtml(safe)}</textarea>`;
     }
+
+    // "Acciones Definidas" va al FINAL y solo lo ve/edita el ADMIN — el asesor
+    // no debe ver ni sobreescribir ese campo (lo llena exclusivamente el admin).
+    const bloqueAccionesDefinidas = user.rol === 'ADMIN' ? `
+                <div>
+                    <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Acciones Definidas</label>
+                    ${textareaPerfil('inputAccionesDefinidas', currentLead['ACCIONES_DEFINIDAS'])}
+                </div>` : '';
 
     container.innerHTML = `
         <div style="background:white; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); margin-bottom:16px;">
@@ -933,10 +958,6 @@ function renderPerfilamiento() {
                     ${textareaPerfil('inputQuienFinancia', currentLead['QUIEN_FINANCIARA'])}
                 </div>
                 <div>
-                    <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Acciones Definidas</label>
-                    ${textareaPerfil('inputAccionesDefinidas', currentLead['ACCIONES_DEFINIDAS'])}
-                </div>
-                <div>
                     <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">¿Qué le falta para tomar una decisión?</label>
                     ${textareaPerfil('inputQueLeFalta', currentLead['QUE_LE_FALTA'])}
                 </div>
@@ -948,6 +969,7 @@ function renderPerfilamiento() {
                     <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Comentarios</label>
                     ${textareaPerfil('inputComentariosPerfil', currentLead['COMENTARIOS_PERFIL'])}
                 </div>
+                ${bloqueAccionesDefinidas}
             </div>
             <button class="btn-guardar" onclick="guardarPerfilamiento('${idPrometeo}')">💾 Guardar cambios</button>
             <span id="perfilGuardadoMsg" style="margin-left:12px; font-size:13px; color:#1b5e20;"></span>
@@ -969,19 +991,31 @@ async function guardarPerfilamiento(idPrometeo) {
         POR_QUE_ELIGIO_CARRERA: getVal('inputPorQueEligio') || '',
         QUE_BUSCA_UNIVERSIDAD: getVal('inputQueBusca') || '',
         QUIEN_FINANCIARA: getVal('inputQuienFinancia') || '',
-        ACCIONES_DEFINIDAS: getVal('inputAccionesDefinidas') || '',
         QUE_LE_FALTA: getVal('inputQueLeFalta') || '',
         OTRAS_OPCIONES: getVal('inputOtrasOpciones') || '',
         COMENTARIOS_PERFIL: getVal('inputComentariosPerfil') || '',
         FECHA_ULT_MODIFICACION: new Date().toISOString()
     };
 
+    // "Acciones Definidas" solo se manda si el input existe en el DOM (es decir,
+    // solo si el usuario es ADMIN). Si un ASESOR guarda perfilamiento, el input
+    // ni siquiera se renderiza, así que este campo no debe incluirse en el payload
+    // — de lo contrario el backend lo sobreescribiría con '' y borraría lo que
+    // el admin haya escrito ahí.
+    if (getVal('inputAccionesDefinidas') !== undefined) {
+        data['ACCIONES_DEFINIDAS'] = getVal('inputAccionesDefinidas');
+    }
+
     const user = getCurrentUser();
     const msgEl = document.getElementById('perfilGuardadoMsg');
     if (msgEl) msgEl.textContent = 'Guardando...';
 
+    // Mismo fix que en guardarFicha(): el ADMIN debe actualizar la fila del
+    // asesor dueño del lead, no crear una fila nueva bajo su propio email.
+    const asesorPropietario = (user.rol === 'ADMIN') ? (currentLead['ASESOR_EMAIL'] || user.email) : user.email;
+
     try {
-        const result = await saveBottom(idPrometeo, currentCampana, data, user ? user.email : '');
+        const result = await saveBottom(idPrometeo, currentCampana, data, asesorPropietario);
         if (result && result.success) {
             Object.assign(currentLead, data);
             sincronizarCacheDetalle(idPrometeo);
@@ -995,6 +1029,82 @@ async function guardarPerfilamiento(idPrometeo) {
     } catch (error) {
         if (msgEl) msgEl.textContent = '';
         alert('Error de conexión al guardar: ' + error.message);
+    }
+}
+
+// Abre el pop-up de detalle para UN snapshot puntual de perfilamiento, a partir
+// de su índice en historialSnapshotsIndexados (armado al renderizar el tab
+// Historial). El ASESOR no ve "Acciones Definidas" en el detalle; el ADMIN sí.
+function abrirDetalleSnapshot(idx) {
+    const item = historialSnapshotsIndexados[idx];
+    if (!item) return;
+    const user = getCurrentUser();
+
+    const labels = {
+        POR_QUE_ELIGIO_CARRERA: '¿Por qué eligió la carrera?',
+        QUE_BUSCA_UNIVERSIDAD: '¿Qué busca en una universidad?',
+        QUIEN_FINANCIARA: '¿Quién financiará la carrera?',
+        QUE_LE_FALTA: '¿Qué le falta para tomar una decisión?',
+        OTRAS_OPCIONES: '¿Cuáles son sus otras opciones?',
+        COMENTARIOS_PERFIL: 'Comentarios',
+        ACCIONES_DEFINIDAS: 'Acciones Definidas'
+    };
+    const camposVisibles = user.rol === 'ADMIN'
+        ? Object.keys(labels)
+        : Object.keys(labels).filter(c => c !== 'ACCIONES_DEFINIDAS');
+
+    const preguntas = camposVisibles.map(c =>
+        `<p style="margin:6px 0;"><strong>${escapeHtml(labels[c])}</strong><br>${escapeHtml(item.datos[c] || '(sin respuesta)')}</p>`
+    ).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'modalDetalleSnapshot';
+    overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; display:flex; align-items:center; justify-content:center;';
+    overlay.innerHTML = `
+        <div style="background:white; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; padding:24px; border-radius:10px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <h3 style="color:#1a237e;">Detalle de perfilamiento</h3>
+                <button onclick="document.getElementById('modalDetalleSnapshot').remove()" style="border:none;background:none;font-size:20px;cursor:pointer;">✕</button>
+            </div>
+            <div style="color:#888; font-size:13px; margin-bottom:16px;">
+                <strong style="color:#1a237e;">${escapeHtml(item.usuario)}</strong> — ${formatearFechaBottom(item.fecha)}
+            </div>
+            ${preguntas}
+            <button class="btn-guardar" onclick="restablecerVersionPerfil(${idx})">↩️ Restablecer esta versión</button>
+        </div>`;
+    document.body.appendChild(overlay);
+}
+
+// Restaura una versión anterior de perfilamiento como estado actual. Apunta
+// SIEMPRE a la fila del asesor dueño de ese snapshot (item.asesorEmail) — no a
+// "el más reciente" — para que un ADMIN pueda restaurar la versión de CUALQUIER
+// asesor sin fragmentar filas ni pisar el trabajo de otro asesor.
+// Reutiliza saveBottom(), así que el backend archiva automáticamente el estado
+// actual antes de pisarlo (mismo mecanismo de snapshot que un guardado normal)
+// — nunca se pierde nada, incluso al restaurar.
+async function restablecerVersionPerfil(idx) {
+    const item = historialSnapshotsIndexados[idx];
+    if (!item || !confirm('¿Confirmas restablecer esta versión? Se guardará como el estado actual.')) return;
+
+    const idPrometeo = obtenerCampo(currentLead, 'ID PROMETEO');
+    const user = getCurrentUser();
+    const asesorPropietario = item.asesorEmail || user.email;
+
+    const data = Object.assign({}, item.datos, { FECHA_ULT_MODIFICACION: new Date().toISOString() });
+    if (user.rol !== 'ADMIN') delete data.ACCIONES_DEFINIDAS;
+
+    const result = await saveBottom(idPrometeo, currentCampana, data, asesorPropietario);
+    if (result && result.success) {
+        document.getElementById('modalDetalleSnapshot')?.remove();
+        invalidarCacheDashboard();
+        // Recarga el lead completo (no solo currentLead parcial): para ADMIN, restaurar
+        // la versión de un asesor que no es el "más reciente" no necesariamente cambia
+        // lo que se ve en Datos/Perfilamiento (eso sigue mostrando la fila más reciente),
+        // pero sí cambia historialAsesores — recargar mantiene todos los tabs consistentes.
+        await cargarLead(idPrometeo);
+        alert('Versión restablecida correctamente.');
+    } else {
+        alert('Error al restablecer: ' + (result?.error || 'Error desconocido'));
     }
 }
 
@@ -1018,15 +1128,45 @@ function formatearFechaSimple(valor) {
     return `${dd}/${mm}/${yyyy}`;
 }
 
+// Renderiza UNA lista cronológica de interacciones (comentarios + snapshots de
+// perfilamiento) mezcladas. Los comentarios se ven como texto plano; los
+// snapshots se ven como una tarjeta clickeable que abre el detalle completo
+// (abrirDetalleSnapshot). Cada snapshot clickeable se registra en
+// historialSnapshotsIndexados con el email del asesor dueño de esa fila.
+function renderListaInteracciones(items, asesorEmail) {
+    if (!items || items.length === 0) {
+        return '<p style="color:#888; font-size:14px;">Sin interacciones registradas.</p>';
+    }
+    return items.map(it => {
+        if (it.tipo === 'perfil_snapshot') {
+            const idx = historialSnapshotsIndexados.length;
+            historialSnapshotsIndexados.push({ datos: it.datos, usuario: it.usuario, fecha: it.fecha, asesorEmail: asesorEmail });
+            return `
+                <div onclick="abrirDetalleSnapshot(${idx})"
+                     style="cursor:pointer; background:#f3f6ff; border:1px solid #c5cae9; border-radius:6px; padding:10px 14px; margin-bottom:6px; font-size:14px; color:#1a237e;">
+                    📝 Actualización de perfilamiento — <strong>${escapeHtml(it.usuario)}</strong>
+                    <span style="color:#888; font-size:12px;"> · ${formatearFechaBottom(it.fecha)}</span>
+                    <span style="float:right; color:#1a237e; font-size:12px;">Ver detalle →</span>
+                </div>`;
+        }
+        return `
+            <div style="padding:8px 4px; font-size:14px; color:#333; border-bottom:1px solid #f0f0f0;">
+                <span style="color:#888;">[${formatearFechaBottom(it.fecha)}]</span> <strong>${escapeHtml(it.usuario)}</strong>: ${escapeHtml(it.texto)}
+            </div>`;
+    }).join('');
+}
+
 // Vista de historial:
 // - ASESOR: ve solo su propio historial (currentLead ya viene filtrado a su fila desde el backend).
 // - ADMIN: ve TODAS las filas de gestión de este lead, una por cada asesor que lo ha trabajado,
 //   ordenadas de la más reciente a la más antigua.
+// Muestra comentarios y snapshots de perfilamiento mezclados en orden cronológico.
 function renderHistorial() {
     const container = document.getElementById('historialContent');
     if (!container || !currentLead) return;
 
     const user = getCurrentUser();
+    historialSnapshotsIndexados = []; // se reconstruye en cada render
 
     if (user.rol === 'ADMIN' && historialAsesores) {
         if (historialAsesores.length === 0) {
@@ -1038,26 +1178,25 @@ function renderHistorial() {
             .slice()
             .sort((a, b) => new Date(b.FECHA_ULT_MODIFICACION || 0) - new Date(a.FECHA_ULT_MODIFICACION || 0))
             .forEach(fila => {
-                const historialTexto = fila.COMENTARIOS_HISTORIAL || 'Sin comentarios registrados.';
-                const comentPerfil = fila.COMENTARIOS_PERFIL || '';
+                const items = parsearHistorial(fila.COMENTARIOS_HISTORIAL);
                 html += `
                     <div style="background:white; padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); margin-bottom:16px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:8px;">
                             <strong style="color:#1a237e;">👤 ${escapeHtml(fila.ASESOR_NOMBRE || fila.ASESOR_EMAIL || 'Asesor desconocido')}</strong>
                             <span style="font-size:12px;color:#888;">Última actualización: ${escapeHtml(formatearFechaBottom(fila.FECHA_ULT_MODIFICACION))}</span>
                         </div>
-                        ${comentPerfil ? `<p style="margin-bottom:10px;"><strong style="font-size:13px;color:#555;">Comentarios de perfilamiento:</strong><br>${escapeHtml(comentPerfil)}</p>` : ''}
-                        <div style="white-space:pre-wrap; font-size:14px; line-height:1.6; color:#333;">${escapeHtml(historialTexto)}</div>
+                        ${renderListaInteracciones(items, fila.ASESOR_EMAIL)}
                     </div>`;
             });
         container.innerHTML = html;
         return;
     }
 
-    const historial = currentLead['COMENTARIOS_HISTORIAL'] || 'Sin comentarios ni interacciones registradas en la bitácora.';
+    const items = parsearHistorial(currentLead['COMENTARIOS_HISTORIAL']);
+    const asesorEmailPropio = currentLead['ASESOR_EMAIL'] || user.email;
     container.innerHTML = `
-        <div style="background:white; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); white-space:pre-wrap; font-size:14px; line-height:1.6; color:#333;">
-            ${escapeHtml(historial)}
+        <div style="background:white; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+            ${renderListaInteracciones(items, asesorEmailPropio)}
         </div>
     `;
 }

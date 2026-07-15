@@ -1,7 +1,7 @@
 // API ===============================================
 
 /** Ejecuta una acción en el backend. Adjunta automáticamente el token de sesión
- *  (si existe) para que el backend pueda validar quién hace la llamada. */
+ * (si existe) para que el backend pueda validar quién hace la llamada. */
 async function callAPI(action, data = {}) {
   try {
     const sessionToken = (typeof getSessionToken === 'function') ? getSessionToken() : '';
@@ -20,8 +20,8 @@ async function callAPI(action, data = {}) {
 // AUTENTICACIÓN Y CATÁLOGOS ==================================
 
 /** Login de usuario */
-async function login(email, password) {
-  return await callAPI('login', { email, password });
+async function login(usuario, password) {
+  return await callAPI('login', { usuario, password });
 }
 
 /** Obtiene catálogos (boletas, beneficios) */
@@ -104,12 +104,6 @@ async function unifyIds(idPrincipal, idsSecundarios, campana, datosPredominantes
 // SOLICITUDES DE CAMBIO DE BOLETA ============================
 
 /** Crea una solicitud de cambio de escala */
-/** Crea una solicitud de cambio de escala.
- *  Recibe el payload ya armado por lead-detail.js (idPrometeo, campana, asesorEmail,
- *  asesorNombre, boletaActual, beneficioActual, boletaConBecaActual, boletaSolicitada,
- *  beneficioSolicitado, boletaConBecaSolicitada) y lo reenvía tal cual — antes esta
- *  función esperaba parámetros posicionales que no coincidían con cómo se la llamaba,
- *  por lo que ID_PROMETEO y CAMPANA llegaban corruptos/vacíos al backend. */
 async function createSolicitud(payload) {
   return await callAPI('createSolicitud', payload);
 }
@@ -124,9 +118,7 @@ async function getSolicitudesPendientesCampana(campana) {
   return await callAPI('getSolicitudesPendientesCampana', { campana });
 }
 
-/** Obtiene la solicitud pendiente (si existe) de un lead específico.
- *  NOTA: esta función faltaba por completo — lead-detail.js la llamaba
- *  sin que existiera, por lo que cargarSolicitudPendiente() nunca funcionaba. */
+/** Obtiene la solicitud pendiente (si existe) de un lead específico. */
 async function getSolicitudPendiente(idPrometeo, campana) {
   return await callAPI('getSolicitudPendiente', { idPrometeo, campana });
 }
