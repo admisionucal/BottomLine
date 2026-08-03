@@ -456,7 +456,7 @@ function renderDetalleCC() {
                     </label>
                     <label class="cc-campo">Modalidad
                         <select id="ccModalidad">
-                            ${['Presencial', 'Semi-Presencial', 'Virtual'].map(m =>
+                            ${['Semi-Presencial', 'Virtual'].map(m =>
                                 `<option value="${m}" ${m === modalidadActual ? 'selected' : ''}>${m}</option>`
                             ).join('')}
                         </select>
@@ -478,7 +478,7 @@ function renderDetalleCC() {
                     </label>
                     <label class="cc-campo">Tipo de Ingreso
                         <select id="ccTipoIngreso">
-                            <option value="regular" ${tipoIngresoActual === 'regular' ? 'selected' : ''}>Regular</option>
+                            <option value="regular" ${tipoIngresoActual === 'regular' ? 'selected' : ''}>Ordinario</option>
                             <option value="con_convalidacion" ${tipoIngresoActual === 'con_convalidacion' ? 'selected' : ''}>Traslado con Convalidación</option>
                             <option value="sin_convalidacion" ${tipoIngresoActual === 'sin_convalidacion' ? 'selected' : ''}>Traslado sin Convalidación</option>
                         </select>
