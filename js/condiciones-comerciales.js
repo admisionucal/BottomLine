@@ -576,9 +576,9 @@ function renderDetalleCC() {
                     ${sol.MOTIVO_RECHAZO ? '<br><b>Motivo:</b> ' + escapeHtml(sol.MOTIVO_RECHAZO) : ''}
                 </p>` : `
                 <div style="display:flex; gap:10px; margin-top:20px;">
-                    <button class="btn-guardar" id="btnEnviarCC" style="flex:1;" ${sol.STATUS !== 'PENDIENTE' ? 'disabled' : ''}>
-                        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">send</span>
-                        ${sol.STATUS === 'ENVIADO' ? 'Ya enviado' : sol.STATUS === 'PROCESANDO' ? 'Enviando…' : 'Enviar'}
+                    <button class="btn-guardar" id="btnEnviarCC" style="flex:1;" ${sol.STATUS === 'PROCESANDO' ? 'disabled' : ''}>
+                        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">${sol.STATUS === 'ENVIADO' ? 'forward_to_inbox' : 'send'}</span>
+                        ${sol.STATUS === 'ENVIADO' ? 'Reenviar' : sol.STATUS === 'PROCESANDO' ? 'Enviando…' : 'Enviar'}
                     </button>
                     <button class="btn-secundario" id="btnRechazarCC" style="flex:0 0 auto; padding:0 16px;" ${sol.STATUS !== 'PENDIENTE' ? 'disabled' : ''}>
                         Rechazar
@@ -702,7 +702,7 @@ function actualizarPreviewCC() {
         : tipoRef === 'REFERENTE'
             ? state.personasReferido.length === 0
             : false;
-    if (btnEnviar && state.solicitudActual.STATUS === 'PENDIENTE') {
+    if (btnEnviar && (state.solicitudActual.STATUS === 'PENDIENTE' || state.solicitudActual.STATUS === 'ENVIADO')) {
         btnEnviar.disabled = !datosCC.datosCompletos || faltanPersonas;
         if (msg) {
             if (!datosCC.datosCompletos) {
@@ -866,12 +866,16 @@ async function fetchAssetBase64(path) {
 async function enviarCC() {
     const btn = document.getElementById('btnEnviarCC');
     const msg = document.getElementById('ccEnviarMsg');
+    const esReenvio = state.solicitudActual.STATUS === 'ENVIADO';
 
-    if (!confirm('¿Confirmas el envío de las Condiciones Comerciales con los datos mostrados en la vista previa?')) return;
+    const textoConfirmacion = esReenvio
+        ? '¡Atención! Esta solicitud ya fue enviada antes. ¿Confirmas que quieres REENVIAR las Condiciones Comerciales con los datos mostrados en la vista previa?'
+        : '¿Confirmas el envío de las Condiciones Comerciales con los datos mostrados en la vista previa?';
+    if (!confirm(textoConfirmacion)) return;
 
     btn.disabled = true;
     msg.style.color = '#555';
-    msg.textContent = 'Enviando...';
+    msg.textContent = esReenvio ? 'Reenviando...' : 'Enviando...';
 
     try {
         const datosCC = construirDatosCC(state.leadActual, state.solicitudActual.CAMPANA, state.overrides);
@@ -907,6 +911,7 @@ async function enviarCC() {
 
         const result = await callAPI('enviarCC', {
             idSolicitud: state.solicitudActual.ID_SOLICITUD,
+            reenvio: esReenvio,
             htmlFinal,
             lineamientosBase64,
             lineamientosNombre,
@@ -924,7 +929,8 @@ async function enviarCC() {
         });
 
         if (result.success) {
-            Toast?.show ? Toast.show('Condiciones Comerciales enviadas correctamente') : alert('Enviado correctamente');
+            const mensajeExito = esReenvio ? 'Condiciones Comerciales reenviadas correctamente' : 'Condiciones Comerciales enviadas correctamente';
+            Toast?.show ? Toast.show(mensajeExito) : alert(mensajeExito);
             state.solicitudActual.STATUS = 'ENVIADO';
             invalidarCacheSolicitudesCC();
             renderDetalleCC();

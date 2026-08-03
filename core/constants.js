@@ -3,7 +3,7 @@
 // ================================================================
 
 // ----- URL DE LA API (Google Apps Script) -----
-export const API_URL = 'https://script.google.com/macros/s/AKfycbyycg4oRJCs27qeaXKk0sxZkpB6DpEMjzlRgoY4fSmUakz8bRGgW79kKHC67M_kFCv28A/exec';
+export const API_URL = 'https://script.google.com/macros/s/AKfycbz8mTjzh6q23_-fyqxzmDl6tBkZZG5nBG1lnDEBVaSuvQHZunz2aHckQrLLaXqII8Ts2g/exec';
 
 // ----- MAPEO DE COLUMNAS DE GOOGLE SHEETS -----
 // Centraliza todos los nombres de columnas para evitar strings mágicos.
