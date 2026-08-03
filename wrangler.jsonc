@@ -1,0 +1,7 @@
+{
+  "name": "bottomline", // el nombre de tu proyecto
+  "compatibility_date": "2026-07-09", // la fecha de hoy
+  "assets": {
+    "directory": "./" // carpeta donde está tu index.html (./ si está en la raíz)
+  }
+}

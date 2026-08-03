@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comercial Pregrado - Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="core/ui-kit.css">
+    <style>
+        /* Estilos específicos del login */
+        .login-wrapper {
+            position: relative;
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            background-color: #ffffff;
+            background-image: url('assets/logo.png');
+            background-repeat: no-repeat;
+            background-position: 35% center;
+            background-size: contain;
+        }
+
+        .panel-left {
+            width: 55%;
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        .title-desktop {
+            font-family: 'Hanken Grotesk', sans-serif;
+            font-size: 56px;
+            color: var(--color-primary);
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .panel-right {
+            width: 45%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            position: relative;
+        }
+
+        .arrow-divider {
+            position: absolute;
+            left: -27px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 54px;
+            height: 54px;
+            background: var(--color-primary);
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(0, 64, 161, 0.3);
+            z-index: 10;
+        }
+
+        .glass-card {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 24px;
+            padding: 45px 35px;
+            box-shadow: 0 0 25px 5px rgba(0, 64, 161, 0.18);
+            position: relative;
+        }
+
+        .glass-card h2 {
+            font-family: 'Hanken Grotesk', sans-serif;
+            font-size: 30px;
+            color: var(--color-primary);
+            text-align: center;
+            margin-bottom: 30px;
+            font-weight: 700;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 20px;
+            border: 1px solid rgba(0, 64, 161, 0.2);
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 30px;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            border-color: var(--color-primary);
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(0, 64, 161, 0.15);
+        }
+
+        .password-wrapper {
+            position: relative;
+        }
+
+        .password-wrapper input {
+            padding-right: 48px;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #777777;
+            font-size: 20px;
+            user-select: none;
+        }
+
+        .toggle-password:hover {
+            color: var(--color-primary);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 16px;
+            background: var(--color-primary);
+            color: #ffffff;
+            border: none;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease;
+            margin-top: 10px;
+            box-shadow: 0 4px 12px rgba(0, 64, 161, 0.25);
+        }
+
+        .btn-login:hover {
+            background: var(--color-primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn-login:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-msg {
+            color: var(--color-danger);
+            font-size: 13px;
+            text-align: center;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .header-mobile {
+            display: none;
+        }
+
+        @media (max-width: 800px) {
+            .login-wrapper {
+                flex-direction: column;
+                background-image: none;
+                padding-top: 0;
+            }
+
+            .header-mobile {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                width: 100%;
+                padding: 0 24px;
+                margin-top: -20px;
+                z-index: 5;
+            }
+
+            .header-mobile .title-mobile {
+                font-family: 'Hanken Grotesk', sans-serif;
+                font-size: 40px;
+                color: var(--color-primary);
+                font-weight: 700;
+                line-height: 1.2;
+            }
+
+            .header-mobile .logo-mobile {
+                max-width: 250px;
+                max-height: 250px;
+                object-fit: contain;
+            }
+
+            .panel-left { display: none; }
+            .panel-right {
+                width: 100%;
+                flex: 1;
+                padding: 15px 20px 20px 20px;
+                align-items: flex-start;
+            }
+
+            .glass-card {
+                max-width: 100%;
+                margin-top: -31px;
+            }
+
+            .arrow-divider {
+                left: 50%;
+                top: -20px;
+                transform: translateX(-50%);
+            }
+
+            .arrow-divider .icon-right { display: none; }
+            .arrow-divider .icon-down { display: inline-block; }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrapper">
+        <!-- Cabecera móvil -->
+        <header class="header-mobile">
+            <div class="title-mobile">Comercial<br>Pregrado</div>
+            <img src="assets/logo.png" alt="Logo" class="logo-mobile" onerror="this.style.display='none'">
+        </header>
+
+        <!-- Panel izquierdo (escritorio) -->
+        <div class="panel-left">
+            <h1 class="title-desktop">Comercial<br>Pregrado</h1>
+        </div>
+
+        <!-- Panel derecho (formulario) -->
+        <div class="panel-right">
+            <div class="glass-card">
+                <div class="arrow-divider">
+                    <span class="material-symbols-outlined icon-right">arrow_forward</span>
+                </div>
+
+                <h2>Conéctate</h2>
+
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="usuario">Usuario</label>
+                        <input type="text" id="usuario" placeholder="Ingrese su usuario" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Contraseña</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="password" placeholder="••••••••" required>
+                            <span class="material-symbols-outlined toggle-password" id="togglePassword">visibility</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-login" id="loginBtn">Ingresar</button>
+                    <div class="error-msg" id="errorMsg">Credenciales incorrectas</div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts modulares -->
+    <script type="module" src="js/index.js"></script>
+</body>
+</html>

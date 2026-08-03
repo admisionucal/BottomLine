@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comercial Pregrado - Unificar IDs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="core/ui-kit.css">
+    <style>
+        .container {
+            width: 95%;
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 24px 0;
+        }
+
+        .campaña-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .campaña-selector select {
+            padding: 6px 12px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius);
+            font-size: 13px;
+            background: white;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box select,
+        .search-box input {
+            padding: 8px 14px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius);
+            font-size: 14px;
+            background: white;
+        }
+
+        .search-box select:focus,
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+        }
+
+        .search-box button {
+            padding: 8px 24px;
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .search-box button:hover { opacity: 0.8; }
+
+        .seleccion-resumen {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 4px;
+        }
+
+        .sel-item {
+            position: relative;
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: #f8f9fc;
+            border: 1px solid var(--color-border);
+            font-size: 13px;
+        }
+
+        .sel-item.base {
+            background: rgba(0, 64, 161, 0.06);
+            border-left: 4px solid var(--color-primary);
+        }
+
+        .sel-item .tag-base {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            background: var(--color-primary);
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            border-radius: 4px;
+            padding: 2px 7px;
+            text-transform: uppercase;
+        }
+
+        .sel-item strong {
+            color: var(--color-primary);
+            display: block;
+        }
+
+        .sel-item .nombre {
+            color: #555;
+        }
+
+        .campo-predominante {
+            padding: 16px;
+            background: #f8f9fc;
+            border-radius: 8px;
+            border: 1px solid var(--color-border);
+            margin-top: 12px;
+        }
+
+        .campo-predominante h4 {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 12px;
+        }
+
+        .campo-predominante .row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .campo-predominante .row label {
+            font-weight: 500;
+            font-size: 13px;
+            color: #333;
+            min-width: 160px;
+        }
+
+        .campo-predominante .row select {
+            padding: 6px 12px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius);
+            font-size: 13px;
+            background: white;
+            min-width: 220px;
+        }
+
+        .btn-unificar-final {
+            padding: 10px 32px;
+            background: var(--color-accent);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+
+        .btn-unificar-final:hover { background: var(--color-accent-hover); }
+        .btn-unificar-final:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-cancelar {
+            padding: 10px 32px;
+            background: #777;
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+
+        .btn-cancelar:hover { background: #555; }
+
+        .error-validacion {
+            background: #ffebee;
+            border-left: 4px solid var(--color-danger);
+            color: #b71c1c;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+
+        .badge-estado {
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-estado.activo {
+            background: #c8e6c9;
+            color: #1b5e20;
+        }
+
+        .badge-estado.huerfano {
+            background: #ffe0b2;
+            color: #bf360c;
+        }
+
+        tbody tr.marcado { background: #f3f6ff; }
+
+        @media (max-width: 768px) {
+            .container { padding: 12px; }
+            .search-box { flex-direction: column; align-items: stretch; }
+            .campo-predominante .row { flex-direction: column; align-items: flex-start; gap: 4px; }
+            .campo-predominante .row label { min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-area">
+
+            <div class="container">
+                <div id="unifApp">
+                <div class="campaña-selector">
+                    <label>CAMPAÑA</label>
+                    <select id="selectCampana"></select>
+                </div>
+
+                <div class="card">
+                    <h3 style="margin-bottom:12px;">
+                        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">search</span> Buscar leads
+                    </h3>
+                    <div class="search-box">
+                        <select id="searchType">
+                            <option value="celular">Teléfono / Celular</option>
+                            <option value="nombre">Nombre</option>
+                            <option value="dni">DNI</option>
+                        </select>
+                        <input type="text" id="searchValue" placeholder="Escribe el valor a buscar...">
+                        <button id="btnBuscar">Buscar</button>
+                    </div>
+                    <div id="resultadosWrap" style="margin-top:12px;">
+                        <div class="loading" id="resultadosEmpty">Realiza una búsqueda para encontrar leads</div>
+                        <div class="table-wrap" id="resultadosTableWrap" style="display:none;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width:36px;"></th>
+                                        <th>ID Prometeo</th>
+                                        <th>Nombre</th>
+                                        <th>DNI</th>
+                                        <th>Celular</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resultadosBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" id="seleccionCard" style="display:none;">
+                    <h3 style="margin-bottom:12px;">
+                        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">push_pin</span> Confirmar unificación
+                    </h3>
+                    <div class="seleccion-resumen" id="resumenSeleccion"></div>
+                    <div id="errorValidacion"></div>
+
+                    <div class="campo-predominante" id="predominanteContainer" style="display:none;">
+                        <h4><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">settings</span> Datos predominantes</h4>
+                        <div class="row">
+                            <label>Comentarios/Historial:</label>
+                            <select id="historialSelect">
+                                <option value="ambos" selected>Combinar todos los historiales</option>
+                                <option value="id1">Solo historial del Principal (activo)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                        <button class="btn-unificar-final" id="btnUnificar" disabled>
+                            <span class="material-symbols-outlined" style="font-size:16px;">link</span> Unificar seleccionados
+                        </button>
+                        <button class="btn-cancelar" id="btnCancelar">Cancelar</button>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="core/utils.js"></script>
+    <script type="module" src="core/constants.js"></script>
+    <script type="module" src="core/components.js"></script>
+    <script type="module" src="js/sidebar.js"></script>
+    <script type="module" src="js/unificar-ids.js"></script>
+</body>
+</html>
+

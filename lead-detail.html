@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comercial Pregrado - Lead Detail</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="core/ui-kit.css">
+    <style>
+        /* Estilos específicos de lead-detail */
+        .container {
+            width: 95%;
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 24px 0;
+        }
+
+        .lead-header {
+            background: white;
+            padding: 18px 22px;
+            border-radius: 10px;
+            border: 1px solid #e8eaf6;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .lead-header .info h2 {
+            font-size: 22px;
+            color: var(--color-primary);
+        }
+
+        .lead-header .info .sub {
+            color: #777;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .lead-header .info .sub span {
+            background: #e8eaf6;
+            padding: 2px 12px;
+            border-radius: 12px;
+            margin-right: 8px;
+        }
+
+        .lead-header .info .sub .colegio-tag {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .status-large {
+            padding: 8px 24px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .status-large.vp { background: #c8e6c9; color: #1b5e20; }
+        .status-large.pp { background: #bbdefb; color: #0d47a1; }
+        .status-large.pago { background: #ffecb3; color: #e65100; }
+        .status-large.perdido { background: #ffcdd2; color: #b71c1c; }
+        .status-large.vll { background: #ffe0b2; color: #bf360c; }
+        .status-large.black { background: #212121; color: white; }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            background: white;
+            border-radius: 10px 10px 0 0;
+            padding: 0 4px;
+            border-bottom: 2px solid var(--color-border);
+            border-left: 1px solid #e8eaf6;
+            border-right: 1px solid #e8eaf6;
+            border-top: 1px solid #e8eaf6;
+        }
+
+        .tabs button {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            font-size: 14px;
+            font-weight: 500;
+            color: #777;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tabs button.active {
+            color: var(--color-primary);
+            border-bottom-color: var(--color-primary);
+        }
+
+        .tabs button:hover {
+            color: var(--color-primary);
+        }
+
+        .tab-content {
+            background: white;
+            padding: 24px;
+            border-radius: 0 0 10px 10px;
+            border-left: 1px solid #e8eaf6;
+            border-right: 1px solid #e8eaf6;
+            border-bottom: 1px solid #e8eaf6;
+            min-height: 300px;
+        }
+
+        .tab-content[style*="display:none"] { display: none; }
+
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px 32px;
+        }
+
+        .grid-2col .campo {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .grid-2col .campo label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .grid-2col .campo select,
+        .grid-2col .campo input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            font-size: 15px;
+            background: white;
+            color: #1a1a1a;
+            font-family: var(--font-family);
+        }
+
+        .grid-2col .campo select:focus,
+        .grid-2col .campo input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+        }
+
+        .grid-2col .campo .value {
+            font-size: 16px;
+            color: #1a1a1a;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .status-display {
+            padding: 14px 18px;
+            background: #f8f9fc;
+            border-radius: 8px;
+            border: 1px solid var(--color-border);
+            margin-bottom: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px 24px;
+        }
+
+        .status-display .label {
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .status-display .badge {
+            margin-left: 8px;
+            font-size: 14px;
+            padding: 6px 16px;
+        }
+
+        .campo-editable-select,
+        .campo-editable-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #90caf9;
+            background: #f3f8ff;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #1a1a1a;
+            font-family: inherit;
+        }
+
+        .campo-editable-select:focus,
+        .campo-editable-input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            background: white;
+        }
+
+        .combo-buscable {
+            position: relative;
+        }
+
+        .combo-buscable-input {
+            padding-right: 34px !important;
+        }
+
+        .combo-buscable-arrow {
+            position: absolute;
+            right: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            color: #000;
+            pointer-events: none;
+        }
+
+        .combo-buscable-panel {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            max-height: 220px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #90caf9;
+            border-radius: 6px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+            z-index: 50;
+        }
+
+        .combo-buscable-panel.open {
+            display: block;
+        }
+
+        .combo-buscable-option {
+            padding: 8px 12px;
+            font-size: 14px;
+            color: #1a1a1a;
+            cursor: pointer;
+        }
+
+        .combo-buscable-option:hover,
+        .combo-buscable-option.activa {
+            background: #f3f8ff;
+            color: var(--color-primary);
+        }
+
+        .combo-buscable-empty {
+            padding: 8px 12px;
+            font-size: 13px;
+            color: #999;
+        }        
+
+        .btn-guardar {
+            padding: 10px 32px;
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+
+        .btn-guardar:hover { opacity: 0.8; }
+        .btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-solicitar {
+            padding: 6px 20px;
+            border: none;
+            background: var(--color-primary);
+            color: white;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .btn-solicitar:hover { opacity: 0.8; }
+        .btn-solicitar.rojo { background: var(--color-danger); }
+
+        .comentarios-section {
+            margin-top: 24px;
+            border-top: 1px solid #eee;
+            padding-top: 18px;
+        }
+
+        .comentarios-section h4 {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 12px;
+        }
+
+        .comentario-item {
+            padding: 10px 16px;
+            background: #f8f9fc;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .comentario-item .fecha {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .comentario-item .autor {
+            font-weight: 500;
+            color: var(--color-primary);
+            margin-right: 12px;
+        }
+
+        .comentario-nuevo {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .comentario-nuevo input {
+            flex: 1;
+            padding: 10px 16px;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .comentario-nuevo input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+        }
+
+        .comentario-nuevo button {
+            padding: 10px 24px;
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .comentario-nuevo button:hover { opacity: 0.8; }
+
+        .table-historial {
+            width: 100%;
+            font-size: 13px;
+            border-collapse: collapse;
+        }
+
+        .table-historial th {
+            text-align: center;
+            vertical-align: middle;
+            padding: 10px 14px;
+            background: #f8f9fc;
+            border-bottom: 2px solid #e8eaf6;
+            font-size: 12px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            color: #444;
+            font-weight: 600;
+        }
+
+        .table-historial td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .table-historial tr:hover { background: #fafbff; }
+
+        .overlay-guardando {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .overlay-guardando.show { display: flex; }
+
+        .overlay-guardando-box {
+            background: white;
+            padding: 26px 42px;
+            border-radius: 14px;
+            box-shadow: 0 10px 34px rgba(0, 0, 0, 0.28);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--color-primary);
+        }
+
+        .overlay-guardando-emoji {
+            font-size: 26px;
+            animation: guardando-pulso 0.9s ease-in-out infinite;
+        }
+
+        @keyframes guardando-pulso {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.18); }
+        }
+
+        .aprobacion-box {
+            padding: 14px 18px;
+            background: #fff8e1;
+            border: 1px solid #ffecb3;
+            border-radius: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px 16px;
+            margin-top: 16px;
+        }
+
+        .aprobacion-box .label {
+            font-weight: 600;
+            font-size: 14px;
+            color: #e65100;
+        }
+
+        .aprobacion-box .estado {
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .aprobacion-box .estado.pendiente {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .aprobacion-box .estado.aprobado {
+            background: #e8f5e9;
+            color: #1b5e20;
+        }
+
+        .aprobacion-box .estado.rechazado {
+            background: #ffcdd2;
+            color: #b71c1c;
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 12px; }
+            .grid-2col { grid-template-columns: 1fr; }
+            .lead-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .tabs button { padding: 10px 16px; font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-area">
+
+            <div class="overlay-guardando" id="overlayGuardando">
+                <div class="overlay-guardando-box">
+                    <span class="overlay-guardando-emoji"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">save</span></span>
+                    <span>Guardando...</span>
+                </div>
+            </div>
+
+            <div class="container">
+                <!-- LEAD HEADER -->
+                <div class="lead-header" id="leadHeader">
+                    <div class="info">
+                        <h2 id="leadNombre">Cargando...</h2>
+                        <div class="sub" id="leadSub">
+                            <span id="leadId">ID: ---</span>
+                            <span id="leadCarrera">---</span>
+                            <span id="leadModalidad">---</span>
+                            <span id="leadAsesor">---</span>
+                        </div>
+                    </div>
+                    <div class="status-large vp" id="statusBadge">Cargando...</div>
+                </div>
+
+                <!-- TABS -->
+                <div class="tabs">
+                    <button class="active" data-tab="vista1">Datos</button>
+                    <button data-tab="vista2">Perfilamiento</button>
+                    <button data-tab="historial">Historial</button>
+                    <button data-tab="pagos">Pagos</button>
+                </div>
+
+                <div class="tab-content" id="tab-vista1">
+                    <div id="vista1Content"><div class="loading">Cargando datos...</div></div>
+                </div>
+
+                <div class="tab-content" id="tab-vista2" style="display:none;">
+                    <div id="vista2Content"><div class="loading">Cargando datos...</div></div>
+                </div>
+
+                <div class="tab-content" id="tab-historial" style="display:none;">
+                    <div id="historialContent"><div class="loading">Cargando historial...</div></div>
+                </div>
+
+                <div class="tab-content" id="tab-pagos" style="display:none;">
+                    <div id="pagosContent"><div class="loading">Cargando pagos...</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de solicitud de Condiciones Comerciales -->
+    <div class="modal-overlay" id="solicitudCCModal">
+        <div class="modal-box modal-box-detalle" style="max-width:520px;">
+            <button class="modal-close-x" id="solicitudCCModalClose"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
+            <h4 style="margin-bottom:2px;">Condiciones Comerciales</h4>
+            <p style="color:#888; font-size:13px; margin-bottom:16px;">Adjunta los documentos del alumno (opcional) y solicita el envío.</p>
+
+            <div style="display:flex; flex-direction:column; gap:14px;">
+                <div>
+                    <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">DNI (puedes subir 1 o 2 archivos, ej. anverso y reverso)</label>
+                    <input type="file" id="ccArchivoDni" accept=".pdf,.png,.jpg,.jpeg" multiple style="display:none;">
+                    <button type="button" class="btn-guardar" id="ccArchivoDniBtn" style="padding:6px 14px; font-size:12px;">Seleccionar archivo(s)</button>
+                    <div id="ccArchivoDniLista" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px;"></div>
+                </div>
+                <div>
+                    <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Certificado de Estudios</label>
+                    <input type="file" id="ccArchivoCertificado" accept=".pdf,.png,.jpg,.jpeg" style="display:none;">
+                    <button type="button" class="btn-guardar" id="ccArchivoCertificadoBtn" style="padding:6px 14px; font-size:12px;">Seleccionar archivo</button>
+                    <div id="ccArchivoCertificadoLista" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px;"></div>
+                </div>
+                <div>
+                    <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Boleta de Procedencia</label>
+                    <input type="file" id="ccArchivoBoletaProcedencia" accept=".pdf,.png,.jpg,.jpeg" style="display:none;">
+                    <button type="button" class="btn-guardar" id="ccArchivoBoletaProcedenciaBtn" style="padding:6px 14px; font-size:12px;">Seleccionar archivo</button>
+                    <div id="ccArchivoBoletaProcedenciaLista" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px;"></div>
+                </div>
+
+                <div>
+                    <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Correos adicionales (opcional)</label>
+                    <div id="ccCorreosLista" style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px;"></div>
+                    <div style="display:flex; gap:8px;">
+                        <input type="email" id="ccNuevoCorreoInput" class="campo-editable-input" placeholder="correo@ejemplo.com" style="flex:1;">
+                        <button type="button" class="btn-guardar" id="ccAgregarCorreoBtn" style="padding:8px 14px; font-size:13px;">Agregar</button>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn-guardar" style="background:#777; flex:1;" id="ccCancelarBtn">Cancelar</button>
+                <button class="btn-guardar" style="flex:1;" id="ccSolicitarBtn">Solicitar</button>
+            </div>
+            <span id="ccSolicitudMsg" style="display:block; margin-top:8px; font-size:13px; text-align:center;"></span>
+        </div>
+    </div>
+
+    <!-- Modal de detalle de snapshot -->
+    <div class="modal-overlay" id="snapshotModal">
+        <div class="modal-box modal-box-detalle">
+            <button class="modal-close-x" id="snapshotModalClose"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
+            <h4 id="snapshotFecha"></h4>
+            <div id="snapshotContenido"></div>
+            <button class="btn-guardar" id="snapshotRestaurarBtn">Restablecer esta versión</button>
+        </div>
+    </div>
+
+    <script type="module" src="core/utils.js"></script>
+    <script type="module" src="core/constants.js"></script>
+    <script type="module" src="core/components.js"></script>
+    <script type="module" src="js/sidebar.js"></script>
+    <script type="module" src="js/lead-detail.js"></script>
+</body>
+</html>

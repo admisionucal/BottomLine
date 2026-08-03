@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comercial Pregrado - Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="core/ui-kit.css">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        /* Estilos específicos del dashboard */
+        .container { width: 98%; max-width: 2000px; margin: 0 auto; padding: 10px 0; }
+
+        .table-controls-sticky {
+            position: sticky;
+            top: 0;
+            z-index: 8;
+            background: white;
+            transition: transform 0.25s ease;
+        }
+        .table-controls-sticky.oculto {
+            transform: translateY(-100%);
+        }
+
+        .table-toolbar {
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--color-border);
+            flex-wrap: wrap;
+            gap: 10px;
+            background: white;
+        }
+
+        .table-toolbar .left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .table-toolbar .left .badge {
+            background: #e8eaf6;
+            padding: 4px 14px;
+            border-radius: 16px;
+            font-size: 13px;
+            color: var(--color-primary);
+        }
+
+        .filtros-panel {
+            display: none;
+            position: relative;
+            z-index: 5;
+            background: white;
+            border-top: 1px solid var(--color-border);
+            padding: 0 20px;
+        }
+
+        .filtros-panel.open {
+            display: block;
+            padding: 4px 20px 10px;
+        }
+
+        .pagination {
+            padding: 14px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-top: 1px solid var(--color-border);
+        }
+
+        .pagination .pages {
+            display: flex;
+            gap: 6px;
+        }
+
+        .pagination .pages button {
+            min-width: 30px;
+            height: 30px;
+            padding: 0 8px;
+            border: 1px solid var(--color-border);
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .pagination .pages button.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+        }
+
+        .pagination .pages button:hover:not(.active) {
+            background: #f0f0f0;
+        }
+
+        .view { display: none; }
+        .view#view-bottomline { display: block; }
+
+        #lastUpdate {
+            position: fixed;
+            bottom: 14px;
+            right: 20px;
+            background: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #888;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            z-index: 20;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+
+        /* Badge de notificaciones */
+        .cal-trigger-badge {
+            background: var(--color-accent);
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 10px;
+            padding: 2px 8px;
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <!-- Sidebar se inyecta dinámicamente -->
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-area">
+            <!-- Header se inyecta dinámicamente -->
+            
+            <div class="container">
+                <!-- ===== VISTA: USUARIO ===== -->
+                <div class="view" id="view-usuario">
+                    <div class="loading" id="view-usuario-loading">Cargando perfil…</div>
+                </div>
+
+                <!-- ===== VISTA: ASISTENCIA ===== -->
+                <div class="view" id="view-asistencia" style="display:none;">
+                    <div class="loading" id="view-asistencia-loading">Cargando módulo de asistencia…</div>
+                </div>
+
+                <!-- ===== VISTA: CALENDARIO DE PPs ===== -->
+                <div class="view" id="view-calendario" style="display:none;">
+                    <div class="cal-page-card">
+                        <div class="cal-page-header">
+                            <strong><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">calendar_today</span> Calendario de PPs</strong>
+                            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <div class="cal-view-toggle" id="calViewToggle">
+                                    <button type="button" data-vista="mes" class="activo" onclick="cambiarVistaCalendario('mes')">Mes</button>
+                                    <button type="button" data-vista="ano" onclick="cambiarVistaCalendario('ano')">Año</button>
+                                </div>
+                                <button class="btn-export" onclick="exportarCalendarioActual()" id="btnExportarCalendario"><span class="material-symbols-outlined" style="font-size:16px;">download</span> Exportar</button>
+                            </div>
+                        </div>
+                        <div class="cal-page-content">
+                            <div class="cal-page-body" id="calendarioPPContainer"></div>
+                            <div class="cal-page-leyenda" id="calLeyenda"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== VISTA: UNIFICAR IDS ===== -->
+                <div class="view" id="view-unificar" style="display:none;">
+                    <div class="loading" id="view-unificar-loading">Cargando módulo de Unificar IDs…</div>
+                </div>
+
+                <!-- ===== VISTA: CONDICIONES COMERCIALES ===== -->
+                <div class="view" id="view-cc" style="display:none;">
+                    <div class="loading" id="view-cc-loading">Cargando módulo de Condiciones Comerciales…</div>
+                </div>
+
+                <!-- ===== VISTA: PLACEHOLDER ===== -->
+                <div class="view" id="view-placeholder" style="display:none;">
+                    <div class="placeholder-box">
+                        <div class="placeholder-icon"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">construction</span></div>
+                        <h2 id="placeholderTitle">Sección</h2>
+                        <p>Esta sección estará disponible próximamente.</p>
+                    </div>
+                </div>
+
+                <!-- VISTA: BOTTOM LINE -->
+                <div class="view" id="view-bottomline" style="display:none;">
+                    <div class="table-wrapper">
+                        <div class="table-controls-sticky" id="tableControlsSticky">
+                            <div class="table-toolbar">
+                                <div class="left">
+                                    <div class="filtros-dropdown" id="filtrosDropdown">
+                                        <button type="button" class="btn-filtros" id="filtrosToggleBtn">
+                                            <span class="material-symbols-outlined" style="font-size:16px;">tune</span> Filtros
+                                        </button>
+                                    </div>
+                                    <span class="badge" id="leadCount">0 leads</span>
+                                </div>
+                                <div class="toolbar-search" id="toolbarSearchWrap">
+                                    <input type="text" id="dashboardSearchInput" placeholder="Buscar por ID Prometeo o Nombre">
+                                </div>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                    <button class="btn-export" id="btnActualizar"><span class="material-symbols-outlined" style="font-size:16px;">refresh</span> Actualizar</button>
+                                    <button class="btn-export" id="btnExportar"><span class="material-symbols-outlined" style="font-size:16px;">download</span> Exportar</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel de Filtros: fuera del contenedor sticky a propósito.
+                             Vive en flujo normal justo debajo del toolbar (que es lo
+                             único que queda fijo/auto-oculto arriba) y empuja la
+                             tabla hacia abajo al abrirse, en vez de quedar pegado
+                             mientras los datos se deslizan y se sobreponen. -->
+                        <div class="filtros-panel" id="navFiltrosPanel">
+                            <div class="filters" id="filtersContainer">
+                                <div class="filter-group">
+                                    <label class="filter-label">CARRERA</label>
+                                    <div class="multiselect" id="filterCarrera"></div>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">TIPO DE INGRESO</label>
+                                    <div class="multiselect" id="filterIngreso"></div>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">TIPO DE BECA</label>
+                                    <div class="multiselect" id="filterBeneficio"></div>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">MODALIDAD DE ESTUDIO</label>
+                                    <div class="multiselect" id="filterModalidad"></div>
+                                </div>
+                                <div class="filter-group" id="filterAsesorGroup">
+                                    <label class="filter-label">ASESOR</label>
+                                    <div class="multiselect" id="filterAsesor"></div>
+                                </div>
+                                <div class="filter-group" id="filterStatusGroup">
+                                    <label class="filter-label">STATUS DE GESTIÓN</label>
+                                    <div class="multiselect" id="filterStatus"></div>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">CAMPAÑA</label>
+                                    <div class="multiselect" id="campanaOptions"></div>
+                                    <select id="selectCampana" style="display:none;"></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="tableContainer">
+                            <div class="loading">Cargando leads...</div>
+                        </div>
+
+                        <div class="pagination">
+                            <div class="pages" id="paginationPages"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="lastUpdate">Última actualización: --</div>
+
+    <script type="module" src="core/utils.js"></script>
+    <script type="module" src="core/constants.js"></script>
+    <script type="module" src="core/components.js"></script>
+    <script type="module" src="js/sidebar.js"></script>
+    <script type="module" src="js/dashboard.js"></script>   
+</body>
+</html>
+

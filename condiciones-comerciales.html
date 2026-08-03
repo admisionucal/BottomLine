@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comercial Pregrado - Condiciones Comerciales</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="core/ui-kit.css">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        .container { width: 95%; max-width: 1800px; margin: 0 auto; padding: 24px 0; }
+
+        tbody tr.fila-cc { cursor: pointer; }
+        tbody tr.fila-cc:hover { background: #f3f6ff; }
+
+        #detalleCCContainer {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            padding: 40px;
+            text-align: center;
+            color: #888;
+        }
+
+        .cc-campo {
+            display: flex;
+            flex-direction: column;
+            font-size: 12px;
+            color: #555;
+            gap: 4px;
+        }
+        .cc-campo input, .cc-campo select {
+            padding: 7px 10px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius);
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-area">
+
+            <div class="container">
+                <div id="ccApp">
+                <!-- ===== VISTA 1: LISTADO ===== -->
+                <div id="vistaListaCC">
+                    <div class="table-toolbar">
+                        <div class="left">
+                            <h3 style="margin:0;">
+                                <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">request_quote</span>
+                                Solicitudes de Condiciones Comerciales
+                            </h3>
+                            <span class="badge" id="ccCount">0 solicitudes</span>
+                        </div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#555;cursor:pointer;">
+                                <input type="checkbox" id="chkIncluirResueltas"> Mostrar también enviadas/rechazadas
+                            </label>
+                            <button class="btn-export" id="btnActualizarCC"><span class="material-symbols-outlined" style="font-size:16px;">refresh</span> Actualizar</button>
+                            <button class="btn-export" id="btnExportarCC"><span class="material-symbols-outlined" style="font-size:16px;">download</span> Exportar</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap" id="tablaCCWrap">
+                        <div class="loading">Cargando solicitudes...</div>
+                    </div>
+                    <div class="pagination">
+                        <div class="pages" id="paginationCCPages"></div>
+                    </div>
+                </div>
+
+                <!-- ===== VISTA 2: DETALLE (se completa en la Parte 5) ===== -->
+                <div id="vistaDetalleCC" style="display:none;">
+                    <div id="detalleCCContainer">
+                        <p>Vista de detalle en construcción (Parte 5).</p>
+                        <p style="font-size:12px;">Solicitud: <span id="detalleCCId"></span></p>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="core/utils.js"></script>
+    <script type="module" src="core/constants.js"></script>
+    <script type="module" src="core/components.js"></script>
+    <script type="module" src="js/sidebar.js"></script>
+    <script type="module" src="js/condiciones-comerciales.js"></script>
+</body>
+</html>

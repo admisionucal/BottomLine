@@ -1,0 +1,742 @@
+/* ================================================================
+   UI-KIT CSS - Estilos comunes centralizados
+   ================================================================ */
+
+/* ----- 1. VARIABLES GLOBALES (Temas) ----- */
+:root {
+    /* -- Colores Primarios -- */
+    --color-primary: #0040A1;
+    --color-primary-light: #E5EEFF;
+    --color-primary-dark: #00337F;
+    --color-accent: #FB923C;
+    --color-accent-hover: #E2760F;
+    
+    /* -- Colores de Estado -- */
+    --color-success: #2e7d32;
+    --color-success-bg: #EEF8F1;
+    --color-warning: #FB923C;
+    --color-warning-bg: #FFF6E8;
+    --color-danger: #d32f2f;
+    --color-danger-bg: #FFF1F1;
+    --color-info: #1565c0;
+    --color-info-bg: #EEF5FF;
+    
+    /* -- Colores Neutros -- */
+    --color-text-primary: #1a1d29;
+    --color-text-secondary: #6b7280;
+    --color-text-muted: #8a8fa3;
+    --color-border: #e0e0e0;
+    --color-bg-page: #f5f7fa;
+    --color-bg-card: #ffffff;
+
+    /* -- Dimensiones -- */
+    --header-height: 60px;
+    --sidebar-width-collapsed: 64px;
+    --sidebar-width-expanded: 260px;
+    --radius: 8px;
+    --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.06);
+    
+    /* -- Tipografía -- */
+    --font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-family-heading: 'Hanken Grotesk', var(--font-family);
+}
+
+/* ----- 2. RESET Y ESTILOS BASE ----- */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+html, body {
+    font-family: var(--font-family);
+    background: var(--color-bg-page);
+    color: var(--color-text-primary);
+}
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    vertical-align: middle;
+    line-height: 1;
+}
+
+/* ----- 3. LAYOUT (APP SHELL) ----- */
+.app-shell { display: flex; min-height: 100vh; }
+
+/* ----- 4. SIDEBAR ----- */
+.sidebar {
+    flex-shrink: 0;
+    width: var(--sidebar-width-collapsed);
+    background: var(--color-primary-light);
+    border-right: 1px solid #c3c6d6;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: width 0.2s ease;
+    z-index: 100;
+}
+.sidebar.expanded { width: var(--sidebar-width-expanded); }
+.sidebar-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 20px;
+    min-height: var(--header-height);
+    border-bottom: 1px solid rgba(255,255,255,0.14);
+}
+.sidebar-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+.sidebar.expanded .sidebar-brand { opacity: 1; }
+.sidebar-brand-logo { width: 26px; height: 26px; object-fit: contain; flex-shrink: 0; }
+.sidebar-brand-text {
+    font-family: var(--font-family-heading);
+    color: var(--color-primary);
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1.15;
+    white-space: nowrap;
+}
+.sidebar-brand-text span { color: var(--color-accent); }
+
+.sidebar-toggle { background: none; border: none; color: var(--color-primary); font-size: 20px; cursor: pointer; flex-shrink: 0; line-height: 1; padding: 0; }
+.sidebar-nav { padding: 0 0 20px; }
+.nav-group { border-bottom: 1px solid #d7e2fb; }
+.nav-group-btn {
+    width: 100%; display: flex; align-items: center; gap: 16px;
+    background: none; border: none; border-left: 4px solid transparent;
+    color: #424654; padding: 14px 22px; cursor: pointer; font-size: 14px;
+    text-align: left; transition: background 0.15s, color 0.15s;
+}
+.nav-group-btn:hover { background: #F1F5F9; }
+.nav-group-btn.active { background: #0056D2; border-left-color: var(--color-primary); color: #EAF1FF; }
+.nav-icon { font-size: 19px; flex-shrink: 0; width: 20px; text-align: center; }
+.nav-label { flex: 1; white-space: nowrap; opacity: 0; transition: opacity 0.15s ease; }
+.sidebar.expanded .nav-label { opacity: 1; }
+.nav-caret { font-size: 11px; opacity: 0; transition: opacity 0.15s ease, transform 0.2s ease; flex-shrink: 0; }
+.sidebar.expanded .nav-caret { opacity: 0.7; }
+.nav-group.open .nav-caret { transform: rotate(90deg); }
+.nav-submenu { display: none; background: #DCE9FF; }
+.sidebar.expanded .nav-group.open .nav-submenu { display: block; }
+.nav-subitem {
+    width: 100%; display: flex; align-items: center; gap: 8px;
+    background: none; border: none; border-left: 3px solid transparent;
+    color: #424654; padding: 11px 11px 11px 53px; cursor: pointer; font-size: 13px;
+    text-align: left; transition: background 0.15s, color 0.15s;
+}
+.nav-subitem:hover { background: #eaf1ff; color: var(--color-primary); }
+.nav-subitem.active { background: rgba(0,64,161,0.12); border-left-color: var(--color-primary); color: var(--color-primary); font-weight: 600; }
+
+/* ----- FOOTER DEL SIDEBAR: foto, nombre, rol y cerrar sesión (centrado) ----- */
+.sidebar-footer {
+    margin-top: auto;
+    border-top: 1px solid #d7e2fb;
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+.sidebar-footer-user {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    text-align: center;
+}
+.sidebar-footer-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid #c3c6d6;
+    background: white;
+}
+.sidebar-footer-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    max-width: 100%;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+.sidebar.expanded .sidebar-footer-info { opacity: 1; }
+.sidebar-footer-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sidebar-footer-rol {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--color-primary);
+}
+.sidebar-footer-logout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--color-danger);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 4px;
+    border-radius: 6px;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.sidebar-footer-logout:hover { background: var(--color-danger-bg); color: #b71c1c; }
+.sidebar-footer-logout-label {
+    opacity: 0;
+    white-space: nowrap;
+    transition: opacity 0.15s ease;
+}
+.sidebar.expanded .sidebar-footer-logout-label { opacity: 1; }
+
+.sidebar-overlay { display: none; }
+@media (max-width: 768px) {
+    .sidebar.expanded { width: 250px; box-shadow: 2px 0 16px rgba(0,0,0,0.25); }
+    .sidebar.expanded ~ .main-area { margin-left: 64px; }
+    .sidebar-overlay.show { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 90; }
+}
+
+/* ----- 5. MAIN AREA & HEADER ----- */
+.main-area {
+    flex: 1;
+    min-width: 0;
+    margin-left: var(--sidebar-width-collapsed);
+    transition: margin-left 0.2s ease;
+}
+.sidebar.expanded ~ .main-area { margin-left: var(--sidebar-width-expanded); }
+
+.btn-secundario {
+    background: white;
+    border: 1px solid var(--color-border);
+    color: #555;
+    border-radius: var(--radius);
+    font-size: 13px;
+    cursor: pointer;
+}
+.btn-secundario:hover { background: #f5f5f5; }
+
+/* ----- 6. COMPONENTES DE UI REUTILIZABLES ----- */
+
+/* -- Tarjetas -- */
+.card {
+    background: var(--color-bg-card);
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid #e8eaf6;
+    margin-bottom: 16px;
+}
+
+/* -- Botones -- */
+.btn-primary {
+    padding: 10px 24px;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+}
+.btn-primary:hover { background: var(--color-primary-dark); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-export {
+    padding: 6px 16px;
+    border: 1px solid var(--color-primary);
+    background: white;
+    color: var(--color-primary);
+    border-radius: var(--radius);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.btn-export:hover { background: var(--color-primary); color: white; }
+.btn-export:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-refresh {
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: #555;
+    padding: 7px 14px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.btn-refresh:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+/* -- Inputs -- */
+.form-input, .form-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    background: white;
+    font-family: var(--font-family);
+}
+.form-input:focus, .form-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+/* -- Loader (Spinner) -- */
+.spinner {
+    width: 34px;
+    height: 34px;
+    border: 3px solid #ddd;
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* -- Badges de Estado -- */
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    display: inline-block;
+}
+.status-vp { background: #c8e6c9; color: #1b5e20; }
+.status-pp { background: #bbdefb; color: #0d47a1; }
+.status-pago { background: #ffecb3; color: #E2760F; }
+.status-perdido { background: #ffcdd2; color: #b71c1c; }
+.status-sin { background: #f5f5f5; color: #616161; }
+.status-vll { background: #ffe0b2; color: #bf360c; }
+.status-black { background: #212121; color: white; }
+
+/* -- Toast (Notificaciones) -- */
+.toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(16px);
+    background: white;
+    border: 1.5px solid var(--color-border);
+    border-radius: 10px;
+    padding: 10px 22px;
+    font-size: 14px;
+    opacity: 0;
+    transition: all .3s;
+    z-index: 2000;
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    text-transform: none;
+    font-family: var(--font-family);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.ok   { border-color: var(--color-success); color: var(--color-success); }
+.toast.err  { border-color: var(--color-danger); color: var(--color-danger); }
+.toast.info { border-color: var(--color-info); color: var(--color-info); }
+
+/* -- Modal -- */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+    background: white;
+    border-radius: 14px;
+    padding: 28px;
+    max-width: 380px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0,0,0,.15);
+}
+.modal-box.modal-box-detalle { max-width: 800px; width: 92%; text-align: left; max-height: 82vh; overflow-y: auto; padding: 24px 26px; }
+
+/* -- Tablas -- */
+.table-wrap {
+    overflow-x: auto;
+    border-radius: var(--radius);
+    border: 1px solid var(--color-border);
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+table thead th {
+    background: #f8f9fc;
+    padding: 10px 14px;
+    text-align: center;
+    vertical-align: middle;
+    color: #444;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    border-bottom: 2px solid #e8eaf6;
+    white-space: nowrap;
+    cursor: default;
+}
+table tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f0f0f0;
+    color: #333;
+}
+table tbody tr:hover { background: #fafbff; }
+
+/* Utilidad para mantener consistencia en tablas incrustadas (ej. Asistencia) */
+.table-sticky-wrapper {
+    position: relative;
+}
+.table-sticky-wrapper table thead th {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+}
+
+/* ----- 7. FILTROS (Multi-select) ----- */
+.multiselect { position: relative; }
+.multiselect-btn {
+    width: 100%;
+    text-align: left;
+    padding: 8px 32px 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    background: white;
+    cursor: pointer;
+    position: relative;
+    color: #000;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.multiselect-btn::after {
+    content: '⌵';
+    position: absolute;
+    font-family: Arial, sans-serif;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #000;
+    font-size: 13px;
+}
+.multiselect-btn:hover { border-color: var(--color-primary); }
+.multiselect-btn.has-selection { border-color: var(--color-primary); background: #f5f6ff; color: var(--color-primary); font-weight: 600; }
+.multiselect-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 100%;
+    width: max-content;
+    max-width: 280px;
+    max-height: 260px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #d7dbe3;
+    border-radius: var(--radius);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+    z-index: 60;
+    padding: 8px 12px;
+}
+.multiselect-panel.open { display: block; }
+.multiselect-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 2px 0;
+    font-size: 13px;
+    color: #424654;
+    cursor: pointer;
+}
+.multiselect-option input[type="checkbox"], .multiselect-option input[type="radio"] {
+    width: 12px; height: 12px;
+    accent-color: var(--color-accent);
+    cursor: pointer;
+    flex-shrink: 0;
+    margin: 2px 2px 0;
+}
+.multiselect-option.ms-todos { font-weight: 700; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid #eee; }
+
+.filtros-panel .filters {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px 24px;
+    padding: 4px 20px 10px;
+    background: white;
+}
+.filtros-panel .filter-label {
+    display: block;
+    color: #424654;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+}
+.btn-filtros {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--color-primary);
+    background: white;
+    color: var(--color-primary);
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-filtros:hover, .btn-filtros.active { background: var(--color-primary); color: white; }
+
+@media (max-width: 900px) {
+    .filtros-panel .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+    .filtros-panel .filters { grid-template-columns: 1fr; }
+}
+
+/* ----- 8. ACCESIBILIDAD ----- */
+:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* ----- 9. ASISTENCIA: KPIs / ANÁLISIS / MANTENIMIENTO ----- */
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat-card { background: white; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px; border-top: 3px solid #ccc; }
+.stat-num { font-size: 26px; font-weight: 700; }
+.stat-lbl { font-size: 12px; color: #888; margin-top: 3px; }
+.sc-green .stat-num  { color: #2e7d32; } .sc-green  { border-top-color: #2e7d32; }
+.sc-blue .stat-num   { color: #1565c0; } .sc-blue   { border-top-color: #1565c0; }
+.sc-warn .stat-num   { color: #FB923C; } .sc-warn   { border-top-color: #FB923C; }
+.sc-red .stat-num    { color: #d32f2f; } .sc-red    { border-top-color: #d32f2f; }
+.sc-purple .stat-num { color: #0040A1; } .sc-purple { border-top-color: #0040A1; }
+
+.filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+.filter-row select, .filter-row input { padding: 7px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; background: white; }
+
+.chip { display: inline-block; border-radius: 20px; font-size: 11px; font-weight: 700; padding: 2px 10px; text-transform: uppercase; }
+.chip-ok   { background: #c8e6c9; color: #1b5e20; }
+.chip-warn { background: #ffe0b2; color: #bf360c; }
+.chip-err  { background: #ffcdd2; color: #b71c1c; }
+.chip-blue { background: #bbdefb; color: #0d47a1; }
+
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+
+.cfg-label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; text-transform: uppercase; font-weight: 500; }
+.cfg-input { width: 100%; max-width: 220px; background: #f8f9fc; border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; font-size: 14px; margin-bottom: 14px; }
+.btn-save { background: #0040A1; border: none; border-radius: 6px; color: white; font-weight: 600; font-size: 14px; padding: 10px 24px; cursor: pointer; }
+.btn-save:hover { background: #002D73; }
+
+.mant-layout { display: grid; grid-template-columns: 420px 1fr; gap: 16px; align-items: stretch; }
+.mant-layout > .card { display: flex; flex-direction: column; height: 100%; }
+.mant-col-izq { display: flex; flex-direction: column; gap: 16px; height: 100%; }
+.mant-col-izq .card { flex: 1; margin-bottom: 0; display: flex; flex-direction: column; justify-content: center; }
+@media (max-width: 900px) { .mant-layout { grid-template-columns: 1fr; } }
+
+.colab-cfg-fila {
+    display: grid; grid-template-columns: 140px auto repeat(6, 100px); gap: 8px; align-items: center;
+    padding: 10px 6px; border-bottom: 1px solid #eee;
+}
+.colab-cfg-fila:last-child { border-bottom: none; }
+.colab-cfg-head { font-size: 10px; text-transform: uppercase; color: #888; font-weight: 600; text-align: center; }
+.colab-cfg-nombre { font-size: 13px; font-weight: 600; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.colab-cfg-hora { width: 100%; border: 1px solid #ddd; border-radius: 6px; padding: 5px 4px; font-size: 12px; background: #f8f9fc; }
+.colab-cfg-hora:disabled { opacity: .4; }
+.colab-switch { position: relative; display: inline-block; width: 38px; height: 21px; flex-shrink: 0; }
+.colab-switch input { opacity: 0; width: 0; height: 0; }
+.colab-switch-slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; transition: .2s; border-radius: 21px; }
+.colab-switch-slider:before { position: absolute; content: ""; height: 15px; width: 15px; left: 3px; bottom: 3px; background: white; transition: .2s; border-radius: 50%; }
+.colab-switch input:checked + .colab-switch-slider { background: #2e7d32; }
+.colab-switch input:checked + .colab-switch-slider:before { transform: translateX(17px); }
+.colab-cfg-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* ----- 10. ASISTENCIA: MODAL DE DETALLE DEL DÍA (Calendario de asistencia) ----- */
+.modal-close-x {
+    position: absolute; top: 12px; right: 14px; background: none; border: none;
+    font-size: 16px; color: #9aa0ab; cursor: pointer; padding: 4px;
+}
+.modal-close-x:hover { color: #0040A1; }
+.detalle-tabla { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+.detalle-tabla th {
+    text-align: center; vertical-align: middle; padding: 10px 14px; background: #f8f9fc; color: #444;
+    font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 2px solid #e8eaf6;
+}
+.detalle-tabla th:first-child { border-radius: 6px 0 0 6px; }
+.detalle-tabla th:last-child { border-radius: 0 6px 6px 0; }
+.detalle-tabla td { padding: 9px 10px; border-top: 1px solid #eee; color: #333; }
+.detalle-tabla tbody tr:hover td { background: #fafbff; }
+
+/* #asisApp table thead th traía position:sticky de otra regla del Dashboard
+   con la misma especificidad, y al no redeclarar position/top/z-index acá,
+   ese sticky ajeno quedaba activo por debajo — el header se veía
+   desplazado/superpuesto con los datos. Se neutraliza scopeado a #asisApp
+   para no afectar ninguna otra tabla del dashboard. */
+#asisApp table thead th,
+#asisApp .detalle-tabla th {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+}
+
+/* ----- 11. CALENDARIO UNIFICADO (Calendario de PPs y Calendario de Asistencia) ----- */
+.cal-page-card { background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); overflow: hidden; }
+.cal-page-header { padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; color: #0040A1; gap: 12px; flex-wrap: wrap; }
+.cal-page-content { display: flex; }
+.cal-page-body { flex: 1; min-width: 0; padding: 16px 20px 20px; }
+.cal-page-content:not(.vista-anio) .cal-page-body { max-width: 700px; margin: 0 auto; }
+.cal-page-leyenda { flex: 0 0 118px; max-width: 118px; border-left: 1px solid #f0f0f0; background: #fafbfc; padding: 16px 10px; }
+@media (max-width: 700px) {
+    .cal-page-content { flex-direction: column; }
+    .cal-page-leyenda { flex: 0 0 auto; max-width: none; border-left: none; border-top: 1px solid #f0f0f0; }
+    .cal-page-leyenda .cal-leyenda-items { flex-direction: row; flex-wrap: wrap; }
+}
+
+.cal-view-toggle { display: flex; gap: 2px; background: #f0f2f8; border-radius: 8px; padding: 3px; flex-shrink: 0; }
+.cal-view-toggle button { border: none; background: transparent; padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; color: #777; cursor: pointer; transition: all 0.15s; }
+.cal-view-toggle button.activo { background: white; color: #0040A1; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+
+.cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.cal-nav { background: #f0f2f8; border: none; border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-size: 15px; color: #0040A1; }
+.cal-nav:hover { background: #e0e4f5; }
+.cal-titulo { text-align: center; display: flex; flex-direction: column; font-size: 14px; color: #0040A1; }
+.cal-total { font-size: 11px; color: #888; font-weight: 400; }
+.cal-dias-semana { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; color: #999; font-weight: 600; margin-bottom: 4px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.cal-celda { position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 12px; color: #bbb; background: #fafbfc; transition: background 0.15s, box-shadow 0.15s, transform 0.15s; }
+.cal-celda.vacia { visibility: hidden; }
+.cal-numero { font-size: 13px; color: #666; line-height: 1; }
+.cal-celda.con-datos { cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+.cal-celda.con-datos .cal-numero { color: white; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+.cal-celda.con-datos:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,0.25); }
+.cal-celda.hoy { box-shadow: inset 0 0 0 2px #FB923C; }
+.cal-celda.hoy:not(.con-datos) .cal-numero { color: #FB923C; font-weight: 700; }
+/* Días "Falta" del Calendario de Asistencia: no son clicables (no hay datos
+   que mostrar), se marcan con un lavado de color suave en vez de sólido. */
+.cal-celda.cal-falta { background: #fdecea; }
+.cal-celda.cal-falta .cal-numero { color: #c0392b; }
+.cal-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.cal-badge { position: absolute; top: -5px; right: -5px; background: #FB923C; color: white; font-size: 10px; font-weight: 700; border-radius: 9px; min-width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; padding: 0 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+
+.cal-anio-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.cal-mini-mes { border: 1px solid #eee; border-radius: 8px; padding: 10px; }
+.cal-mini-header { text-align: center; font-size: 12.5px; font-weight: 700; color: #0040A1; margin-bottom: 6px; cursor: pointer; }
+.cal-mini-header:hover { text-decoration: underline; }
+.cal-mini-dias-semana { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 8px; color: #ccc; margin-bottom: 2px; }
+.cal-mini-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-mini-celda { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #ccc; border-radius: 3px; }
+.cal-mini-celda.vacia { visibility: hidden; }
+.cal-mini-celda.con-datos { color: white; font-weight: 700; cursor: pointer; text-shadow: 0 1px 1px rgba(0,0,0,0.3); }
+.cal-mini-celda.con-datos:hover { filter: brightness(1.12); }
+.cal-mini-celda.cal-falta { background: #fdecea; color: #c0392b; }
+.cal-mini-celda.hoy { box-shadow: inset 0 0 0 1px #FB923C; }
+.cal-mini-celda.hoy:not(.con-datos) { color: #FB923C; font-weight: 700; }
+.cal-mini-total { text-align: center; font-size: 10px; color: #999; margin-top: 5px; font-weight: 600; }
+
+.cal-leyenda-items { display: flex; flex-direction: column; gap: 8px; }
+.cal-leyenda-item { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.cal-leyenda-item input[type="checkbox"] { width: 14px; height: 14px; accent-color: #0040A1; cursor: pointer; margin: 0; flex-shrink: 0; }
+.cal-leyenda-badge { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 40px; font-size: 11px; font-weight: 600; line-height: 1.25; border-radius: 7px; background: #e8e8e8; color: #999; transition: background 0.15s, color 0.15s; }
+.cal-leyenda-badge-linea { display: block; }
+.cal-leyenda-item.activo .cal-leyenda-badge { background: var(--cat-color); color: white; }
+/* Leyenda estática (sin checkbox), usada en el Calendario de Asistencia */
+.cal-leyenda-item.estatico { cursor: default; }
+
+@media (max-width: 900px) { .cal-anio-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .cal-anio-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* ===== MODAL DE DETALLE DEL DÍA (compartido: Calendario de PPs y de Asistencia) ===== */
+.cal-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 200; }
+.cal-modal-overlay-top { z-index: 300; }
+/* Ancho ampliado a propósito: con el ancho anterior (720px) las tablas de
+   detalle (6-7 columnas) obligaban a deslizar horizontalmente. */
+.cal-modal { background: white; border-radius: 10px; width: 92%; max-width: 960px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.25); }
+.cal-modal-header { padding: 14px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; color: #0040A1; }
+.cal-modal-close { background: none; border: none; cursor: pointer; color: #888; }
+.cal-modal-toolbar { padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #888; border-bottom: 1px solid #f2f2f2; }
+.cal-modal-body { padding: 0 20px 20px; overflow-y: auto; }
+.cal-modal-body table { width: 100%; border-collapse: collapse; font-size: 12.5px; table-layout: fixed; }
+.cal-modal-body th, .cal-modal-body td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; text-align: left; white-space: normal; word-break: break-word; }
+.cal-modal-body th { color: #888; font-weight: 600; text-transform: uppercase; font-size: 10.5px; position: sticky; top: 0; background: white; }
+@media (max-width: 700px) { .cal-modal-body table { table-layout: auto; } .cal-modal-body th, .cal-modal-body td { white-space: nowrap; } }
+
+/* Variante ancha de la leyenda lateral del calendario, usada por el Resumen
+   Mensual del Calendario de Asistencia (ASESOR) — mismo look, más espacio. */
+.cal-page-leyenda.cal-page-leyenda-wide { flex: 0 0 220px; max-width: 220px; }
+@media (max-width: 700px) {
+    .cal-page-leyenda.cal-page-leyenda-wide { flex: 0 0 auto; max-width: none; }
+}
+
+/* ----- 12. BUSCADOR DEL TOOLBAR (solo en el Dashboard, entre Filtros/leads y Actualizar/Exportar) ----- */
+.toolbar-search {
+    flex: 1;
+    min-width: 200px;
+    max-width: 420px;
+    margin: 0 16px;
+    position: relative;
+}
+.toolbar-search::before {
+    content: 'search';
+    font-family: 'Material Symbols Outlined';
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #737785;
+    font-size: 18px;
+    pointer-events: none;
+}
+.toolbar-search input {
+    width: 100%;
+    padding: 9px 14px 9px 38px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 14px;
+}
+.toolbar-search input:focus { outline: none; border-color: var(--color-primary); }
+
+@media (max-width: 768px) {
+    .toolbar-search { flex-basis: 100%; max-width: none; margin: 0; order: 3; }
+}
+
+/* ----- 13. TABLA (Bottom Line): wrapper con card blanca ----- */
+/* Importante: NO usar overflow:hidden aquí — cualquier ancestro con overflow
+   distinto de "visible" neutraliza el position:sticky de sus descendientes
+   (el .table-controls-sticky de más abajo). */
+.table-wrapper {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+

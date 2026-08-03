@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comercial Pregrado - Mi Usuario</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="core/ui-kit.css">
+    <style>
+        /* Estilos específicos de usuario - prefijados con #usuarioApp */
+        #usuarioApp {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-family);
+        }
+
+        #usuarioApp .user-profile-card {
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: var(--shadow-card);
+            overflow: hidden;
+            min-height: 88vh;
+        }
+
+        #usuarioApp .user-cover {
+            height: 250px;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        #usuarioApp .user-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center top;
+            display: block;
+        }
+
+        #usuarioApp .user-profile-columns {
+            display: flex;
+            align-items: flex-start;
+            gap: 32px;
+            padding: 0 16px 16px;
+            flex-wrap: wrap;
+        }
+
+        #usuarioApp .user-profile-left {
+            position: relative;
+            flex: 1 1 260px;
+            max-width: 320px;
+            min-width: 240px;
+            padding-top: 140px;
+        }
+
+        #usuarioApp .user-profile-right {
+            flex: 2 1 380px;
+            min-width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-top: 10px;
+        }
+
+        #usuarioApp .user-avatar-wrap-lg {
+            position: absolute;
+            left: 0;
+            top: -126px;
+            width: 252px;
+            height: 252px;
+            border-radius: 50%;
+            background: #fff;
+            padding: 6px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18);
+            z-index: 2;
+        }
+
+        #usuarioApp .user-avatar-lg {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            background: var(--color-primary-light);
+            display: block;
+        }
+
+        #usuarioApp .user-profile-headline {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-bottom: 16px;
+        }
+
+        #usuarioApp .user-profile-headline h2 {
+            font-size: 24px;
+            color: #1a1d29;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        #usuarioApp .user-profile-cargo {
+            font-size: 15px;
+            font-weight: 500;
+            color: #6b7280;
+        }
+
+        #usuarioApp .user-profile-details-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        #usuarioApp .upd-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        #usuarioApp .upd-icon {
+            font-size: 19px;
+            color: #8a8fa3;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        #usuarioApp .upd-value {
+            font-size: 15px;
+            color: #1a1d29;
+            font-weight: 500;
+            word-break: break-word;
+            line-height: 1.35;
+        }
+
+        #usuarioApp .campana-tag {
+            display: inline-block;
+            background: var(--color-primary-light);
+            color: var(--color-primary);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 3px 11px;
+            border-radius: 12px;
+            margin: 0 6px 6px 0;
+        }
+
+        #usuarioApp .user-kpi-card {
+            background: #fff;
+            border: 1px solid #eef0f4;
+            border-radius: 14px;
+            box-shadow: var(--shadow-card);
+            padding: 16px 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        #usuarioApp .user-kpi-icon {
+            font-size: 24px;
+            color: var(--color-primary);
+            background: var(--color-primary-light);
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        #usuarioApp .user-kpi-body {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        #usuarioApp .user-kpi-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        #usuarioApp .user-kpi-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1a1d29;
+        }
+
+        #usuarioApp .user-kpi-sub {
+            font-size: 12px;
+            color: #8a8fa3;
+        }
+
+        #usuarioApp .user-kpi-action {
+            cursor: pointer;
+            transition: box-shadow 0.15s ease, transform 0.15s ease;
+        }
+
+        #usuarioApp .user-kpi-action:hover {
+            box-shadow: 0 4px 14px rgba(0, 64, 161, 0.18);
+            transform: translateY(-1px);
+        }
+
+        #usuarioApp .user-kpi-arrow {
+            margin-left: auto;
+            color: var(--color-primary);
+            flex-shrink: 0;
+        }
+
+        #usuarioApp .ukc-stats {
+            display: flex;
+            gap: 24px;
+            margin-top: 4px;
+        }
+
+        #usuarioApp .ukc-stat {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        #usuarioApp .ukc-stat-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #8a8fa3;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        #usuarioApp .ukc-stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1d29;
+        }
+
+        #usuarioApp .ukc-stat-sub {
+            font-size: 11px;
+            color: #8a8fa3;
+        }
+
+        #usuarioApp .user-kpi-loading {
+            font-size: 13px;
+            color: #8a8fa3;
+            padding: 8px 4px;
+        }
+
+        @media (max-width: 720px) {
+            #usuarioApp .user-profile-columns {
+                flex-direction: column;
+            }
+            #usuarioApp .user-profile-left {
+                max-width: none;
+            }
+        }
+
+        @media (max-width: 640px) {
+            #usuarioApp .user-cover {
+                height: 200px;
+            }
+            #usuarioApp .user-avatar-wrap-lg {
+                width: 192px;
+                height: 192px;
+                top: -96px;
+            }
+            #usuarioApp .user-profile-left {
+                padding-top: 108px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-area">
+
+            <div class="container" style="width:98%; max-width:2000px; margin:0 auto; padding:10px 0;">
+                <div id="usuarioApp">
+                    <div class="user-profile-card">
+                        <div class="user-cover">
+                            <img src="assets/banner.png" alt="">
+                        </div>
+
+                        <div class="user-profile-columns">
+                            <div class="user-profile-left">
+                                <div class="user-avatar-wrap-lg">
+                                    <img class="user-avatar-lg" id="userProfileFoto" src="assets/logo.png" alt="Foto de perfil" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='assets/logo.png';">
+                                </div>
+
+                                <div class="user-profile-headline">
+                                    <h2 id="userProfileNombre">—</h2>
+                                    <span class="user-profile-cargo" id="userProfileCargo">—</span>
+                                </div>
+
+                                <div class="user-profile-details-stack">
+                                    <div class="upd-row">
+                                        <span class="material-symbols-outlined upd-icon">shield_person</span>
+                                        <span class="upd-value" id="userProfileRol">—</span>
+                                    </div>
+                                    <div class="upd-row">
+                                        <span class="material-symbols-outlined upd-icon">badge</span>
+                                        <span class="upd-value" id="userProfileDni">—</span>
+                                    </div>
+                                    <div class="upd-row">
+                                        <span class="material-symbols-outlined upd-icon">mail</span>
+                                        <span class="upd-value" id="userProfileEmail">—</span>
+                                    </div>
+                                    <div class="upd-row">
+                                        <span class="material-symbols-outlined upd-icon">apartment</span>
+                                        <span class="upd-value" id="userProfileCampanas">—</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="user-profile-right" id="userKpiGrid">
+                                <div class="user-kpi-card user-kpi-action" id="kpiMarcarAsistencia">
+                                    <span class="material-symbols-outlined user-kpi-icon">schedule</span>
+                                    <div class="user-kpi-body">
+                                        <span class="user-kpi-title">Marcar Asistencia</span>
+                                        <span class="user-kpi-sub">Ir a registrar tu marcación de hoy</span>
+                                    </div>
+                                    <span class="material-symbols-outlined user-kpi-arrow">chevron_right</span>
+                                </div>
+
+                                <div class="user-kpi-card" id="kpiHoraEntrada">
+                                    <span class="material-symbols-outlined user-kpi-icon">login</span>
+                                    <div class="user-kpi-body">
+                                        <span class="user-kpi-title">Hora de entrada promedio</span>
+                                        <span class="user-kpi-value" id="userKpiHoraEntradaValor">--:--</span>
+                                    </div>
+                                </div>
+
+                                <div class="user-kpi-card" id="kpiResumenAsistenciaAdmin" style="display:none;">
+                                    <span class="material-symbols-outlined user-kpi-icon">groups</span>
+                                    <div class="user-kpi-body">
+                                        <span class="user-kpi-title">Asistencia de hoy</span>
+                                        <span class="user-kpi-value" id="userKpiAsistenciaHoyValor">--</span>
+                                        <span class="user-kpi-sub" id="userKpiAsistenciaHoySub">colaboradores marcaron entrada hoy</span>
+                                    </div>
+                                </div>
+
+                                <div id="userKpiVpPpContainer"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="core/utils.js"></script>
+    <script type="module" src="core/constants.js"></script>
+    <script type="module" src="core/components.js"></script>
+    <script type="module" src="js/sidebar.js"></script>
+    <script type="module" src="js/usuario.js"></script>
+</body>
+</html>
