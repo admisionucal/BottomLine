@@ -366,7 +366,7 @@ function renderVista1() {
 
                 <div style="background:white; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
                     <h3 style="color:var(--color-accent); margin-bottom:4px; font-size:16px;">
-                        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">edit</span> Datos del asesor
+                        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">edit</span> Datos de la boleta
                     </h3>
                     <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:20px;" id="bloqueEditableFicha">
     `;
