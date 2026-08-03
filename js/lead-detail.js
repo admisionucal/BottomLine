@@ -779,7 +779,7 @@ function opcionesBeneficioPorTipo(catalogo, tipo) {
 }
 
 function obtenerBoletaVirtualFija(carrera, caso, modalidad) {
-    if (normalizarTexto(modalidad) !== 'virtual') return null;
+    if (normalizarTexto(modalidad) !== 'remoto') return null;
 
     const carreraNorm = normalizarTexto(carrera);
     const preciosEspeciales690 = {
