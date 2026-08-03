@@ -313,6 +313,7 @@ function renderVista1() {
     const celular2 = obtenerCampo(lead, COLUMNAS.TELEFONO_3) || '';
     const celularesTexto = [celular1, celular2].filter(Boolean).join(' / ') || '-';
     const correo = obtenerCampo(lead, COLUMNAS.EMAIL) || '-';
+    const dni = obtenerCampo(lead, COLUMNAS.DNI) || '-';
     const descuentoActual = obtenerCampo(lead, COLUMNAS.DESCUENTO_PRECIOS) || '0';
 
     const tipoIngresoCatalogo = tipoIngresoCatalogoPorCaso(caso);
@@ -350,7 +351,7 @@ function renderVista1() {
                 <div style="background:white; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05)">
                     <h2 style="color:var(--color-primary); margin-bottom:4px; font-size:22px;">${escapeHtml(nombre)}</h2>
                     <p style="color:#666; margin-bottom:20px;">
-                        <strong>ID Prometeo:</strong> ${escapeHtml(id)} &nbsp;|&nbsp;
+                        <strong>N° Documento:</strong> ${escapeHtml(dni)} &nbsp;|&nbsp;
                         <strong>Celular:</strong> ${escapeHtml(celularesTexto)} &nbsp;|&nbsp;
                         <strong>Correo:</strong> ${escapeHtml(correo)}
                     </p>
