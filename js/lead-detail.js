@@ -308,7 +308,8 @@ function renderVista1() {
     const tipoAlumnoActual = obtenerCampo(lead, COLUMNAS.TIPO_ALUMNO) || 'ALUMNO REGULAR';
     const cuotasActual = obtenerCampo(lead, COLUMNAS.NUMERO_CUOTAS) || '5 cuotas';
     const boletaFinal = obtenerCampo(lead, COLUMNAS.BOLETA_FINAL) || '-';
-    const boletaColegio = obtenerCampo(lead, COLUMNAS.BOLETA_COLEGIO) || '-';
+    const boletaColegioRaw = obtenerCampo(lead, COLUMNAS.BOLETA_COLEGIO);
+    const boletaColegio = boletaColegioRaw === '' ? '-' : boletaColegioRaw;
     const celular1 = obtenerCampo(lead, COLUMNAS.TELEFONO_2) || '';
     const celular2 = obtenerCampo(lead, COLUMNAS.TELEFONO_3) || '';
     const celularesTexto = [celular1, celular2].filter(Boolean).join(' / ') || '-';
@@ -360,7 +361,7 @@ function renderVista1() {
                         ${campoHTML('Carrera', carrera)}
                         ${campoHTML('Modalidad', modalidad)}
                         ${campoHTML('Colegio', colegio)}
-                        ${campoHTML('Boleta del Colegio', boletaColegio || '-')}
+                        ${campoHTML('Boleta del Colegio', boletaColegio)}
                         ${campoHTML('Tipo Ingreso', tipoIngreso || '-')}
                     </div>
                 </div>
