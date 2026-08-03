@@ -332,7 +332,7 @@ function renderVista1() {
     const boletaConBecaActual = obtenerCampo(lead, COLUMNAS.BOLETA_CON_BECA) || '';
     const valorComboActual = `${boletaActual}||${beneficioActual}||${boletaConBecaActual}`;
 
-    const boletaVirtualFija = obtenerBoletaVirtualFija(carrera, caso);
+    const boletaVirtualFija = obtenerBoletaVirtualFija(carrera, caso, modalidad);
 
     const opcionesAdicional = opcionesBeneficioPorTipo(state.catalogoBeneficios, 'ADICIONAL');
     const opcionesEnganche = opcionesBeneficioPorTipo(state.catalogoBeneficios, 'ENGANCHE');
@@ -778,20 +778,20 @@ function opcionesBeneficioPorTipo(catalogo, tipo) {
         }));
 }
 
-function obtenerBoletaVirtualFija(carrera, caso) {
+function obtenerBoletaVirtualFija(carrera, caso, modalidad) {
+    if (normalizarTexto(modalidad) !== 'virtual') return null;
+
     const carreraNorm = normalizarTexto(carrera);
-    const preciosFijos = {
-        'administracionymarketing': 650,
-        'administracionynegociosinternacionales': 650,
-        'psicologia': 650,
+    const preciosEspeciales690 = {
         'comunicacionymarketingdigital': 690,
         'disenodigitaldeinteriores': 690,
         'disenografico': 690,
         'marketingdigital': 690
     };
-    if (preciosFijos[carreraNorm] !== undefined) return preciosFijos[carreraNorm];
+    if (preciosEspeciales690[carreraNorm] !== undefined) return 690;
     if (carreraNorm === 'disenograficopublicitario' && caso === 2) return 690;
-    return null;
+
+    return 650; // remoto, cualquier otra carrera
 }
 
 // ===== MONTO A PAGAR =====
