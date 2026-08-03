@@ -125,7 +125,7 @@ export const SELECT_OPTIONS = {
         { value: '80',  label: 'Matrícula S/95 - E. Admisión S/50' },
         { value: '100', label: 'Matrícula S/0 - E. Admisión S/0' }
     ],
-    tiempo: ['1 año', '1 año y medio', '2 años', '2 años y medio', '3 años', '3 años y medio', '4 años'],
+    tiempo: ['Traslado +2', '2 años', '2 años y medio', '3 años', '3 años y medio', '4 años'],
     tipoAlumno: ['ALUMNO REGULAR', 'ALUMNO ETU'],
     cuotas: ['5 cuotas', '6 cuotas']
 };
