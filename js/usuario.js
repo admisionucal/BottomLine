@@ -154,20 +154,13 @@ async function cargarVpPpAsesor(user) {
         return;
     }
 
-    const nombreAsesor = String(user.nombre_completo || user.nombre_asesor || user.nombre || '').trim().toLowerCase();
+    const resumen = await obtenerResumenVpPpCacheado(user, campanas);
+
     let vpTotal = 0, vpCompletos = 0, ppTotal = 0, ppCompletos = 0;
-
-    const resultados = await Promise.all(campanas.map(c => obtenerLeadsCacheados(user, c)));
-
-    resultados.forEach(leads => {
-        leads.forEach(lead => {
-            const asesorLead = String(lead[COLUMNAS.ASESOR_NOMBRE_RAW] || '').trim().toLowerCase();
-            if (nombreAsesor && asesorLead !== nombreAsesor) return;
-
-            const { esVp, esPp, completo } = clasificarLead(lead);
-            if (esVp) { vpTotal++; if (completo) vpCompletos++; }
-            if (esPp) { ppTotal++; if (completo) ppCompletos++; }
-        });
+    campanas.forEach(c => {
+        const r = resumen[c] || { vpTotal: 0, vpCompletos: 0, ppTotal: 0, ppCompletos: 0 };
+        vpTotal += r.vpTotal; vpCompletos += r.vpCompletos;
+        ppTotal += r.ppTotal; ppCompletos += r.ppCompletos;
     });
 
     cont.innerHTML = renderTarjetaVpPp('Valoraciones Positivas (VP)', vpTotal, vpCompletos, 'trending_up') +
@@ -183,54 +176,29 @@ async function cargarVpPpPorCampanaAdmin(user) {
     const campanas = getUserCampanas();
     if (campanas.length === 0) { cont.innerHTML = ''; return; }
 
-    const resultados = await Promise.all(campanas.map(c => obtenerLeadsCacheados(user, c)));
+    const resumen = await obtenerResumenVpPpCacheado(user, campanas);
 
     let html = '';
-    campanas.forEach((campana, i) => {
-        const leads = resultados[i] || [];
-        let vpTotal = 0, vpCompletos = 0, ppTotal = 0, ppCompletos = 0;
-
-        leads.forEach(lead => {
-            const { esVp, esPp, completo } = clasificarLead(lead);
-            if (esVp) { vpTotal++; if (completo) vpCompletos++; }
-            if (esPp) { ppTotal++; if (completo) ppCompletos++; }
-        });
-
-        html += renderTarjetaCampana(campana, vpTotal, vpCompletos, ppTotal, ppCompletos);
+    campanas.forEach(campana => {
+        const r = resumen[campana] || { vpTotal: 0, vpCompletos: 0, ppTotal: 0, ppCompletos: 0 };
+        html += renderTarjetaCampana(campana, r.vpTotal, r.vpCompletos, r.ppTotal, r.ppCompletos);
     });
 
     cont.innerHTML = html;
 }
 
-// ===== HELPERS =====
-function clasificarLead(lead) {
-    const status = lead[COLUMNAS.STATUS_GESTION];
-    const completo = !!(lead.PERFILAMIENTO_COMPLETO && lead.PERFILAMIENTO_COMPLETO.completo);
-    return {
-        esVp: status === STATUS.VP_VIVA,
-        esPp: status === STATUS.PP_VIVA,
-        completo
-    };
-}
-
-async function obtenerLeadsCacheados(user, campana) {
-    const cacheKey = CACHE_KEYS.LEADS_RAW(user.email, user.rol, campana);
+// ===== HELPER =====
+async function obtenerResumenVpPpCacheado(user, campanas) {
+    const cacheKey = CACHE_KEYS.VPPP_RESUMEN(user.email, user.rol, campanas);
     const cached = cacheGet(cacheKey);
-    if (cached && cached.data) return cached.data;
+    if (cached) return cached;
 
-    const result = await callAPI('getLeads', {
-        email: user.email,
-        rol: user.rol,
-        campana: campana,
-        nombreAsesor: user.nombre_completo || user.nombre_asesor || user.nombre || ''
-    });
-
+    const result = await callAPI('getResumenVpPp', { campanas });
     if (result.success) {
-        const data = result.data || [];
-        cacheSet(cacheKey, { data, timestamp: Date.now() });
-        return data;
+        cacheSet(cacheKey, result.data);
+        return result.data;
     }
-    return [];
+    return {};
 }
 
 function renderTarjetaVpPp(titulo, total, completos, icono) {

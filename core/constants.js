@@ -3,7 +3,7 @@
 // ================================================================
 
 // ----- URL DE LA API (Google Apps Script) -----
-export const API_URL = 'https://script.google.com/macros/s/AKfycbw6aiNaooUHfwvoGxWaLAsF6bWPrJl-T9KdW-s3TpMtS91HUC-E4UAZBRG7Qiqwa4mXgQ/exec';
+export const API_URL = 'https://script.google.com/macros/s/AKfycbyycg4oRJCs27qeaXKk0sxZkpB6DpEMjzlRgoY4fSmUakz8bRGgW79kKHC67M_kFCv28A/exec';
 
 // ----- MAPEO DE COLUMNAS DE GOOGLE SHEETS -----
 // Centraliza todos los nombres de columnas para evitar strings mágicos.
@@ -162,6 +162,7 @@ export const BCC_DEFAULT_CC = {
 export const CACHE_KEYS = {
     USER: 'bl_user',
     LEADS_RAW: (email, rol, campana) => `bl_leads_raw_${email}_${rol}_${campana}`,
+    VPPP_RESUMEN: (email, rol, campanas) => `bl_vppp_resumen_${email}_${rol}_${campanas.slice().sort().join('|')}`,
     LEAD_DETAIL: (id, campana, email) => `bl_detail_${id}_${campana}_${email}`,
     LEAD_SELECTED: (id, campana) => `bl_selected_${id}_${campana}`,
     PAYMENTS: (id, campana) => `bl_payments_${id}_${campana}`,
