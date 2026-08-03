@@ -440,7 +440,7 @@ function renderVista1() {
         ? opcionesBoletaBeneficioCatalogo(filasCatalogoRangosInferiores(state.catalogoBoletas, tipoIngresoCatalogo, boletaReferencia))
         : [];
 
-    html += renderSolicitudBox(permiteSolicitar, opcionesRangoInferior, id);
+    html += renderSolicitudBox(permiteSolicitar, opcionesRangoInferior, id, esColegioAliado);
 
     container.innerHTML = html;
 
@@ -600,7 +600,7 @@ function initComboBuscable(id, opcionesIniciales) {
     input._actualizarOpcionesCombo = (nuevas) => { opciones = nuevas; };
 }
 
-function renderSolicitudBox(permite, opciones, id) {
+function renderSolicitudBox(permite, opciones, id, esColegioAliado) {
     const user = getCurrentUser();
     const esAdmin = esRolSupervisorOAdmision(user.rol);
 
