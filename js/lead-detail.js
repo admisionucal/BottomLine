@@ -489,7 +489,16 @@ function renderVista1() {
     document.getElementById('btnGuardarFicha')?.addEventListener('click', () => guardarFicha(id));
 
     actualizarMonto();
-    renderSolicitudCCBox(boletaVirtualFija !== null || boletaActual !== '');
+    // Se guarda en state (no solo como argumento local) para poder
+    // revalidarlo justo al hacer clic en "Solicitar envío de CC" — ver
+    // abrirModalSolicitudCC(), que usa esto como segunda barrera además
+    // de que el botón ni siquiera se pinte cuando esto es false.
+    // Nota: antes esto se saltaba con `boletaVirtualFija !== null` (precio
+    // fijo por modalidad Remoto) sin exigir guardado — se quitó esa
+    // excepción: aunque el precio sea fijo, si no se guarda la ficha no hay
+    // garantía de que siga correspondiendo a la carrera/modalidad vigente.
+    state.boletaGuardada = boletaActual !== '';
+    renderSolicitudCCBox(state.boletaGuardada);
 }
 
 function capturarEdicionesTemporal() {
@@ -529,10 +538,17 @@ function selectSimpleHTML(id, opciones, valorActual, disabled) {
 }
 
 function selectConValorHTML(id, opciones, valorActual, disabled) {
+    const hayCoincidencia = opciones.some(op => String(op.value) === String(valorActual));
     const opts = opciones.map(op =>
         `<option value="${escapeHtml(op.value)}" ${String(op.value) === String(valorActual) ? 'selected' : ''}>${escapeHtml(op.label)}</option>`
     ).join('');
-    return `<select id="${id}" class="campo-editable-select" ${disabled ? 'disabled' : ''}>${opts}</select>`;
+    // Si nada calza con el valor guardado (p.ej. porque todavía no se ha
+    // guardado nada para este lead), el navegador seleccionaría la PRIMERA
+    // opción del catálogo por defecto — dando la falsa impresión de que ya
+    // hay algo elegido. Se agrega un placeholder deshabilitado y
+    // seleccionado en ese caso para que el <select> se vea genuinamente vacío.
+    const placeholder = hayCoincidencia ? '' : '<option value="" selected disabled hidden>-- Selecciona --</option>';
+    return `<select id="${id}" class="campo-editable-select" ${disabled ? 'disabled' : ''}>${placeholder}${opts}</select>`;
 }
 
 function opcionesInstitucionPorTipo(tipo) {
@@ -1008,6 +1024,17 @@ document.addEventListener('click', (e) => {
 });
 
 function abrirModalSolicitudCC() {
+    // Segunda barrera (además de que renderSolicitudCCBox ni siquiera pinta
+    // el botón cuando esto es false): si por lo que sea se llega a disparar
+    // este flujo sin que la boleta esté realmente guardada en el lead
+    // (por ejemplo, el select mostrando un valor "por defecto" del
+    // navegador que nunca se guardó), se corta acá con un mensaje claro
+    // en vez de dejar avanzar la solicitud con datos vacíos.
+    if (!state.boletaGuardada) {
+        alert('Debes guardar los datos de la boleta del lead (botón "Guardar Ficha") antes de poder solicitar el envío de Condiciones Comerciales.');
+        return;
+    }
+
     ccCorreosAdicionales = [];
     ccArchivos = { dni: [], certificado: [], boletaProcedencia: [] };
     ['dni', 'certificado', 'boletaProcedencia'].forEach(renderListaArchivosCC);
