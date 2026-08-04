@@ -1051,7 +1051,7 @@ function abrirModalSolicitudCC() {
     // DNI: si el lead no lo tiene registrado, se pide acá mismo — es el dato
     // que arma el nombre de la carpeta del alumno en Drive (ver solicitarCC
     // en el backend); sin él la carpeta se crea como "SIN-DNI".
-    const dniActual = (obtenerCampo(state.lead, COLUMNAS.DNI) || '').trim();
+    const dniActual = String(obtenerCampo(state.lead, COLUMNAS.DNI) || '').trim();
     const bloqueDniFaltante = document.getElementById('ccBloqueDniFaltante');
     const dniInput = document.getElementById('ccDniInput');
     if (bloqueDniFaltante) bloqueDniFaltante.style.display = dniActual ? 'none' : 'block';
@@ -1109,7 +1109,7 @@ async function enviarSolicitudCC() {
     // Si el lead no tenía DNI registrado, se usa el que se acaba de ingresar
     // en el aviso del modal (ccBloqueDniFaltante) — es el dato que arma el
     // nombre de la carpeta del alumno en Drive.
-    const dni = (obtenerCampo(state.lead, COLUMNAS.DNI) || '').trim() || (dniInput?.value || '').trim();
+    const dni = String(obtenerCampo(state.lead, COLUMNAS.DNI) || '').trim() || (dniInput?.value || '').trim();
     const nombreCompleto = obtenerCampo(state.lead, COLUMNAS.NOMBRES) || '';
 
     if (!dni) {
