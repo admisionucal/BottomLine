@@ -546,6 +546,3 @@ window.mostrarUnificar = mostrarUnificar;
 window.mostrarCC = mostrarCC;
 window.logout = logout;
 window.irAMarcarAsistenciaDesdeUsuario = irAMarcarAsistenciaDesdeUsuario;
-
-console.log('✅ Sidebar - Funciones de navegación registradas en window');
-
