@@ -245,7 +245,7 @@ function renderHeaderLead() {
     const nombre = obtenerCampo(lead, COLUMNAS.NOMBRES) || 'Sin Nombre';
     const carrera = obtenerCampo(lead, COLUMNAS.CARRERA, COLUMNAS.PROGRAMA) || '-';
     const modalidad = obtenerCampo(lead, COLUMNAS.MODALIDAD) || '-';
-    const asesor = obtenerCampo(lead, COLUMNAS.ASESOR_ULTIMO_CONTACTO, COLUMNAS.ASESOR_NOMBRE) || '-';
+    const asesor = obtenerCampo(lead, COLUMNAS.ASESOR_NOMBRE, COLUMNAS.ASESOR_ULTIMO_CONTACTO) || '-';
     const status = lead[COLUMNAS.STATUS_GESTION] || 'SIN_STATUS';
 
     document.getElementById('leadId').textContent = id;
@@ -1048,6 +1048,15 @@ function abrirModalSolicitudCC() {
     if (bloqueBoletaProc) bloqueBoletaProc.style.display = esTraslado ? '' : 'none';
     if (!esTraslado) ccArchivos.boletaProcedencia = [];
 
+    // DNI: si el lead no lo tiene registrado, se pide acá mismo — es el dato
+    // que arma el nombre de la carpeta del alumno en Drive (ver solicitarCC
+    // en el backend); sin él la carpeta se crea como "SIN-DNI".
+    const dniActual = (obtenerCampo(state.lead, COLUMNAS.DNI) || '').trim();
+    const bloqueDniFaltante = document.getElementById('ccBloqueDniFaltante');
+    const dniInput = document.getElementById('ccDniInput');
+    if (bloqueDniFaltante) bloqueDniFaltante.style.display = dniActual ? 'none' : 'block';
+    if (dniInput) dniInput.value = '';
+
     document.getElementById('ccNuevoCorreoInput').value = '';
     document.getElementById('ccSolicitudMsg').textContent = '';
     renderCorreosCCLista();
@@ -1096,12 +1105,23 @@ async function enviarSolicitudCC() {
     const btn = document.getElementById('ccSolicitarBtn');
     const user = getCurrentUser();
     const id = obtenerCampo(state.lead, COLUMNAS.ID_PROMETEO);
-    const dni = obtenerCampo(state.lead, COLUMNAS.DNI) || '';
+    const dniInput = document.getElementById('ccDniInput');
+    // Si el lead no tenía DNI registrado, se usa el que se acaba de ingresar
+    // en el aviso del modal (ccBloqueDniFaltante) — es el dato que arma el
+    // nombre de la carpeta del alumno en Drive.
+    const dni = (obtenerCampo(state.lead, COLUMNAS.DNI) || '').trim() || (dniInput?.value || '').trim();
     const nombreCompleto = obtenerCampo(state.lead, COLUMNAS.NOMBRES) || '';
 
-    if (!dni.trim()) {
+    if (!dni) {
         msgEl.style.color = '#d32f2f';
-        msgEl.textContent = 'Este lead no tiene N° de DNI registrado. Complétalo antes de solicitar las Condiciones Comerciales.';
+        msgEl.textContent = 'Ingresa el N° de DNI del alumno para poder solicitar las Condiciones Comerciales.';
+        dniInput?.focus();
+        return;
+    }
+    if (dniInput && dniInput.value.trim() && !/^\d{8}$/.test(dni)) {
+        msgEl.style.color = '#d32f2f';
+        msgEl.textContent = 'El DNI debe tener 8 dígitos.';
+        dniInput.focus();
         return;
     }
 

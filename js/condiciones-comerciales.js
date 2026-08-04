@@ -378,6 +378,13 @@ function renderDetalleCC() {
 
     const carreraActual = state.overrides.carrera ?? (lead[COLUMNAS.CARRERA] || lead[COLUMNAS.PROGRAMA] || '');
     const modalidadActual = state.overrides.modalidadEstudio ?? (lead[COLUMNAS.MODALIDAD] || '');
+    // Si el valor real del lead no calza con ninguna de las dos opciones
+    // estándar (por capitalización distinta, espacios, u otra modalidad),
+    // se agrega igual como opción seleccionable en vez de perderlo o
+    // disfrazarlo con el "Semi-Presencial" que el navegador marca por
+    // defecto cuando ningún <option> trae "selected".
+    const modalidadOpcionesCC = ['Semi-Presencial', 'Virtual'];
+    if (modalidadActual && !modalidadOpcionesCC.includes(modalidadActual)) modalidadOpcionesCC.push(modalidadActual);
     const matriculaActual = state.overrides.montoMatricula ?? (lead['MATRICULA_FINAL'] ?? '');
     const examenActual = state.overrides.montoExamen ?? (lead['ADMISION_FINAL'] ?? '');
     const escalaRegularActual = state.overrides.escalaRegular ?? (lead[COLUMNAS.BOLETA] ?? '');
@@ -409,9 +416,14 @@ function renderDetalleCC() {
 
     const adjuntos = [
         { label: 'DNI', id: sol.DNI_FILE_ID, nombre: sol.DNI_FILE_NOMBRE },
-        { label: 'Certificado de Estudios', id: sol.CERTIFICADO_FILE_ID, nombre: sol.CERTIFICADO_FILE_NOMBRE },
-        { label: 'Boleta de Procedencia', id: sol.BOLETA_PROCEDENCIA_FILE_ID, nombre: sol.BOLETA_PROCEDENCIA_FILE_NOMBRE }
+        { label: 'Certificado de Estudios', id: sol.CERTIFICADO_FILE_ID, nombre: sol.CERTIFICADO_FILE_NOMBRE }
     ];
+    // Boleta de Procedencia: mismo criterio que en lead-detail.js (solo aplica
+    // a Traslado con o sin convalidación) — para Ordinario ni se pide al
+    // solicitar ni debe listarse acá como documento pendiente.
+    if (tipoIngresoActual !== 'regular') {
+        adjuntos.push({ label: 'Boleta de Procedencia', id: sol.BOLETA_PROCEDENCIA_FILE_ID, nombre: sol.BOLETA_PROCEDENCIA_FILE_NOMBRE });
+    }
 
     const correosDestinoDefault = [
         lead[COLUMNAS.EMAIL],
@@ -456,10 +468,12 @@ function renderDetalleCC() {
                     </label>
                     <label class="cc-campo">Modalidad
                         <select id="ccModalidad">
-                            ${['Semi-Presencial', 'Virtual'].map(m =>
+                            ${!modalidadActual ? '<option value="" selected disabled>-- Sin definir --</option>' : ''}
+                            ${modalidadOpcionesCC.map(m =>
                                 `<option value="${m}" ${m === modalidadActual ? 'selected' : ''}>${m}</option>`
                             ).join('')}
                         </select>
+                        ${!modalidadActual ? '<span style="display:block; font-size:11px; color:#c62828; margin-top:2px;">Este lead no tiene modalidad guardada — selecciónala.</span>' : ''}
                     </label>
                     <label class="cc-campo">Matrícula (S/)
                         <input type="number" id="ccMatricula" value="${escapeHtml(String(matriculaActual))}">
