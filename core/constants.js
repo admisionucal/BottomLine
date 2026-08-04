@@ -3,7 +3,7 @@
 // ================================================================
 
 // ----- URL DE LA API (Google Apps Script) -----
-export const API_URL = 'https://script.google.com/macros/s/AKfycbxuS610koL4LLAt-wB5IK3yz3NsfwQjH3FGaZ2q0vbn6nBsqUdgoc64HbZFItNEStSs_Q/exec';
+export const API_URL = 'https://script.google.com/macros/s/AKfycby1Rph9W6OcALQmxUmAkE4aCj77-O3dUMBFKWoCGKSr1I9nvOWpIyAvh8xrjrVhELXWlw/exec';
 
 // ----- MAPEO DE COLUMNAS DE GOOGLE SHEETS -----
 // Centraliza todos los nombres de columnas para evitar strings mágicos.
@@ -34,6 +34,7 @@ export const COLUMNAS = {
     TIEMPO_OFRECIDO: 'TIEMPO_OFRECIDO',
     DESCUENTO_PRECIOS: 'DESCUENTO_PRECIOS',
     COLEGIO: 'COLEGIO',
+    CODIGO_MODULAR: 'CODIGO MODULAR',
     STATUS_GESTION: 'STATUS DE GESTION',
     FECHA_COMPROMISO_PAGO: 'FECHA COMPROMISO DE PAGO',
     FECHA_PAGO_COMPLETO: 'FECHA DE PAGO COMPLETO',

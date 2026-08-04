@@ -430,7 +430,8 @@ function renderDetalleCC() {
             <div style="flex:1 1 380px; background:white; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,0.06); padding:24px;">
                 <p style="font-size:12px; color:#999; margin:0 0 16px 0;">
                     ID Prometeo: <strong>${escapeHtml(sol.ID_PROMETEO)}</strong> &nbsp;|&nbsp;
-                    Campaña: <strong>${escapeHtml(sol.CAMPANA)}</strong>
+                    Campaña: <strong>${escapeHtml(sol.CAMPANA)}</strong> &nbsp;|&nbsp;
+                    Colegio: <strong>${escapeHtml(lead[COLUMNAS.COLEGIO])} (${escapeHtml(lead[COLUMNAS.CODIGO_MODULAR] || '-')})</strong>
                 </p>
 
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
