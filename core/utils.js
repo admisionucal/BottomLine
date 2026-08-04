@@ -10,7 +10,7 @@ import { CACHE_KEYS } from './constants.js';
 
 /** Escapa texto para inserción HTML (previene XSS) */
 export function escapeHtml(str) {
-    if (!str) return '';
+    if (str === undefined || str === null) return '';
     return String(str)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')

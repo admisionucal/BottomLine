@@ -340,7 +340,12 @@ function applyFilters() {
         if (state.terminoBusqueda) {
             const id = String(lead[COLUMNAS.ID_PROMETEO] || '').toLowerCase();
             const nombre = String(lead[COLUMNAS.NOMBRES] || '').toLowerCase();
-            if (!id.includes(state.terminoBusqueda) && !nombre.includes(state.terminoBusqueda)) return false;
+            const celular1 = String(lead[COLUMNAS.TELEFONO_2] || '').toLowerCase();
+            const celular2 = String(lead[COLUMNAS.TELEFONO_3] || '').toLowerCase();
+            if (!id.includes(state.terminoBusqueda) &&
+                !nombre.includes(state.terminoBusqueda) &&
+                !celular1.includes(state.terminoBusqueda) &&
+                !celular2.includes(state.terminoBusqueda)) return false;
         }
 
         return true;
