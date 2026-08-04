@@ -473,7 +473,6 @@ function renderDetalleCC() {
                                 `<option value="${m}" ${m === modalidadActual ? 'selected' : ''}>${m}</option>`
                             ).join('')}
                         </select>
-                        ${!modalidadActual ? '<span style="display:block; font-size:11px; color:#c62828; margin-top:2px;">Este lead no tiene modalidad guardada — selecciónala.</span>' : ''}
                     </label>
                     <label class="cc-campo">Matrícula (S/)
                         <input type="number" id="ccMatricula" value="${escapeHtml(String(matriculaActual))}">
