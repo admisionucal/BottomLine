@@ -1282,7 +1282,7 @@ function renderVista2() {
     const esPagoCompleto = status === STATUS.PAGO_COMPLETO;
     const esPagoFraccionado = status === STATUS.PAGO_FRACCIONADO;
 
-    let statusHTML = `<p><strong>Status:</strong> ${STATUS_LABELS[status] || status}</p>`;
+    let statusHTML = '';
     if (esPP) {
         const fecha = formatearFecha(lead[COLUMNAS.FECHA_COMPROMISO_PAGO]) || 'No registrada';
         statusHTML += `<p><strong>Fecha de Promesa de Pago:</strong> ${fecha}</p>`;
@@ -1312,9 +1312,9 @@ function renderVista2() {
     }
 
     let html = `
-        <div style="background:white; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); margin-bottom:16px;">
+        ${statusHTML ? `<div style="background:white; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); margin-bottom:16px;">
             ${statusHTML}
-        </div>
+        </div>` : ''}
 
         <div style="background:white; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); margin-bottom:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
@@ -1420,7 +1420,7 @@ function renderHistorial() {
                                 <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">person</span>
                                 ${escapeHtml(fila.ASESOR_NOMBRE || fila.ASESOR_EMAIL || 'Asesor desconocido')}
                             </strong>
-                            <span style="font-size:12px;color:#888;">Última actualización: ${escapeHtml(formatearFecha(fila.FECHA_ULT_MODIFICACION))}</span>
+                            <span style="font-size:12px;color:#888;">Última actualización: ${escapeHtml(formatearFechaHora(fila.FECHA_ULT_MODIFICACION))}</span>
                         </div>
                         ${renderItemsHistorial(items, fila.ASESOR_EMAIL)}
                     </div>
@@ -1457,7 +1457,13 @@ function renderItemsHistorial(items, asesorEmail) {
         return '<p style="color:#888; font-size:14px;">Sin interacciones registradas.</p>';
     }
 
-    return items.map(it => {
+    // Más reciente primero. El backend agrega cada entrada al final del array
+    // (orden cronológico ascendente), así que acá se invierte para mostrar.
+    const itemsOrdenados = items
+        .slice()
+        .sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+
+    return itemsOrdenados.map(it => {
         if (it.tipo === 'perfil_snapshot') {
             const idx = state.historialSnapshots.length;
             state.historialSnapshots.push({ datos: it.datos, usuario: it.usuario, fecha: it.fecha, asesorEmail: asesorEmail });
@@ -1466,14 +1472,14 @@ function renderItemsHistorial(items, asesorEmail) {
                      style="cursor:pointer; background:#f3f6ff; border:1px solid #c5cae9; border-radius:6px; padding:10px 14px; margin-bottom:6px; font-size:14px; color:var(--color-primary);">
                     <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">edit_note</span>
                     Actualización de perfilamiento — <strong>${escapeHtml(it.usuario)}</strong>
-                    <span style="color:#888; font-size:12px;"> · ${formatearFecha(it.fecha)}</span>
+                    <span style="color:#888; font-size:12px;"> · ${formatearFechaHora(it.fecha)}</span>
                     <span style="float:right; color:var(--color-primary); font-size:12px;">Ver detalle →</span>
                 </div>
             `;
         }
         return `
             <div style="padding:8px 4px; font-size:14px; color:#333; border-bottom:1px solid #f0f0f0;">
-                <span style="color:#888;">[${formatearFecha(it.fecha)}]</span>
+                <span style="color:#888;">[${formatearFechaHora(it.fecha)}]</span>
                 <strong>${escapeHtml(it.usuario)}</strong>: ${escapeHtml(it.texto)}
             </div>
         `;
@@ -1509,10 +1515,10 @@ window.abrirSnapshot = function(idx) {
     };
 
     const preguntas = camposVisibles.map(c =>
-        `<p style="margin:6px 0;"><strong>${escapeHtml(labels[c])}</strong><br>${escapeHtml(item.datos[c] || '-')}</p>`
+        `<p style="margin:6px 0;"><strong>${escapeHtml(labels[c])}</strong><br>${escapeHtml(item.datos[c] || '(sin respuesta)')}</p>`
     ).join('');
 
-    document.getElementById('snapshotFecha').textContent = `${escapeHtml(item.usuario)} — ${formatearFecha(item.fecha)}`;
+    document.getElementById('snapshotFecha').textContent = `${escapeHtml(item.usuario)} — ${formatearFechaHora(item.fecha)}`;
     document.getElementById('snapshotContenido').innerHTML = preguntas;
     document.getElementById('snapshotRestaurarBtn').onclick = () => restaurarSnapshot(idx);
     document.getElementById('snapshotModal').classList.add('show');
@@ -1735,6 +1741,20 @@ function formatearFecha(valor) {
     const mm = String(fecha.getMonth() + 1).padStart(2, '0');
     const yyyy = fecha.getFullYear();
     return `${dd}/${mm}/${yyyy}`;
+}
+
+// Igual que formatearFecha pero con hora:minuto — solo se usa en el Historial,
+// donde interesa saber en qué momento exacto del día ocurrió cada interacción.
+function formatearFechaHora(valor) {
+    if (!valor) return '';
+    const fecha = new Date(valor);
+    if (isNaN(fecha.getTime())) return String(valor);
+    const dd = String(fecha.getDate()).padStart(2, '0');
+    const mm = String(fecha.getMonth() + 1).padStart(2, '0');
+    const yyyy = fecha.getFullYear();
+    const hh = String(fecha.getHours()).padStart(2, '0');
+    const min = String(fecha.getMinutes()).padStart(2, '0');
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
 }
 
 function sincronizarCache() {
