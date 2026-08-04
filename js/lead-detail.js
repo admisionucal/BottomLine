@@ -323,7 +323,8 @@ function renderVista1() {
     const colegioNorm = normalizarTexto(colegio);
     const modalidadNorm = normalizarTexto(modalidad);
     const esColegioAliado = (caso === 1) && modalidadNorm === 'semipresencial' &&
-        (colegioNorm.includes('innovaschool') || colegioNorm.includes('sacooliveros'));
+        (colegioNorm.includes('innovaschool') || colegioNorm.includes('sacooliveros')) &&
+        !colegioNorm.includes('pascual');
 
     const filasFiltradas = esColegioAliado
         ? filasCatalogoSinRango(state.catalogoBoletas, tipoIngresoCatalogo)
