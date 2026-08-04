@@ -20,6 +20,7 @@ export class Sidebar {
         this.active = options.active || 'usuario';
         this.activeSubitem = options.activeSubitem || null;
         this.render();
+        this.aplicarVisibilidadPorRol();
         this.initEvents();
         window.__sidebarInstance = this;
     }
@@ -81,12 +82,15 @@ export class Sidebar {
                 </div>
 
                 <div class="nav-group ${abrirBottomLine ? 'open' : ''}" id="navGroupBottomLine">
-                    <button type="button" class="nav-group-btn ${abrirBottomLine ? 'active' : ''}" title="Bottom Line" onclick="window.toggleNavGroup && toggleNavGroup('navGroupBottomLine', this); window.mostrarBottomLine && mostrarBottomLine();">
+                    <button type="button" class="nav-group-btn ${abrirBottomLine ? 'active' : ''}" title="Bottom Line" onclick="window.toggleNavGroup && toggleNavGroup('navGroupBottomLine', this)">
                         <span class="nav-icon material-symbols-outlined">trending_up</span>
                         <span class="nav-label">Bottom Line</span>
                         <span class="nav-caret">›</span>
                     </button>
                     <div class="nav-submenu">
+                        <button type="button" class="nav-subitem ${esSub('navDashboardBL')}" id="navDashboardBL" title="Dashboard" onclick="window.mostrarBottomLine && mostrarBottomLine(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
+                            <span class="material-symbols-outlined">dashboard</span> Dashboard
+                        </button>
                         <button type="button" class="nav-subitem ${esSub('navUnificarIds')}" id="navUnificarIds" title="Unificar IDs" style="display:none;" onclick="window.mostrarUnificar && mostrarUnificar(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">merge</span> Unificar IDs
                         </button>
@@ -108,8 +112,19 @@ export class Sidebar {
         this.renderFooter();
     }
 
+    // Muestra los subitems restringidos a SUPERVISOR/ADMISION.
+    aplicarVisibilidadPorRol() {
+        const user = getCurrentUser();
+        if (!user || !esRolSupervisorOAdmision(user.rol)) return;
+
+        ['navUnificarIds', 'navCondicionesCC', 'navAsistenciaKPIs', 'navAsistenciaAnalisis', 'navAsistenciaMantenimiento']
+            .forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = '';
+            });
+    }
+
     // Bloque inferior fijo del sidebar: foto, nombre, rol y cerrar sesión.
-    // Reemplaza al antiguo bloque de usuario que vivía en el header.
     renderFooter() {
         const footer = document.getElementById('sidebarFooter');
         if (!footer) return;

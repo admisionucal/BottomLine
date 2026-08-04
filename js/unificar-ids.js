@@ -55,12 +55,6 @@ function initUnificar() {
     const modoEmbebido = !!document.querySelector('.sidebar-nav');
     if (!modoEmbebido) {
         new Sidebar({ active: 'bottomline', activeSubitem: 'navUnificarIds' });
-        // En dashboard.html estos subitems los revela setupUI() según el rol;
-        // aquí, como página standalone, ya sabemos que el usuario es admin.
-        const navU = document.getElementById('navUnificarIds');
-        if (navU) navU.style.display = 'flex';
-        const navC = document.getElementById('navCondicionesCC');
-        if (navC) navC.style.display = 'flex';
     }
 
     // Cargar campañas

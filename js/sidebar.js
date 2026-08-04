@@ -184,7 +184,10 @@ function mostrarBottomLine() {
     document.querySelectorAll('.nav-group-btn').forEach(b => b.classList.remove('active'));
     const grupo = document.getElementById('navGroupBottomLine');
     if (grupo) grupo.querySelector('.nav-group-btn').classList.add('active');
+
     document.querySelectorAll('.nav-subitem').forEach(b => b.classList.remove('active'));
+    const navDash = document.getElementById('navDashboardBL');
+    if (navDash) navDash.classList.add('active');
 }
 
 // ===== VISTA: ASISTENCIA =====

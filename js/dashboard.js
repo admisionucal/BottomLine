@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const vistaInicial = new URLSearchParams(window.location.search).get('view') || 'usuario';
     const gruposBottomLine = ['bottomline', 'calendario', 'unificar', 'cc'];
     const activaInicial = gruposBottomLine.includes(vistaInicial) ? 'bottomline' : vistaInicial;
+    const subitemPorVista = { bottomline: 'navDashboardBL' };
 
     // Inyectar Sidebar y Header
     const sidebar = new Sidebar({ active: activaInicial });
@@ -155,23 +156,9 @@ function setupUI(user) {
     if (!esAdmin && asesorGroup) asesorGroup.style.display = 'none';
 
     if (esAdmin) {
-        // Bottom Line > Unificar IDs: solo SUPERVISOR/ADMISION
-        const navUnificarIds = document.getElementById('navUnificarIds');
-        if (navUnificarIds) navUnificarIds.style.display = 'flex';
-
-        const navCondicionesCC = document.getElementById('navCondicionesCC');
-        if (navCondicionesCC) navCondicionesCC.style.display = 'flex';
 
         const filtersContainer = document.getElementById('filtersContainer');
         if (filtersContainer) filtersContainer.classList.add('cols-4');
-
-        // Asistencia > KPIs / Análisis / Mantenimiento: solo SUPERVISOR/ADMISION
-        const navKPIs = document.getElementById('navAsistenciaKPIs');
-        if (navKPIs) navKPIs.style.display = 'block';
-        const navAnalisis = document.getElementById('navAsistenciaAnalisis');
-        if (navAnalisis) navAnalisis.style.display = 'block';
-        const navMantenimiento = document.getElementById('navAsistenciaMantenimiento');
-        if (navMantenimiento) navMantenimiento.style.display = 'block';
 
         // Asistencia > Marcación: EXCLUSIVA de ASESOR
         const navMarcacion = document.getElementById('navAsistenciaMarcacion');
