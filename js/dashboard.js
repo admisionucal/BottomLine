@@ -28,17 +28,12 @@ let state = {
     pagesPerBlock: 20,
     terminoBusqueda: '',
     filtros: {
-        carrera: [],
-        ingreso: [],
-        beneficio: [],
-        modalidad: [],
-        asesor: [],
-        // Por defecto se muestran VP Viva y PP Viva. Si el usuario ya usó
-        // el dashboard antes, esto se pisa más abajo con lo que tenga
-        // guardado en caché (ver "Restaurar campaña guardada").
+        carrera: [], ingreso: [], beneficio: [], modalidad: [], asesor: [],
         status: [STATUS.VP_VIVA, STATUS.PP_VIVA]
     },
     campana: '',
+    calCampanas: [],
+    calLeadsPorCampana: {},
     mapaCalendario: {},
     categoriasVisibles: { viva: true, muerta: false, pagoCompleto: false, pagoFraccionado: false },
     calendarioMes: new Date(),
@@ -79,8 +74,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupUI(user);
     if (esRolSupervisorOAdmision(user.rol)) actualizarBadgeCC();
     await loadCampanas(user);
+    setupCalendarioCampanaFiltro(user);
     setupBuscador();
     await loadLeads();
+    await cargarLeadsCalendario();
 
     // Eventos
     document.getElementById('btnActualizar')?.addEventListener('click', () => loadLeads(true));
@@ -257,6 +254,85 @@ function renderCampanaOptions(campanas) {
         const panel = container.querySelector('.multiselect-panel');
         if (panel) panel.classList.add('open');
     }
+}
+
+// ===== FILTRO DE CAMPAÑA DEL CALENDARIO =====
+function setupCalendarioCampanaFiltro(user) {
+    const campanas = getUserCampanas();
+    const grupo = document.getElementById('calCampanaFilterGroup');
+    if (!grupo) return;
+
+    // Si el usuario solo tiene una campaña, no hay nada que filtrar.
+    if (campanas.length <= 1) {
+        grupo.style.display = 'none';
+        state.calCampanas = campanas.slice();
+        return;
+    }
+    grupo.style.display = '';
+
+    const saved = cacheGet(CACHE_KEYS.CAL_CAMPANAS);
+    const seleccionGuardada = Array.isArray(saved) ? saved.filter(c => campanas.includes(c)) : [];
+    state.calCampanas = seleccionGuardada.length > 0 ? seleccionGuardada : [state.campana].filter(Boolean);
+
+    createMultiSelect('calFilterCampana', campanas, state.calCampanas, 'Todas');
+}
+
+window.addEventListener('multiselect-change', (e) => {
+    if (e.detail.containerId !== 'calFilterCampana') return;
+    state.calCampanas = e.detail.values;
+    cacheSet(CACHE_KEYS.CAL_CAMPANAS, state.calCampanas);
+    cargarLeadsCalendario();
+});
+
+function getCalCampanasEfectivas() {
+    const todas = getUserCampanas();
+    if (!state.calCampanas || state.calCampanas.length === 0) return todas;
+    return state.calCampanas.filter(c => todas.includes(c));
+}
+
+async function cargarLeadsCalendario(forceRefresh = false) {
+    const user = getCurrentUser();
+    if (!user) return;
+    const campanasActivas = getCalCampanasEfectivas();
+
+    if (campanasActivas.length === 0) {
+        state.calLeadsPorCampana = {};
+        actualizarCalendario();
+        renderCalendarioPP();
+        renderLeyendaCalendario();
+        return;
+    }
+
+    const resultados = await Promise.all(campanasActivas.map(async (campana) => {
+        const cacheKey = CACHE_KEYS.LEADS_RAW(user.email, user.rol, campana);
+        if (!forceRefresh) {
+            const cached = cacheGet(cacheKey);
+            if (cached && cached.data) return { campana, leads: cached.data };
+        }
+        try {
+            const result = await callAPI('getLeads', {
+                email: user.email,
+                rol: user.rol,
+                campana,
+                nombreAsesor: user.nombre_completo || user.nombre_asesor || user.nombre || ''
+            });
+            if (result.success) {
+                const data = result.data || [];
+                cacheSet(cacheKey, { data, timestamp: Date.now() });
+                return { campana, leads: data };
+            }
+        } catch (error) {
+            // Se ignora
+        }
+        return { campana, leads: [] };
+    }));
+
+    state.calLeadsPorCampana = {};
+    resultados.forEach(({ campana, leads }) => { state.calLeadsPorCampana[campana] = leads; });
+
+    actualizarCalendario();
+    renderCalendarioPP();
+    renderLeyendaCalendario();
 }
 
 // ===== LEADS =====
@@ -608,14 +684,16 @@ function actualizarCalendario() {
 
 function construirMapaAsesor() {
     const mapa = {};
-    state.leadsRaw.forEach(lead => {
-        const status = lead[COLUMNAS.STATUS_GESTION] || '';
-        if (status !== STATUS.PP_VIVA) return;
-        const fecha = parsearFechaFlexible(lead[COLUMNAS.FECHA_COMPROMISO_PAGO]);
-        if (!fecha) return;
-        const clave = fechaAClaveISO(fecha);
-        if (!mapa[clave]) mapa[clave] = [];
-        mapa[clave].push(lead);
+    Object.keys(state.calLeadsPorCampana).forEach(campana => {
+        (state.calLeadsPorCampana[campana] || []).forEach(lead => {
+            const status = lead[COLUMNAS.STATUS_GESTION] || '';
+            if (status !== STATUS.PP_VIVA) return;
+            const fecha = parsearFechaFlexible(lead[COLUMNAS.FECHA_COMPROMISO_PAGO]);
+            if (!fecha) return;
+            const clave = fechaAClaveISO(fecha);
+            if (!mapa[clave]) mapa[clave] = [];
+            mapa[clave].push({ lead, campana });
+        });
     });
     return mapa;
 }
@@ -629,15 +707,17 @@ function construirMapaAdmin() {
         pagoFraccionado: { status: STATUS.PAGO_FRACCIONADO, campo: COLUMNAS.FECHA_PROMESA_PAGO }
     };
 
-    state.leadsRaw.forEach(lead => {
-        const status = lead[COLUMNAS.STATUS_GESTION] || '';
-        const catKey = Object.keys(categorias).find(k => categorias[k].status === status);
-        if (!catKey) return;
-        const fecha = parsearFechaFlexible(lead[categorias[catKey].campo]);
-        if (!fecha) return;
-        const clave = fechaAClaveISO(fecha);
-        if (!mapa[clave]) mapa[clave] = { viva: [], muerta: [], pagoCompleto: [], pagoFraccionado: [] };
-        mapa[clave][catKey].push(lead);
+    Object.keys(state.calLeadsPorCampana).forEach(campana => {
+        (state.calLeadsPorCampana[campana] || []).forEach(lead => {
+            const status = lead[COLUMNAS.STATUS_GESTION] || '';
+            const catKey = Object.keys(categorias).find(k => categorias[k].status === status);
+            if (!catKey) return;
+            const fecha = parsearFechaFlexible(lead[categorias[catKey].campo]);
+            if (!fecha) return;
+            const clave = fechaAClaveISO(fecha);
+            if (!mapa[clave]) mapa[clave] = { viva: [], muerta: [], pagoCompleto: [], pagoFraccionado: [] };
+            mapa[clave][catKey].push({ lead, campana });
+        });
     });
     return mapa;
 }
@@ -660,12 +740,12 @@ function itemsVisiblesDelDia(clave) {
     const datos = state.mapaCalendario[clave];
     if (!datos) return [];
     if (Array.isArray(datos)) {
-        return datos.map(lead => ({ lead, categoria: 'viva' }));
+        return datos.map(({ lead, campana }) => ({ lead, categoria: 'viva', campana }));
     }
     let items = [];
     Object.keys(state.categoriasVisibles).forEach(key => {
         if (state.categoriasVisibles[key] && datos[key]) {
-            datos[key].forEach(lead => items.push({ lead, categoria: key }));
+            datos[key].forEach(({ lead, campana }) => items.push({ lead, categoria: key, campana }));
         }
     });
     return items;
@@ -704,6 +784,22 @@ function renderLeyendaCalendario() {
             </label>`;
     });
     html += '</div>';
+
+    // NUEVO: si hay más de una campaña activa a la vez, se explica el tono claro/normal.
+    const activas = getCalCampanasEfectivas();
+    if (activas.length > 1) {
+        html += '<div class="cal-leyenda-campanas">';
+        activas.forEach((campana, idx) => {
+            const color = idx === 0 ? '#0040A1' : aclararColor('#0040A1', Math.min(0.45, 0.22 * idx));
+            html += `
+                <div class="cal-leyenda-campana-item">
+                    <span class="cal-dot-campana" style="background:${color};"></span>
+                    <span>${escapeHtml(campana)}${idx === 0 ? ' (tono normal)' : ' (tono más claro)'}</span>
+                </div>`;
+        });
+        html += '</div>';
+    }
+
     cont.innerHTML = html;
 }
 
@@ -717,12 +813,33 @@ function toggleCategoriaCalendario(key, visible) {
     }
 }
 
-// Arma el "background" inline de una celda con datos: si hay una sola
-// categoría ese día, la celda entera se pinta de su color; si hay varias,
-// se reparte el ancho en partes iguales para que compartan el color.
-function construirFondoCelda(categorias) {
-    if (!categorias || categorias.length === 0) return '';
-    const colores = categorias.map(key => (CATEGORIAS_CALENDARIO[key] ? CATEGORIAS_CALENDARIO[key].color : '#0040A1'));
+function aclararColor(hex, porcentaje) {
+    const num = parseInt(hex.replace('#', ''), 16);
+    let r = (num >> 16) & 0xFF;
+    let g = (num >> 8) & 0xFF;
+    let b = num & 0xFF;
+    r = Math.round(r + (255 - r) * porcentaje);
+    g = Math.round(g + (255 - g) * porcentaje);
+    b = Math.round(b + (255 - b) * porcentaje);
+    return '#' + [r, g, b].map(v => Math.min(255, Math.max(0, v)).toString(16).padStart(2, '0')).join('');
+}
+
+function colorParaItem(categoria, campana) {
+    const base = CATEGORIAS_CALENDARIO[categoria] ? CATEGORIAS_CALENDARIO[categoria].color : '#0040A1';
+    const activas = getCalCampanasEfectivas();
+    if (activas.length <= 1) return base;
+    const idx = activas.indexOf(campana);
+    if (idx <= 0) return base;
+    return aclararColor(base, Math.min(0.45, 0.22 * idx));
+}
+
+function construirFondoCelda(items) {
+    if (!items || items.length === 0) return '';
+    const colores = [];
+    items.forEach(it => {
+        const color = colorParaItem(it.categoria, it.campana);
+        if (!colores.includes(color)) colores.push(color);
+    });
     if (colores.length === 1) return `background:${colores[0]};`;
 
     const paso = 100 / colores.length;
@@ -765,8 +882,7 @@ function renderCalendarioPP() {
         const cantidad = items.length;
         const esHoy = claveDia === hoyClave;
 
-        const categoriasDelDia = [...new Set(items.map(it => it.categoria))];
-        const estiloFondo = cantidad > 0 ? construirFondoCelda(categoriasDelDia) : '';
+        const estiloFondo = cantidad > 0 ? construirFondoCelda(items) : '';
 
         celdas += `
             <div class="cal-celda ${cantidad > 0 ? 'con-datos' : ''} ${esHoy ? 'hoy' : ''}"
@@ -824,8 +940,7 @@ function renderCalendarioAnio(cont) {
             const cantidad = itemsDia.length;
             totalMes += cantidad;
             const esHoy = claveDia === hoyClave;
-            const categoriasDia = [...new Set(itemsDia.map(it => it.categoria))];
-            const estiloFondo = cantidad > 0 ? construirFondoCelda(categoriasDia) : '';
+            const estiloFondo = cantidad > 0 ? construirFondoCelda(itemsDia) : '';
 
             celdas += `
                 <div class="cal-mini-celda ${cantidad > 0 ? 'con-datos' : ''} ${esHoy ? 'hoy' : ''}"
@@ -861,7 +976,6 @@ function cambiarAnioCalendario(delta) {
     renderCalendarioPP();
 }
 
-// Salta de la vista de año a la vista mensual, ya ubicado en el mes elegido.
 function irAMes(year, month) {
     state.calendarioMes = new Date(year, month, 1);
     cambiarVistaCalendario('mes');
@@ -875,9 +989,10 @@ function abrirDetalleDia(claveDia) {
 
     const user = getCurrentUser();
     const esAdmin = user && esRolSupervisorOAdmision(user.rol);
+    const mostrarCampana = getCalCampanasEfectivas().length > 1;
 
     let filas = '';
-    items.forEach(({ lead, categoria }) => {
+    items.forEach(({ lead, categoria, campana }) => {
         const id = lead[COLUMNAS.ID_PROMETEO] || '-';
         const carrera = lead['CARRERA'] || lead['PROGRAMA'] || '-';
         const modalidadIngreso = lead['MODALIDAD INGRESO'] || '-';
@@ -887,7 +1002,8 @@ function abrirDetalleDia(claveDia) {
         const cat = CATEGORIAS_CALENDARIO[categoria];
         filas += `
             <tr>
-                ${esAdmin ? `<td><span class="cal-dot" style="background:${cat.color};"></span> ${escapeHtml(cat.label)}</td>` : ''}
+                ${esAdmin ? `<td><span class="cal-dot" style="background:${colorParaItem(categoria, campana)};"></span> ${escapeHtml(cat.label)}</td>` : ''}
+                ${mostrarCampana ? `<td>${escapeHtml(campana)}</td>` : ''}
                 <td><a href="#" class="id-link" onclick="verDetalleDesdeCalendario('${escapeHtml(id)}'); return false;">${escapeHtml(id)}</a></td>
                 <td>${escapeHtml(carrera)}</td>
                 <td>${escapeHtml(modalidadIngreso)}</td>
@@ -897,7 +1013,7 @@ function abrirDetalleDia(claveDia) {
             </tr>`;
     });
 
-    const colspan = esAdmin ? 7 : 5;
+    const colspan = (esAdmin ? 7 : 5) + (mostrarCampana ? 1 : 0);
 
     const modalHtml = `
         <div class="cal-modal-overlay cal-modal-overlay-top" id="calModalOverlay" onclick="cerrarDetalleDia(event)">
@@ -913,7 +1029,7 @@ function abrirDetalleDia(claveDia) {
                 <div class="cal-modal-body">
                     <table>
                         <thead><tr>
-                            ${esAdmin ? '<th>CATEGORÍA</th>' : ''}<th>ID</th><th>CARRERA</th><th>MODALIDAD INGRESO</th><th>MODALIDAD</th><th>BOLETA FINAL</th>${esAdmin ? '<th>ASESOR</th>' : ''}
+                            ${esAdmin ? '<th>CATEGORÍA</th>' : ''}${mostrarCampana ? '<th>CAMPAÑA</th>' : ''}<th>ID</th><th>CARRERA</th><th>MODALIDAD INGRESO</th><th>MODALIDAD</th><th>BOLETA FINAL</th>${esAdmin ? '<th>ASESOR</th>' : ''}
                         </tr></thead>
                         <tbody>${filas || `<tr><td colspan="${colspan}" style="text-align:center;color:#888;padding:20px;">Sin registros</td></tr>`}</tbody>
                     </table>
@@ -937,10 +1053,12 @@ function verDetalleDesdeCalendario(id) {
 
 // ===== EXPORTAR CALENDARIO =====
 function construirFilasExportCalendario(items, esAdmin, incluirFecha) {
-    return items.map(({ lead, categoria, fecha }) => {
+    const mostrarCampana = getCalCampanasEfectivas().length > 1;
+    return items.map(({ lead, categoria, campana, fecha }) => {
         const fila = {};
         if (incluirFecha && fecha) fila['FECHA'] = fecha.split('-').reverse().join('/');
         if (esAdmin) fila['CATEGORÍA'] = CATEGORIAS_CALENDARIO[categoria].label;
+        if (mostrarCampana) fila['CAMPAÑA'] = campana || '';
         fila['ID PROMETEO'] = lead[COLUMNAS.ID_PROMETEO] || '';
         fila['CARRERA'] = lead['CARRERA'] || lead['PROGRAMA'] || '';
         fila['MODALIDAD INGRESO'] = lead['MODALIDAD INGRESO'] || '';
@@ -968,6 +1086,11 @@ function recolectarItemsPorPrefijo(prefijo) {
     return items;
 }
 
+function nombreCampanaExport() {
+    const activas = getCalCampanasEfectivas();
+    return activas.length > 0 ? activas.join('-') : 'Campana';
+}
+
 function exportarDiaExcel() {
     if (!state.diaSeleccionado) return;
     const items = itemsVisiblesDelDia(state.diaSeleccionado);
@@ -978,8 +1101,7 @@ function exportarDiaExcel() {
     const user = getCurrentUser();
     const esAdmin = user && esRolSupervisorOAdmision(user.rol);
     const filasExport = construirFilasExportCalendario(items, esAdmin, false);
-    const campana = document.getElementById('selectCampana')?.value || 'Campana';
-    descargarExcelCalendario(filasExport, `Calendario_${state.diaSeleccionado}_${campana}.xlsx`);
+    descargarExcelCalendario(filasExport, `Calendario_${state.diaSeleccionado}_${nombreCampanaExport()}.xlsx`);
 }
 
 function exportarMesExcel() {
@@ -994,11 +1116,10 @@ function exportarMesExcel() {
     const user = getCurrentUser();
     const esAdmin = user && esRolSupervisorOAdmision(user.rol);
     const filasExport = construirFilasExportCalendario(items, esAdmin, true);
-    const campana = document.getElementById('selectCampana')?.value || 'Campana';
     const nombreMes = state.calendarioMes
         .toLocaleDateString('es-PE', { month: 'long', year: 'numeric' })
         .replace(/\s+/g, '_');
-    descargarExcelCalendario(filasExport, `Calendario_${nombreMes}_${campana}.xlsx`);
+    descargarExcelCalendario(filasExport, `Calendario_${nombreMes}_${nombreCampanaExport()}.xlsx`);
 }
 
 function exportarAnioExcel() {
@@ -1011,8 +1132,7 @@ function exportarAnioExcel() {
     const user = getCurrentUser();
     const esAdmin = user && esRolSupervisorOAdmision(user.rol);
     const filasExport = construirFilasExportCalendario(items, esAdmin, true);
-    const campana = document.getElementById('selectCampana')?.value || 'Campana';
-    descargarExcelCalendario(filasExport, `Calendario_${year}_${campana}.xlsx`);
+    descargarExcelCalendario(filasExport, `Calendario_${year}_${nombreCampanaExport()}.xlsx`);
 }
 
 function exportarCalendarioActual() {
@@ -1023,8 +1143,6 @@ function exportarCalendarioActual() {
     }
 }
 
-// Exponer al scope global: estas funciones se invocan desde onclick="" en HTML
-// generado dinámicamente (innerHTML) y desde dashboard.html / sidebar.js.
 window.cambiarVistaCalendario = cambiarVistaCalendario;
 window.toggleCategoriaCalendario = toggleCategoriaCalendario;
 window.cambiarMesCalendario = cambiarMesCalendario;

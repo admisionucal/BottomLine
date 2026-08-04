@@ -169,6 +169,7 @@ export const CACHE_KEYS = {
     PAYMENTS: (id, campana) => `bl_payments_${id}_${campana}`,
     SOLICITUDES_CC: (email, rol, incluirResueltas) => `bl_solicitudes_cc_${email}_${rol}_${incluirResueltas}`,
     FILTROS_ESTADO: 'bl_filtros_estado',
+    CAL_CAMPANAS: 'bl_cal_campanas',
     BOLETAS: 'bl_boletas',
     BENEFICIOS: 'bl_beneficios',
     INSTITUCIONES_PROCEDENCIA: 'bl_instituciones_procedencia',

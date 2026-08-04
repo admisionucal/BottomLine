@@ -138,6 +138,35 @@ async function cargarCatalogos() {
     }
 }
 
+// Determina el "caso" de ingreso del lead a partir de su MODALIDAD_INGRESO:
+// 1 = Ordinario, 2 = Traslado con Conva, 3 = Traslado sin Conva.
+function determinarCasoIngreso(lead) {
+    const tipoIngresoLower = String(obtenerCampo(lead, COLUMNAS.MODALIDAD_INGRESO) || '').trim().toLowerCase();
+    if (tipoIngresoLower.indexOf('sin conva') !== -1) return 3;
+    if (tipoIngresoLower.indexOf('con conva') !== -1) return 2;
+    return 1;
+}
+
+function esLeadNoOrdinario(lead) {
+    return determinarCasoIngreso(lead) !== 1;
+}
+
+async function actualizarCatalogoProcedencia() {
+    try {
+        const result = await callAPI('getCatalogos');
+        if (result.success) {
+            const instituciones = result.data?.institucionesProcedencia || [];
+            const carreras = result.data?.carrerasProcedencia || [];
+            cacheSet(CACHE_KEYS.INSTITUCIONES_PROCEDENCIA, instituciones);
+            cacheSet(CACHE_KEYS.CARRERAS_PROCEDENCIA, carreras);
+            state.catalogoInstitucionesProcedencia = instituciones;
+            state.catalogoCarrerasProcedencia = carreras;
+        }
+    } catch (e) {
+        console.error('Error actualizando catálogo de instituciones/carreras de procedencia:', e);
+    }
+}
+
 // ===== LEAD =====
 async function cargarLead() {
     const user = getCurrentUser();
@@ -153,6 +182,7 @@ async function cargarLead() {
         renderAll();
         cargarSolicitudPendiente();
         cargarSolicitudCC();
+        if (esLeadNoOrdinario(state.lead)) actualizarCatalogoProcedencia().then(() => renderVista1());
         return;
     }
 
@@ -189,6 +219,7 @@ async function cargarLead() {
             renderAll();
             cargarSolicitudPendiente();
             cargarSolicitudCC();
+            if (esLeadNoOrdinario(state.lead)) actualizarCatalogoProcedencia().then(() => renderVista1());
         } else {
             alert('Error al cargar datos del lead: ' + (result?.error || 'No encontrado'));
             window.location.href = 'dashboard.html?view=bottomline';
@@ -288,11 +319,7 @@ function renderVista1() {
     const carrera = obtenerCampo(lead, COLUMNAS.CARRERA, COLUMNAS.PROGRAMA) || '-';
     const modalidad = obtenerCampo(lead, COLUMNAS.MODALIDAD) || '-';
     const tipoIngreso = String(obtenerCampo(lead, COLUMNAS.MODALIDAD_INGRESO) || '').trim();
-    const tipoIngresoLower = tipoIngreso.toLowerCase();
-
-    let caso = 1;
-    if (tipoIngresoLower.indexOf('sin conva') !== -1) caso = 3;
-    else if (tipoIngresoLower.indexOf('con conva') !== -1) caso = 2;
+    const caso = determinarCasoIngreso(lead);
 
     const boletaActual = obtenerCampo(lead, COLUMNAS.BOLETA) || '';
     const beneficioActual = obtenerCampo(lead, COLUMNAS.BENEFICIO) || '';
