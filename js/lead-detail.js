@@ -786,8 +786,8 @@ function obtenerBoletaVirtualFija(carrera, caso, modalidad) {
     const preciosEspeciales690 = {
         'comunicacionymarketingdigital': 690,
         'disenodigitaldeinteriores': 690,
-        'disenografico': 690,
-        'marketingdigital': 690
+        'disenograficopublicitario': 690,
+        'disenograficoymarketingdigital': 690
     };
     if (preciosEspeciales690[carreraNorm] !== undefined) return 690;
     if (carreraNorm === 'disenograficopublicitario' && caso === 2) return 690;
@@ -1011,6 +1011,16 @@ function abrirModalSolicitudCC() {
     ccCorreosAdicionales = [];
     ccArchivos = { dni: [], certificado: [], boletaProcedencia: [] };
     ['dni', 'certificado', 'boletaProcedencia'].forEach(renderListaArchivosCC);
+
+    // Boleta de Procedencia: solo aplica a Traslado (con o sin convalidación).
+    // Si el lead no es traslado, se oculta el campo y se limpia cualquier
+    // archivo que hubiera quedado seleccionado de una apertura anterior.
+    const tipoIngreso = String(obtenerCampo(state.lead, COLUMNAS.MODALIDAD_INGRESO) || '').toLowerCase();
+    const esTraslado = tipoIngreso.indexOf('con conva') !== -1 || tipoIngreso.indexOf('sin conva') !== -1;
+    const bloqueBoletaProc = document.getElementById('ccBloqueBoletaProcedencia');
+    if (bloqueBoletaProc) bloqueBoletaProc.style.display = esTraslado ? '' : 'none';
+    if (!esTraslado) ccArchivos.boletaProcedencia = [];
+
     document.getElementById('ccNuevoCorreoInput').value = '';
     document.getElementById('ccSolicitudMsg').textContent = '';
     renderCorreosCCLista();
@@ -1061,6 +1071,12 @@ async function enviarSolicitudCC() {
     const id = obtenerCampo(state.lead, COLUMNAS.ID_PROMETEO);
     const dni = obtenerCampo(state.lead, COLUMNAS.DNI) || '';
     const nombreCompleto = obtenerCampo(state.lead, COLUMNAS.NOMBRES) || '';
+
+    if (!dni.trim()) {
+        msgEl.style.color = '#d32f2f';
+        msgEl.textContent = 'Este lead no tiene N° de DNI registrado. Complétalo antes de solicitar las Condiciones Comerciales.';
+        return;
+    }
 
     btn.disabled = true;
     msgEl.style.color = '#666';

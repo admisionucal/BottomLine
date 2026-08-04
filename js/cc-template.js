@@ -13,7 +13,7 @@
 // ================================================================
 
 import { COLUMNAS, CARRERAS_ETU } from '../core/constants.js';
-import { escapeHtml } from '../core/utils.js';
+import { escapeHtml, parseNumero } from '../core/utils.js';
 
 // ----------------------------------------------------------------
 // LOGO: se embebe como data URI (base64) en vez de referenciarlo por
@@ -122,7 +122,7 @@ export function construirDatosCC(lead, campana, overrides = {}) {
     }
 
     // ===== MATRÍCULA (editable) =====
-    const montoMatricula = Number(overrides.montoMatricula ?? lead['MATRICULA_FINAL'] ?? '');
+    const montoMatricula = parseNumero(overrides.montoMatricula ?? lead['MATRICULA_FINAL'] ?? '') || 0;
     d.montoMatricula = montoMatricula;
     if (montoMatricula === 0) {
         d.matriDescuentoTexto = 'S/0';
@@ -136,7 +136,7 @@ export function construirDatosCC(lead, campana, overrides = {}) {
     }
 
     // ===== EXAMEN DE ADMISIÓN (editable) =====
-    const montoExamen = Number(overrides.montoExamen ?? lead['ADMISION_FINAL'] ?? '');
+    const montoExamen = parseNumero(overrides.montoExamen ?? lead['ADMISION_FINAL'] ?? '') || 0;
     d.montoExamen = montoExamen;
     if (montoExamen === 0) {
         d.admiDescuentoTexto = 'S/0';
@@ -150,8 +150,8 @@ export function construirDatosCC(lead, campana, overrides = {}) {
     }
 
     // ===== ESCALAS (editables) =====
-    const escalaRegular = Number(overrides.escalaRegular ?? lead[COLUMNAS.BOLETA] ?? '');
-    const escalaFinal = Number(overrides.escalaFinal ?? lead[COLUMNAS.BOLETA_CON_BECA] ?? '');
+    const escalaRegular = parseNumero(overrides.escalaRegular ?? lead[COLUMNAS.BOLETA] ?? '');
+    const escalaFinal = parseNumero(overrides.escalaFinal ?? lead[COLUMNAS.BOLETA_CON_BECA] ?? '');
     d.escalaRegular = escalaRegular;
     d.escalaFinal = escalaFinal;
 
