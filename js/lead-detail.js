@@ -1509,7 +1509,7 @@ window.abrirSnapshot = function(idx) {
     };
 
     const preguntas = camposVisibles.map(c =>
-        `<p style="margin:6px 0;"><strong>${escapeHtml(labels[c])}</strong><br>${escapeHtml(item.datos[c] || '(sin respuesta)')}</p>`
+        `<p style="margin:6px 0;"><strong>${escapeHtml(labels[c])}</strong><br>${escapeHtml(item.datos[c] || '-')}</p>`
     ).join('');
 
     document.getElementById('snapshotFecha').textContent = `${escapeHtml(item.usuario)} — ${formatearFecha(item.fecha)}`;
