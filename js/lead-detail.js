@@ -335,7 +335,8 @@ function renderVista1() {
     const metodoPagoActual = obtenerCampo(lead, COLUMNAS.METODO_PAGO) || '';
     const boletaFinal = obtenerCampo(lead, COLUMNAS.BOLETA_FINAL) || '-';
     const boletaColegioRaw = obtenerCampo(lead, COLUMNAS.BOLETA_COLEGIO);
-    const boletaColegio = (boletaColegioRaw === null || boletaColegioRaw === '') ? '-' : boletaColegioRaw;
+    const boletaColegioNum = parseNumero(boletaColegioRaw);
+    const boletaColegio = (boletaColegioRaw === null || boletaColegioRaw === '' || boletaColegioNum === 0) ? '-' : boletaColegioRaw;
     const celular1 = obtenerCampo(lead, COLUMNAS.TELEFONO_2) || '';
     const celular2 = obtenerCampo(lead, COLUMNAS.TELEFONO_3) || '';
     const celularesTexto = [celular1, celular2].filter(Boolean).join(' / ') || '-';
