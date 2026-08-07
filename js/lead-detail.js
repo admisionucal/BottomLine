@@ -1799,6 +1799,11 @@ document.addEventListener('click', async (e) => {
 // ===== UTILITIES =====
 function formatearFecha(valor) {
     if (!valor) return '';
+    if (typeof valor === 'string') {
+        const m = valor.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    }
+
     const fecha = new Date(valor);
     if (isNaN(fecha.getTime())) return String(valor);
     const dd = String(fecha.getDate()).padStart(2, '0');
