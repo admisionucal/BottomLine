@@ -329,14 +329,15 @@ function renderVista1() {
     const carreraProcedenciaActual = obtenerCampo(lead, COLUMNAS.CARRERA_PROCEDENCIA) || '';
     const tipoInstitucionProcedenciaActual = obtenerCampo(lead, COLUMNAS.TIPO_INSTITUCION_PROCEDENCIA) || '';
     const boletaProcedenciaActual = obtenerCampo(lead, COLUMNAS.BOLETA_PROCEDENCIA) || '';
+    const cicloQuedoActual = obtenerCampo(lead, COLUMNAS.CICLO_QUEDO) || '';
     const tiempoOfrecidoActual = obtenerCampo(lead, COLUMNAS.TIEMPO_OFRECIDO) || '';
-    // Por defecto: Alumno Regular / 5 cuotas — un lead nuevo aún no tiene
-    // estos campos guardados en la hoja bottom{campana}, así que caen acá.
+    // Por defecto: Alumno Regular / 5 cuotas
     const tipoAlumnoActual = obtenerCampo(lead, COLUMNAS.TIPO_ALUMNO) || 'ALUMNO REGULAR';
     const cuotasActual = obtenerCampo(lead, COLUMNAS.NUMERO_CUOTAS) || '5 cuotas';
+    const metodoPagoActual = obtenerCampo(lead, COLUMNAS.METODO_PAGO) || '';
     const boletaFinal = obtenerCampo(lead, COLUMNAS.BOLETA_FINAL) || '-';
     const boletaColegioRaw = obtenerCampo(lead, COLUMNAS.BOLETA_COLEGIO);
-    const boletaColegio = boletaColegioRaw === '' ? '0' : boletaColegioRaw;
+    const boletaColegio = (boletaColegioRaw === undefined || boletaColegioRaw === null || boletaColegioRaw === '') ? '-' : boletaColegioRaw;
     const celular1 = obtenerCampo(lead, COLUMNAS.TELEFONO_2) || '';
     const celular2 = obtenerCampo(lead, COLUMNAS.TELEFONO_3) || '';
     const celularesTexto = [celular1, celular2].filter(Boolean).join(' / ') || '-';
@@ -423,6 +424,7 @@ function renderVista1() {
         html += campoEditableHTML('Carrera de Procedencia', inputBuscableHTML('selectCarreraProcedencia', state.catalogoCarrerasProcedencia, carreraProcedenciaActual, bloqueado));
         html += campoEditableHTML('Boleta de Procedencia', `<input type="number" id="inputBoletaProcedencia" class="campo-editable-input" value="${escapeHtml(boletaProcedenciaActual)}" ${bloqueado ? 'disabled' : ''}>`);
         if (caso === 2) {
+            html += campoEditableHTML('¿En qué ciclo se quedó?', selectSimpleHTML('selectCicloQuedo', opcionesCicloPorTipoInstitucion(tipoInstitucionProcedenciaActual), cicloQuedoActual, bloqueado || !tipoInstitucionProcedenciaActual));
             html += campoEditableHTML('Tiempo Ofrecido', selectSimpleHTML('selectTiempoOfrecido', SELECT_OPTIONS.tiempo, tiempoOfrecidoActual, bloqueado));
         }
     }
@@ -447,6 +449,7 @@ function renderVista1() {
 
     html += campoEditableHTML('Beneficio Adicional', selectConValorHTML('selectBeneficioAdicional', opcionesAdicional, valorAdicionalCombo, bloqueado));
     html += campoEditableHTML('Beneficio Enganche', selectConValorHTML('selectBeneficioEnganche', opcionesEnganche, valorEngancheCombo, bloqueado));
+    html += campoEditableHTML('Método de Pago', selectSimpleHTML('selectMetodoPago', SELECT_OPTIONS.metodoPago, metodoPagoActual, bloqueado));
 
     html += `
                     </div>
@@ -506,6 +509,16 @@ function renderVista1() {
 
             inputInstitucion.disabled = !tipoSel || bloqueado;
             inputInstitucion.placeholder = tipoSel ? 'Escribe para buscar...' : 'Selecciona primero el tipo';
+
+            const selectCiclo = document.getElementById('selectCicloQuedo');
+            if (selectCiclo) {
+                const nuevasOpcionesCiclo = opcionesCicloPorTipoInstitucion(tipoSel);
+                const valorCicloActual = selectCiclo.value;
+                selectCiclo.innerHTML = '<option value="">-- Seleccionar --</option>' +
+                    nuevasOpcionesCiclo.map(o => `<option value="${o}" ${o === valorCicloActual ? 'selected' : ''}>${o}</option>`).join('');
+                selectCiclo.disabled = !tipoSel || bloqueado;
+                if (!nuevasOpcionesCiclo.includes(valorCicloActual)) selectCiclo.value = '';
+            }
         });
     }
 
@@ -536,6 +549,7 @@ function capturarEdicionesTemporal() {
     if (getVal('selectInstitucion') !== undefined) cambios[COLUMNAS.INSTITUCION_PROCEDENCIA] = getVal('selectInstitucion');
     if (getVal('selectCarreraProcedencia') !== undefined) cambios[COLUMNAS.CARRERA_PROCEDENCIA] = getVal('selectCarreraProcedencia');
     if (getVal('inputBoletaProcedencia') !== undefined) cambios[COLUMNAS.BOLETA_PROCEDENCIA] = getVal('inputBoletaProcedencia');
+    if (getVal('selectCicloQuedo') !== undefined) cambios[COLUMNAS.CICLO_QUEDO] = getVal('selectCicloQuedo');
     return cambios;
 }
 
@@ -585,6 +599,13 @@ function opcionesInstitucionPorTipo(tipo) {
     return state.catalogoInstitucionesProcedencia
         .filter(i => String(i.tipo || '').trim().toUpperCase() === tipoNorm)
         .map(i => i.nombre);
+}
+
+function opcionesCicloPorTipoInstitucion(tipo) {
+    const tipoNorm = String(tipo || '').trim().toUpperCase();
+    if (tipoNorm === 'INSTITUTO') return Array.from({ length: 8 }, (_, i) => String(i + 1));
+    if (tipoNorm === 'UNIVERSIDAD') return Array.from({ length: 10 }, (_, i) => String(i + 1));
+    return [];
 }
 
 function inputBuscableHTML(id, opciones, valorActual, disabled, placeholder = 'Escribe para buscar...') {
@@ -1051,15 +1072,30 @@ document.addEventListener('click', (e) => {
     renderListaArchivosCC(campo);
 });
 
+function camposFaltantesCC(lead, caso) {
+    const vacio = v => v === undefined || v === null || String(v).trim() === '';
+    const faltantes = [];
+    if (vacio(obtenerCampo(lead, COLUMNAS.TIPO_ALUMNO))) faltantes.push('Tipo de Alumno');
+    if (vacio(obtenerCampo(lead, COLUMNAS.NUMERO_CUOTAS))) faltantes.push('Número de Cuotas');
+    if (vacio(obtenerCampo(lead, COLUMNAS.DESCUENTO_PRECIOS))) faltantes.push('Descuento Admisión y Matrícula');
+    if (vacio(obtenerCampo(lead, COLUMNAS.BOLETA))) faltantes.push('Boleta / Beneficio');
+    if (vacio(obtenerCampo(lead, COLUMNAS.METODO_PAGO))) faltantes.push('Método de Pago');
+    if (caso === 2 || caso === 3) {
+        if (vacio(obtenerCampo(lead, COLUMNAS.TIPO_INSTITUCION_PROCEDENCIA))) faltantes.push('Tipo de Institución de Procedencia');
+        if (vacio(obtenerCampo(lead, COLUMNAS.INSTITUCION_PROCEDENCIA))) faltantes.push('Institución de Procedencia');
+        if (vacio(obtenerCampo(lead, COLUMNAS.CARRERA_PROCEDENCIA))) faltantes.push('Carrera de Procedencia');
+        if (vacio(obtenerCampo(lead, COLUMNAS.BOLETA_PROCEDENCIA))) faltantes.push('Boleta de Procedencia');
+        if (caso === 2 && vacio(obtenerCampo(lead, COLUMNAS.TIEMPO_OFRECIDO))) faltantes.push('Tiempo Ofrecido');
+        if (caso === 2 && vacio(obtenerCampo(lead, COLUMNAS.CICLO_QUEDO))) faltantes.push('¿En qué ciclo se quedó?');
+    }
+    return faltantes;
+}
+
 function abrirModalSolicitudCC() {
-    // Segunda barrera (además de que renderSolicitudCCBox ni siquiera pinta
-    // el botón cuando esto es false): si por lo que sea se llega a disparar
-    // este flujo sin que la boleta esté realmente guardada en el lead
-    // (por ejemplo, el select mostrando un valor "por defecto" del
-    // navegador que nunca se guardó), se corta acá con un mensaje claro
-    // en vez de dejar avanzar la solicitud con datos vacíos.
-    if (!state.boletaGuardada) {
-        alert('Debes guardar los datos de la boleta del lead (botón "Guardar Ficha") antes de poder solicitar el envío de Condiciones Comerciales.');
+    const caso = determinarCasoIngreso(state.lead);
+    const faltantes = camposFaltantesCC(state.lead, caso);
+    if (faltantes.length > 0) {
+        alert('Debes guardar los datos de la boleta antes de solicitar Condiciones Comerciales:\n\n- ' + faltantes.join('\n- '));
         return;
     }
 
@@ -1169,6 +1205,7 @@ async function enviarSolicitudCC() {
             campana: state.campana,
             dni: dni,
             nombreCompleto: nombreCompleto,
+            modalidadIngreso: obtenerCampo(state.lead, COLUMNAS.MODALIDAD_INGRESO) || '',
             asesorEmail: user.email,
             asesorNombre: user.nombre,
             correosAdicionales: ccCorreosAdicionales,
@@ -1230,7 +1267,7 @@ async function guardarFicha(idPrometeo) {
 
     if (getVal('selectTipoAlumno') !== undefined) data[COLUMNAS.TIPO_ALUMNO] = getVal('selectTipoAlumno');
     if (getVal('selectCuotas') !== undefined) data[COLUMNAS.NUMERO_CUOTAS] = getVal('selectCuotas');
-
+    if (getVal('selectMetodoPago') !== undefined) data[COLUMNAS.METODO_PAGO] = getVal('selectMetodoPago');
     if (getVal('selectDescuento') !== undefined) data[COLUMNAS.DESCUENTO_PRECIOS] = getVal('selectDescuento');
 
     if (getVal('selectBoletaBeneficio') !== undefined) {
@@ -1255,6 +1292,7 @@ async function guardarFicha(idPrometeo) {
     }
     if (getVal('selectCarreraProcedencia') !== undefined) data[COLUMNAS.CARRERA_PROCEDENCIA] = getVal('selectCarreraProcedencia').trim().toUpperCase();
     if (getVal('inputBoletaProcedencia') !== undefined) data[COLUMNAS.BOLETA_PROCEDENCIA] = getVal('inputBoletaProcedencia');
+    if (getVal('selectCicloQuedo') !== undefined) data[COLUMNAS.CICLO_QUEDO] = getVal('selectCicloQuedo');
     if (getVal('selectTiempoOfrecido') !== undefined) data[COLUMNAS.TIEMPO_OFRECIDO] = getVal('selectTiempoOfrecido');
 
     if (state.ultimoCalculo.total !== undefined) {

@@ -446,7 +446,7 @@ function mostrarCC() {
     if (viewCC) viewCC.style.display = 'block';
 
     document.querySelectorAll('.nav-group-btn').forEach(b => b.classList.remove('active'));
-    const grupo = document.getElementById('navGroupBottomLine');
+    const grupo = document.getElementById('navGroupCargos');
     if (grupo) grupo.querySelector('.nav-group-btn').classList.add('active');
 
     if (__ccModuloCargado) {

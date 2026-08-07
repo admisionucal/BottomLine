@@ -1,30 +1,10 @@
 // ================================================================
-// CC TEMPLATE - Construcción de datos y render del PDF de
-// Condiciones Comerciales, 100% en frontend (sin llamadas al backend).
-//
-// NOTA DE ALCANCE: por decisión explícita, esta versión NO contempla
-// Convenio Certus. Financiamiento a 6 cuotas y programa ETU (especia-
-// lización técnica universitaria) SÍ están soportados, a partir de los
-// campos TIPO_ALUMNO ('ALUMNO ETU' | 'ALUMNO REGULAR') y NUMERO_CUOTAS
-// ('5 cuotas' | '6 cuotas') que llena el asesor en el Lead Detail (con
-// "ALUMNO REGULAR" y "5 cuotas" como default) y que Supervisor/Admisión
-// puede sobreescribir en Vista 2 al momento de enviar. El mapeo carrera
-// → especialización ETU vive hardcodeado en CARRERAS_ETU (constants.js).
+// CC TEMPLATE - Construcción de datos y render del PDF de Condiciones Comerciales
 // ================================================================
 
 import { COLUMNAS, CARRERAS_ETU } from '../core/constants.js';
-import { escapeHtml, parseNumero } from '../core/utils.js';
+import { escapeHtml, parseNumero, normalizarTexto } from '../core/utils.js';
 
-// ----------------------------------------------------------------
-// LOGO: se embebe como data URI (base64) en vez de referenciarlo por
-// ruta relativa ("assets/LogoUCALDoc.png"), porque ese HTML se usa en
-// dos contextos donde una ruta relativa NO resuelve:
-//   1) iframe con srcdoc (vista previa) — no comparte base URL con la página.
-//   2) el string de HTML que se manda al backend (Apps Script) para
-//      convertir a PDF — el backend no tiene acceso al servidor de archivos.
-// Se precarga UNA vez (precargarLogoCC) y queda cacheada en memoria;
-// renderPlantillaCC/renderPlantillaCCPreview la usan si ya está lista,
-// y si no, caen de vuelta a la ruta relativa (mejor eso que nada).
 let logoDataUri = null;
 
 export async function precargarLogoCC() {
@@ -48,18 +28,13 @@ function logoSrcCC() {
     return logoDataUri || 'assets/LogoUCALDoc.png';
 }
 
-// Config por campaña — replica el CONFIG del Apps Script de Cargos,
-// solo con los campos que necesita el template (no folderId/PDFs, eso
-// vive en el otro sistema y no lo tocamos).
+// Config por campaña
 export const CONFIG_CC = {
     '26.2': { periodo: '2026-2', perC: '26-2', inicioClases: 'Agosto' },
     '27.1': { periodo: '2027-1', perC: '27-1', inicioClases: 'Marzo' }
 };
 
-// Detecta si el beneficio de primera boleta corresponde a un caso de
-// Referidos, por palabras clave (no por string exacto — el catálogo real
-// usa "Referido - 50% dscto. 1ra boleta" y "Referente - 100% dscto. 5ta
-// boleta", confirmado directamente contra las opciones reales del select).
+// Detecta si el beneficio de primera boleta corresponde a un caso de Referidos
 export function detectarTipoReferido(label) {
     const l = String(label || '').toLowerCase();
     if (l.indexOf('referente') !== -1) return 'REFERENTE';
@@ -67,11 +42,7 @@ export function detectarTipoReferido(label) {
     return null;
 }
 
-/**
- * Arma el objeto de datos para el PDF de Condiciones Comerciales a
- * partir del lead (bottom{campana}) y overrides opcionales que el
- * supervisor haya editado en Vista 2 (sin tocar el lead real).
- */
+// Arma el objeto de datos para el PDF de Condiciones Comerciales
 export function construirDatosCC(lead, campana, overrides = {}) {
     const cfg = CONFIG_CC[campana] || { periodo: campana, perC: campana, inicioClases: '' };
 
@@ -84,24 +55,16 @@ export function construirDatosCC(lead, campana, overrides = {}) {
     d.carrera = overrides.carrera ?? (lead[COLUMNAS.CARRERA] || lead[COLUMNAS.PROGRAMA] || '');
     d.modalidadEstudio = overrides.modalidadEstudio ?? (lead[COLUMNAS.MODALIDAD] || '');
 
-    // ===== TIPO DE ALUMNO (ETU) — editable =====
-    // "ALUMNO REGULAR" es el default con el que arranca todo lead nuevo
-    // (ver lead-detail.js). Solo se pinta la especialización si, además de
-    // haber sido marcado como ETU, la carrera tiene un mapeo definido en
-    // CARRERAS_ETU — si no, se ignora en silencio (no rompe el PDF) y el
-    // Lead Detail / Vista 2 ya avisan al usuario de esa inconsistencia.
+    // ===== TIPO DE ALUMNO (ETU) =====
     d.tipoAlumno = overrides.tipoAlumno ?? (lead[COLUMNAS.TIPO_ALUMNO] || 'ALUMNO REGULAR');
     d.carreraETU = CARRERAS_ETU[d.carrera] || '';
     d.programaETU = d.tipoAlumno === 'ALUMNO ETU' && !!d.carreraETU;
 
-    // ===== NÚMERO DE CUOTAS — editable =====
+    // ===== NÚMERO DE CUOTAS =====
     d.numeroCuotas = overrides.cuotas ?? (lead[COLUMNAS.NUMERO_CUOTAS] || '5 cuotas');
     d.mostrar6Cuotas = d.numeroCuotas === '6 cuotas';
 
-    // Tipo de ingreso (editable) — determina las banderas de traslado/
-    // convalidación, que a su vez cambian varias Consideraciones y el
-    // horario de Semi-Presencial. Valores esperados: 'regular',
-    // 'con_convalidacion', 'sin_convalidacion'.
+    // Tipo de ingreso
     const modalidadIngresoOverride = overrides.tipoIngresoOverride;
     const modalidadIngreso = String(
         modalidadIngresoOverride !== undefined ? '' : (lead[COLUMNAS.MODALIDAD_INGRESO] || '')
@@ -171,7 +134,6 @@ export function construirDatosCC(lead, campana, overrides = {}) {
     }
 
     // ===== BENEFICIO DE PRIMERA BOLETA (editable) =====
-    // Formato guardado: "VALOR||MODO||LABEL" (ver fix de guardarFicha en lead-detail.js)
     const rawAdicional = String(overrides.beneficioPrimeraRaw ?? lead[COLUMNAS.BENEFICIO_ADICIONAL] ?? '').trim();
     const [adicValorStr, adicModo, adicLabel] = rawAdicional.split('||');
     const adicValor = Number(adicValorStr || 0);
@@ -180,15 +142,7 @@ export function construirDatosCC(lead, campana, overrides = {}) {
     d.beneficioPrimera = beneficioPrimera;
     const beneficioPrimeraLower = beneficioPrimera.toLowerCase();
 
-    // Comparación por palabras clave contra las 11 etiquetas REALES del
-    // catálogo (confirmadas directamente contra el dropdown):
-    // "-- Ninguno --", "Sin descuento adicional", "Charla Colegio - 50%
-    // dscto.", "Charla Colegio - 30% dscto.", "Referido - 50% dscto. 1ra
-    // boleta", "Referente - 100% dscto. 5ta boleta", "Ciclo completo - 5%
-    // dscto.", "Reconocemos tu 1ra boleta", "Visita Guiada", "50% dscto.
-    // 1ra boleta", "500 soles en 1ra boleta". Son más cortas que las del
-    // script viejo de Cargos, así que match exacto o con "1ra boleta" como
-    // requisito fallaba silenciosamente en varios casos.
+    // Comparación por palabras clave
     d.beneficioMostrar = !!beneficioPrimera &&
         beneficioPrimeraLower.indexOf('ninguno') === -1 &&
         beneficioPrimeraLower.indexOf('sin descuento') === -1 &&
@@ -201,21 +155,13 @@ export function construirDatosCC(lead, campana, overrides = {}) {
 
     if (d.beneficioMostrar) {
         d.beneficioTipo = tipoTextoBeneficio(beneficioPrimera);
-        const montoFinal = calcularBeneficioValor(escalaFinal, adicValor, adicModo);
+        const baseParaBeneficio = d.becaMostrar ? escalaFinal : escalaRegular;
+        const montoFinal = calcularBeneficioValor(baseParaBeneficio, adicValor, adicModo);
         d.beneficioValor = 'S/' + montoFinal;
         d.beneficioTexto = textoDetalleBeneficio(adicValor, adicModo);
     }
 
-    // ===== FINANCIAMIENTO A 6 CUOTAS (editable vía NUMERO_CUOTAS) =====
-    // OJO: el beneficio de primera boleta (beneficioMostrar/beneficioValor)
-    // SOLO cubre la cuota 1 — las cuotas 2 a 5 quedan al valor normal (con
-    // beca si aplica, si no a escala regular). El script legacy de Cargos
-    // asumía por error que ese valor con descuento se repetía en las 5
-    // cuotas; acá se corrige: se arma el total real de 5 cuotas sumando la
-    // 1ra cuota (con beneficio, si corresponde) + las 4 restantes al valor
-    // normal, y recién ese total se reparte entre 6, redondeando hacia
-    // arriba. Ej.: boleta S/1000, beneficio 50% en 1ra boleta ⇒
-    // (500 + 1000*4) / 6 = 750 por cuota.
+    // ===== FINANCIAMIENTO A NUMERO_CUOTAS =====
     d.boleta6C = '';
     d.boleta6CLabel = '';
     if (d.mostrar6Cuotas) {
@@ -234,7 +180,7 @@ export function construirDatosCC(lead, campana, overrides = {}) {
         }
     }
 
-    // ===== Helpers (mismo cálculo que actualizarMonto() en lead-detail.js) =====
+    // ===== Helpers =====
     function calcularBeneficioValor(escalaFinalBase, valor, modo) {
         switch (String(modo || '').trim().toUpperCase()) {
             case 'PORCENTAJE':
@@ -263,28 +209,18 @@ export function construirDatosCC(lead, campana, overrides = {}) {
     }
 
     // ===== CONSIDERACIONES (banderas) =====
-    // Comparación normalizada (trim + mayúsculas) para no depender de que
-    // el texto escrito a mano en "Tipo de Beca" coincida carácter a
-    // carácter — el texto ORIGINAL (con su capitalización real) se sigue
-    // usando para mostrarlo en el PDF vía d.tipoBeca.
     const tipoBecaNorm = tipoBeca.trim().toUpperCase();
     d.mostrarBecaImpacto = tipoBecaNorm === 'BECA IMPACTO';
     d.mostrarBecaPotencia = tipoBecaNorm === 'BECA POTENCIA';
     d.mostrarBecaColaborador = tipoBecaNorm === 'BECA COLABORADOR';
     d.mostrarConsidSP = d.modalidadEstudio === 'Semi-Presencial';
 
-    // Recalibrado contra las etiquetas reales:
-    // - "50%" aparece SOLO en "Charla Colegio - 50%...", "Referido - 50%...
-    //   1ra boleta" y "50% dscto. 1ra boleta" → no requiere "1ra boleta"
-    //   porque "Charla Colegio - 50% dscto." no la incluye.
-    // - "Reconocemos tu 1ra boleta" NO menciona "100%" en el texto — hay
-    //   que detectarla por la palabra "reconocemos", no por el porcentaje.
-    // - "500" es único en "500 soles en 1ra boleta", sin ambigüedad.
+    // Recalibrado contra las etiquetas reales
     d.mostrar50Primera = beneficioPrimeraLower.indexOf('50%') !== -1;
     d.mostrar100Primera = beneficioPrimeraLower.indexOf('reconocemos') !== -1;
     d.mostrarBeneficio500 = beneficioPrimeraLower.indexOf('500') !== -1;
 
-    // ===== HORARIOS (solo Semi-Presencial / Virtual; sin Certus) =====
+    // ===== HORARIOS (solo Semi-Presencial / Virtual) =====
     d.horarioHTML = construirHorarioHTML(d);
 
     // ===== VALIDACIÓN MÍNIMA PARA HABILITAR "ENVIAR" =====
@@ -295,7 +231,16 @@ export function construirDatosCC(lead, campana, overrides = {}) {
 
 function construirHorarioHTML(d) {
     if (d.modalidadEstudio === 'Semi-Presencial') {
-        const horario = d.mostrarTrasladoConvalidacion ? '8:00 a.m. - 10:00 p.m.' : '8:00 a.m. - 6:00 p.m.';
+        const esCachimbo = d.tipoIngresoActual === 'regular' || d.mostrarTrasladoSinConvalidacion;
+        const carreraNorm = normalizarTexto(d.carrera);
+        let horario;
+        if (esCachimbo && carreraNorm === 'psicologia') {
+            horario = '8:00 a.m. - 11:00 p.m.';
+        } else if (esCachimbo && carreraNorm === 'disenograficopublicitario') {
+            horario = '8:00 a.m. - 10:00 p.m.';
+        } else {
+            horario = d.mostrarTrasladoConvalidacion ? '8:00 a.m. - 10:00 p.m.' : '8:00 a.m. - 6:00 p.m.';
+        }
         return `
             <p>
               <span style="font-size:11px;">Los porcentajes de presencialidad y virtualidad se ejecutan acorde a la normativa de SUNEDU.</span><br>
@@ -370,18 +315,7 @@ const CC_ESTILOS_BASE = `
   .header-container img { height:80px; display:inline-block; margin-top:0; }
 `;
 
-/**
- * Devuelve el HTML completo del PDF (mismo diseño que plantillaCC.html),
- * como string. Esta es la versión CANÓNICA — es la que se manda al
- * backend (enviarCC) para convertir a PDF real, y también la que usa
- * "Exportar PDF" (window.print() del navegador). Usa el mismo truco del
- * plantillaCC.html original: una <table><thead> con el logo, que los
- * motores de impresión (Chrome / Apps Script HTML→PDF) repiten de forma
- * NATIVA en cada página impresa — por eso NO lleva scripts de paginación:
- * @page/@bottom-center + <thead> ya resuelven la paginación real sin JS,
- * que de todos modos no se ejecuta de forma confiable en la conversión de
- * Apps Script (ver renderPlantillaCCPreview para la vista en pantalla).
- */
+// Devuelve el HTML completo del PDF 
 export function renderPlantillaCC(d) {
     return `<!DOCTYPE html>
 <html>
@@ -423,15 +357,7 @@ export function renderPlantillaCC(d) {
 </html>`;
 }
 
-/**
- * Devuelve el HTML para la VISTA PREVIA en el <iframe> — visualmente
- * paginado como si fuera el PDF final (hojas A4 separadas, con el logo
- * arriba y el pie de página "Universidad de Ciencias y Artes de América
- * Latina" repetido en cada hoja). La paginación corre con JavaScript
- * SOLO dentro del iframe — este HTML nunca se manda al backend, así que
- * no hay riesgo de que el motor de conversión a PDF de Apps Script
- * ignore el script (ver nota en renderPlantillaCC).
- */
+// Devuelve el HTML para la VISTA PREVIA
 export function renderPlantillaCCPreview(d) {
     return `<!DOCTYPE html>
 <html>
@@ -466,14 +392,6 @@ export function renderPlantillaCCPreview(d) {
   }
   #numero-hojas { flex-shrink:0; text-align:center; color:#ccc; font-family:sans-serif; font-size:12px; padding-bottom:10px; }
   ${CC_ESTILOS_BASE}
-  /* El h1 tiene margin-top:-10px (ver CC_ESTILOS_BASE) para acomodar el
-     diseño de tabla del PDF real, donde no causa ningún problema. Acá en
-     el preview, en cambio, .hoja-contenido tiene overflow:hidden — ese
-     margen negativo empujaba el título por encima del borde del
-     contenedor y se recortaba. Se anula el margen Y se sube el techo del
-     contenedor esos mismos 10px (top:90px en vez de 100px) para no
-     perder ese espacio vertical — si no, entra menos contenido por hoja
-     y la paginación deja de coincidir con la del PDF real. */
   .hoja-contenido h1 { margin-top: 0; }
 </style>
 </head>
@@ -526,8 +444,6 @@ export function renderPlantillaCCPreview(d) {
           contenedorPaginas.appendChild(actual.hoja);
         }
 
-        // Agrega un nodo simple completo a la hoja actual; si no entra,
-        // pasa a una hoja nueva.
         function agregarBloque(nodo) {
           var clon = nodo.cloneNode(true);
           actual.contenido.appendChild(clon);
@@ -538,15 +454,6 @@ export function renderPlantillaCCPreview(d) {
           }
         }
 
-        // A diferencia de agregarBloque, esto reparte los <li> de la lista
-        // de a uno, abriendo un <ul> nuevo en cada hoja que haga falta —
-        // así una lista larga (Consideraciones) puede partirse entre
-        // varias hojas sin perder ningún ítem. Además, si un ítem es
-        // demasiado largo para entrar completo, se parte por palabras
-        // (igual que el navegador parte un párrafo largo al imprimir de
-        // verdad) en vez de mandarlo entero a la hoja siguiente — así se
-        // aprovecha el mismo espacio por hoja que usa el PDF real y la
-        // cantidad de hojas coincide.
         function agregarLista(ulNodo) {
           var ulActual = document.createElement('ul');
           actual.contenido.appendChild(ulActual);
@@ -561,8 +468,6 @@ export function renderPlantillaCCPreview(d) {
 
               if (cabe()) { restante = ''; continue; }
 
-              // No entra completo: buscamos por búsqueda binaria cuántas
-              // palabras SÍ entran en el espacio que queda de esta hoja.
               var palabras = restante.split(' ');
               var lo = 0, hi = palabras.length, mejor = 0;
               while (lo <= hi) {
@@ -572,9 +477,6 @@ export function renderPlantillaCCPreview(d) {
               }
 
               if (mejor === 0) {
-                // Ni una palabra entra en lo que queda de esta hoja
-                // (p.ej. una hoja recién comenzada, sin espacio en
-                // absoluto): pasamos el ítem completo a una hoja nueva.
                 ulActual.removeChild(liEl);
                 if (!ulActual.children.length) actual.contenido.removeChild(ulActual);
                 nuevaHoja();
@@ -588,7 +490,6 @@ export function renderPlantillaCCPreview(d) {
               nuevaHoja();
               ulActual = document.createElement('ul');
               actual.contenido.appendChild(ulActual);
-              // el resto de la frase se agrega en la próxima vuelta del while
             }
           });
         }
@@ -602,10 +503,6 @@ export function renderPlantillaCCPreview(d) {
             continue;
           }
 
-          // Evita que "Consideraciones:" quede solo, sin ningún ítem
-          // debajo, al final de una hoja: si el siguiente nodo es la
-          // lista, probamos si el título entra JUNTO con el primer ítem
-          // antes de decidir en qué hoja poner el título.
           var esTituloConsideraciones = nodo.className === 'Consideraciones';
           var primerNodoLista = esTituloConsideraciones && nodos[i + 1] && nodos[i + 1].tagName === 'UL'
             ? nodos[i + 1].children[0] : null;
@@ -637,12 +534,6 @@ export function renderPlantillaCCPreview(d) {
         ajustarEscala();
       }
 
-      // Escala las hojas para que SIEMPRE quepan en el ancho visible del
-      // iframe, sin importar el zoom del navegador ni el ancho real del
-      // panel — evita que el contenido se vea recortado/desordenado.
-      // El contenedor #paginas-scroll ya está acotado por CSS (flex:1
-      // dentro de un body de altura 100%), así que solo hace falta
-      // aplicar la escala; el scroll interno lo resuelve el navegador.
       function ajustarEscala() {
         var paginas = document.getElementById('paginas');
         var primeraHoja = paginas.querySelector('.hoja');
@@ -677,6 +568,11 @@ export function renderPlantillaCCPreview(d) {
 
 function construirConsideracionesHTML(d) {
     const items = [];
+    const esCachimbo = d.tipoIngresoActual === 'regular' || d.mostrarTrasladoSinConvalidacion;
+    const esSemipresencial = d.modalidadEstudio === 'Semi-Presencial';
+    const carreraNorm = normalizarTexto(d.carrera);
+    const esCachimboSemipresencialCarrera = esCachimbo && esSemipresencial &&
+        (carreraNorm === 'psicologia' || carreraNorm === 'disenograficopublicitario');
 
     if (d.programaETU) {
         items.push(`El alumno se matricula en la carrera de ${escapeHtml(d.carrera)}, a la cual pertenece la especialización técnica universitaria ${escapeHtml(d.carreraETU)}.`);
@@ -723,6 +619,14 @@ function construirConsideracionesHTML(d) {
         items.push(`Los postulantes que ingresan bajo la modalidad de traslado deberán presentar la documentación requerida (como certificados de estudios secundarios y certificados de estudios superiores, sílabos u otros documentos solicitados) dentro de los plazos establecidos por la universidad. Si no cuenta con alguno de estos documentos al momento de la inscripción, el postulante podrá continuar su proceso de manera condicional, comprometiéndose a regularizar la entrega en el plazo de 30 días calendarios a partir del pago de la primera cuota. Es importante considerar que la evaluación de cursos, convalidaciones y la asignación académica estarán sujetas a la entrega completa y validación de la documentación. El incumplimiento en la regularización dentro del plazo establecido afectará dichos procesos, así como la continuidad del alumno en la universidad. En caso de que el ingresante no presente su Certificado de Estudios Secundarios dentro del plazo de un (1) mes contado desde el inicio de clases, autoriza expresamente a la Universidad a gestionar la obtención de dicho documento en su representación. El costo de este servicio asciende a S/ 410.00 y será cargado automáticamente en su estado de cuenta.`);
     } else {
         items.push(`Para completar el proceso de admisión, todos los postulantes deben presentar el Certificado de Estudios Secundarios. Si no cuenta con este documento al momento de la inscripción, el postulante podrá continuar de manera condicional, comprometiéndose a regularizar la entrega en el plazo de 30 días calendarios a partir del pago de la primera cuota. Es importante considerar que el incumplimiento de este requisito en el tiempo establecido podrá afectar la continuidad del proceso de admisión o la permanencia en la universidad. En caso de que el ingresante no presente su Certificado de Estudios Secundarios dentro del plazo de un (1) mes contado desde el inicio de clases, autoriza expresamente a la Universidad a gestionar la obtención de dicho documento en su representación. El costo de este servicio asciende a S/ 410.00 y será cargado automáticamente en su estado de cuenta.`);
+    }
+
+    if (esCachimboSemipresencialCarrera) {
+        items.push(`La matrícula puede contemplar ajustes en el itinerario académico con el objetivo de asegurar una adecuada experiencia de aprendizaje.`);
+    }
+
+    if (d.modalidadEstudio === 'Remoto') {
+        items.push(`En casos excepcionales y por necesidades académicas, la Universidad podrá realizar ajustes en el horario informado, comunicándolo de manera oportuna al estudiante.`);
     }
 
     items.push(`Los horarios del primer ciclo son asignados por la universidad sin opción a cambios o ajustes. A partir del segundo ciclo, los alumnos podrán elegir sus horarios en función a la apertura de cursos y disponibilidad de horarios.`);

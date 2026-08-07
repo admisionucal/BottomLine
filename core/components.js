@@ -23,6 +23,7 @@ export class Sidebar {
         this.aplicarVisibilidadPorRol();
         this.initEvents();
         window.__sidebarInstance = this;
+        iniciarControlInactividad();
     }
 
     render() {
@@ -30,6 +31,7 @@ export class Sidebar {
         const abrirUsuario = this.active === 'usuario';
         const abrirAsistencia = this.active === 'asistencia';
         const abrirBottomLine = this.active === 'bottomline';
+        const abrirCargos = this.active === 'cargos';
         const esSub = (id) => this.activeSubitem === id ? 'active' : '';
 
         this.sidebar.innerHTML = `
@@ -94,15 +96,25 @@ export class Sidebar {
                         <button type="button" class="nav-subitem ${esSub('navUnificarIds')}" id="navUnificarIds" title="Unificar IDs" style="display:none;" onclick="window.mostrarUnificar && mostrarUnificar(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">merge</span> Unificar IDs
                         </button>
-                        <button type="button" class="nav-subitem ${esSub('navCondicionesCC')}" id="navCondicionesCC" title="Condiciones Comerciales" style="display:none;" onclick="window.mostrarCC && mostrarCC(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
-                            <span class="material-symbols-outlined">request_quote</span>
-                            <span style="flex:1;">Condiciones Comerciales</span>
-                            <span class="cal-trigger-badge" id="ccTriggerBadge">0</span>
-                        </button>
                         <button type="button" class="nav-subitem" id="calendarioTrigger" title="Calendario de PPs" onclick="window.mostrarCalendario && mostrarCalendario(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">calendar_month</span>
                             <span style="flex:1;">Calendario de PPs</span>
                             <span class="cal-trigger-badge" id="calTriggerBadge">0</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="nav-group ${abrirCargos ? 'open' : ''}" id="navGroupCargos">
+                    <button type="button" class="nav-group-btn ${abrirCargos ? 'active' : ''}" title="Cargos" onclick="window.toggleNavGroup && toggleNavGroup('navGroupCargos', this)">
+                        <span class="nav-icon material-symbols-outlined">request_quote</span>
+                        <span class="nav-label">Cargos</span>
+                        <span class="nav-caret">›</span>
+                    </button>
+                    <div class="nav-submenu">
+                        <button type="button" class="nav-subitem ${esSub('navCondicionesCC')}" id="navCondicionesCC" title="Condiciones Comerciales" style="display:none;" onclick="window.mostrarCC && mostrarCC(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
+                            <span class="material-symbols-outlined">request_quote</span>
+                            <span style="flex:1;">Condiciones Comerciales</span>
+                            <span class="cal-trigger-badge" id="ccTriggerBadge">0</span>
                         </button>
                     </div>
                 </div>
@@ -489,3 +501,23 @@ window.logout = () => {
     sessionStorage.clear();
     window.location.href = 'index.html';
 };
+
+const INACTIVIDAD_LIMITE_MS = 1 * 60 * 60 * 1000; // 1 hora
+
+function iniciarControlInactividad() {
+    if (window.__inactividadIniciada) return;
+    window.__inactividadIniciada = true;
+
+    let ultimaActividad = Date.now();
+    const registrarActividad = () => { ultimaActividad = Date.now(); };
+    ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'].forEach(evt => {
+        window.addEventListener(evt, registrarActividad, { passive: true });
+    });
+
+    setInterval(() => {
+        if (Date.now() - ultimaActividad >= INACTIVIDAD_LIMITE_MS) {
+            alert('Tu sesión se cerró por inactividad. Vuelve a iniciar sesión.');
+            window.logout();
+        }
+    }, 60 * 1000);
+}

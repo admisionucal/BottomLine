@@ -53,18 +53,39 @@
                 <div id="vistaListaCC">
                     <div class="table-toolbar">
                         <div class="left">
-                            <h3 style="margin:0;">
-                                <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">request_quote</span>
-                                Solicitudes de Condiciones Comerciales
-                            </h3>
+                            <div class="filtros-dropdown" id="filtrosDropdownCC">
+                                <button type="button" class="btn-filtros" id="filtrosToggleBtnCC">
+                                    <span class="material-symbols-outlined" style="font-size:16px;">tune</span> Filtros
+                                </button>
+                            </div>
                             <span class="badge" id="ccCount">0 solicitudes</span>
                         </div>
+                        <div class="toolbar-search" id="toolbarSearchWrapCC">
+                            <input type="text" id="ccSearchInput" placeholder="Buscar por ID Prometeo, Nombre o Celular">
+                        </div>
                         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#555;cursor:pointer;">
-                                <input type="checkbox" id="chkIncluirResueltas"> Mostrar también enviadas/rechazadas
-                            </label>
                             <button class="btn-export" id="btnActualizarCC"><span class="material-symbols-outlined" style="font-size:16px;">refresh</span> Actualizar</button>
                             <button class="btn-export" id="btnExportarCC"><span class="material-symbols-outlined" style="font-size:16px;">download</span> Exportar</button>
+                        </div>
+                    </div>
+                    <div class="filtros-panel" id="navFiltrosPanelCC">
+                        <div class="filters" id="filtersContainerCC">
+                            <div class="filter-group">
+                                <label class="filter-label">CARRERA</label>
+                                <div class="multiselect" id="filterCCCarrera"></div>
+                            </div>
+                            <div class="filter-group">
+                                <label class="filter-label">ASESOR</label>
+                                <div class="multiselect" id="filterCCAsesor"></div>
+                            </div>
+                            <div class="filter-group">
+                                <label class="filter-label">ESTADO DE SOLICITUD</label>
+                                <div class="multiselect" id="filterCCEstado"></div>
+                            </div>
+                            <div class="filter-group">
+                                <label class="filter-label">CAMPAÑA</label>
+                                <div class="multiselect" id="filterCCCampana"></div>
+                            </div>
                         </div>
                     </div>
                     <div class="table-wrap" id="tablaCCWrap">

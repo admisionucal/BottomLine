@@ -10,7 +10,7 @@ import {
     escapeHtml, formatearFecha
 } from '../core/utils.js';
 
-import { Sidebar, renderTable, Toast } from '../core/components.js';
+import { Sidebar, renderTable, Toast, createMultiSelect } from '../core/components.js';
 
 import { construirDatosCC, renderPlantillaCC, renderPlantillaCCPreview, detectarTipoReferido, precargarLogoCC } from './cc-template.js';
 
@@ -33,11 +33,22 @@ function nombreLineamientosSegunCuotas(datosCC) {
     return datosCC.mostrar6Cuotas ? NOMBRE_LINEAMIENTOS_6C(datosCC.periodo) : NOMBRE_LINEAMIENTOS_5C(datosCC.periodo);
 }
 
+function campoHTML(label, value) {
+    const safe = (value !== undefined && value !== null && String(value).trim() !== '') ? value : '-';
+    return `
+        <div>
+            <span style="color:#888; font-size:12px; display:block; text-transform:uppercase; font-weight:600;">${escapeHtml(label)}</span>
+            <strong style="color:#222; font-size:15px; display:block; margin-top:2px;">${escapeHtml(safe)}</strong>
+        </div>
+    `;
+}
+
 // ===== ESTADO =====
 const state = {
     solicitudes: [],
     solicitudesFiltradas: [],
-    incluirResueltas: false,
+    terminoBusqueda: '',
+    filtros: { carrera: [], asesor: [], estado: [], campana: [] },
     currentPage: 1,
     pageSize: 11,
     pagesPerBlock: 20,
@@ -103,18 +114,29 @@ function initCC() {
     // no creamos uno nuevo; si es la página standalone, sí.
     modoEmbebido = !!document.querySelector('.sidebar-nav');
     if (!modoEmbebido) {
-        new Sidebar({ active: 'bottomline', activeSubitem: 'navCondicionesCC' });
+        new Sidebar({ active: 'cargos', activeSubitem: 'navCondicionesCC' });
     }
 
     // Los listeners solo se atan una vez: los elementos del DOM persisten
     // entre reingresos a esta vista (embebida o standalone).
     if (!__ccListenersAtados) {
-        document.getElementById('chkIncluirResueltas').addEventListener('change', (e) => {
-            state.incluirResueltas = e.target.checked;
-            cargarSolicitudesCC(true);
-        });
         document.getElementById('btnActualizarCC')?.addEventListener('click', () => cargarSolicitudesCC(true));
         document.getElementById('btnExportarCC')?.addEventListener('click', exportarSolicitudesCCExcel);
+        document.getElementById('filtrosToggleBtnCC')?.addEventListener('click', () => {
+            document.getElementById('navFiltrosPanelCC')?.classList.toggle('open');
+        });
+        document.getElementById('ccSearchInput')?.addEventListener('input', (e) => {
+            state.terminoBusqueda = e.target.value.trim().toLowerCase();
+            aplicarFiltrosCC();
+        });
+        window.addEventListener('multiselect-change', (e) => {
+            const mapaClaves = { cccarrera: 'carrera', ccasesor: 'asesor', ccestado: 'estado', cccampana: 'campana' };
+            const filtroKey = mapaClaves[e.detail.key];
+            if (filtroKey && Object.prototype.hasOwnProperty.call(state.filtros, filtroKey)) {
+                state.filtros[filtroKey] = e.detail.values;
+                aplicarFiltrosCC();
+            }
+        });
         __ccListenersAtados = true;
     }
 
@@ -141,13 +163,17 @@ async function cargarSolicitudesCC(forceRefresh = false) {
     const user = getCurrentUser();
     const wrap = document.getElementById('tablaCCWrap');
 
-    const cacheKey = CACHE_KEYS.SOLICITUDES_CC(user.email, user.rol, state.incluirResueltas);
+    // '_v2' fuerza a descartar cualquier caché vieja en sessionStorage que no
+    // tenga los campos MODALIDAD_LEAD/MODALIDAD_INGRESO_LEAD/BENEFICIO_LEAD/
+    // CELULAR_LEAD (agregados después) — si no, quedan "vacíos" hasta que el
+    // usuario le dé manualmente a Actualizar.
+    const cacheKey = CACHE_KEYS.SOLICITUDES_CC(user.email, user.rol, true) + '_v2';
     if (!forceRefresh) {
         const cached = cacheGet(cacheKey);
         if (cached && cached.data) {
             state.solicitudes = cached.data;
             state.ultimaActualizacion = cached.timestamp;
-            aplicarPaginaCC();
+            aplicarFiltrosCC();
             return;
         }
     }
@@ -157,7 +183,7 @@ async function cargarSolicitudesCC(forceRefresh = false) {
     try {
         const result = await callAPI('getSolicitudesCC', {
             campanas: getUserCampanas(),
-            incluirResueltas: state.incluirResueltas
+            incluirResueltas: true
         });
 
         if (!result.success) {
@@ -168,16 +194,52 @@ async function cargarSolicitudesCC(forceRefresh = false) {
         state.solicitudes = result.data || [];
         state.ultimaActualizacion = Date.now();
         cacheSet(cacheKey, { data: state.solicitudes, timestamp: state.ultimaActualizacion });
-        aplicarPaginaCC();
+        aplicarFiltrosCC();
     } catch (e) {
         wrap.innerHTML = `<div class="loading">Error de conexión: ${escapeHtml(e.message)}</div>`;
     }
 }
 
-function aplicarPaginaCC() {
-    state.solicitudesFiltradas = state.solicitudes;
+const ORDEN_ESTADO_CC = { PENDIENTE: 0, PROCESANDO: 0, ENVIADO: 1, RECHAZADO: 2 };
+
+function aplicarFiltrosCC() {
+    const { carrera, asesor, estado, campana } = state.filtros;
+
+    state.solicitudesFiltradas = state.solicitudes.filter(sol => {
+        if (carrera.length > 0 && !carrera.includes(sol.CARRERA_LEAD || '')) return false;
+        if (asesor.length > 0 && !asesor.includes(sol.ASESOR_NOMBRE || sol.ASESOR_EMAIL || '')) return false;
+        if (estado.length > 0 && !estado.includes(sol.STATUS || '')) return false;
+        if (campana.length > 0 && !campana.includes(sol.CAMPANA || '')) return false;
+
+        if (state.terminoBusqueda) {
+            const id = String(sol.ID_PROMETEO || '').toLowerCase();
+            const nombre = String(sol.NOMBRE_LEAD || '').toLowerCase();
+            const celular = String(sol.CELULAR_LEAD || '').toLowerCase();
+            if (!id.includes(state.terminoBusqueda) && !nombre.includes(state.terminoBusqueda) && !celular.includes(state.terminoBusqueda)) return false;
+        }
+        return true;
+    });
+
+    // Orden fijo: Pendiente/Procesando primero, luego Enviado, luego
+    // Rechazado; dentro de cada grupo, más reciente primero.
+    state.solicitudesFiltradas.sort((a, b) => {
+        const ordenA = ORDEN_ESTADO_CC[a.STATUS] ?? 3;
+        const ordenB = ORDEN_ESTADO_CC[b.STATUS] ?? 3;
+        if (ordenA !== ordenB) return ordenA - ordenB;
+        return new Date(b.FECHA_SOLICITUD || 0) - new Date(a.FECHA_SOLICITUD || 0);
+    });
+
     state.currentPage = 1;
     renderTablaCC();
+    populateFiltrosCC();
+}
+
+function populateFiltrosCC() {
+    const getValues = (campo) => state.solicitudes.map(s => s[campo] || '').filter(v => v && String(v).trim() !== '');
+    createMultiSelect('filterCCCarrera', getValues('CARRERA_LEAD'), state.filtros.carrera, 'Todas');
+    createMultiSelect('filterCCAsesor', state.solicitudes.map(s => s.ASESOR_NOMBRE || s.ASESOR_EMAIL || ''), state.filtros.asesor, 'Todos');
+    createMultiSelect('filterCCEstado', getValues('STATUS'), state.filtros.estado, 'Todos');
+    createMultiSelect('filterCCCampana', getValues('CAMPANA'), state.filtros.campana, 'Todas');
 }
 
 function renderTablaCC() {
@@ -343,6 +405,11 @@ async function mostrarVistaDetalle(idSolicitud, solicitudPrecargada) {
         ]);
 
         if (!resultLead.success) throw new Error(resultLead.error || 'No se pudo cargar el lead');
+        // Temporal: getLeadDetail ya devuelve un desglose de tiempos por tramo
+        // (búsqueda TextFinder, lectura de bottom, mapa de asesores, etc.).
+        // Revisa la consola del navegador (F12) para ver dónde se va el tiempo
+        // al abrir un detalle. Se puede quitar este log cuando ya no haga falta.
+        if (resultLead.timings) console.log('[CC] getLeadDetail timings:', resultLead.timings);
 
         state.leadActual = resultLead.data;
         state.catalogoBeneficios = (resultCatalogos.success && resultCatalogos.data.beneficios) || [];
@@ -396,6 +463,8 @@ function renderDetalleCC() {
             ? 'sin_convalidacion'
             : 'regular';
     const tipoIngresoActual = state.overrides.tipoIngresoOverride ?? tipoIngresoDefault;
+    const esExtraordinario = tipoIngresoActual !== 'regular';
+    const esExtraordinarioConva = tipoIngresoActual === 'con_convalidacion';
 
     const opcionesBenef = opcionesBeneficioAdicional();
     const benefSelected = opcionesBenef.find(o => o.value === String(beneficioRawActual))?.value
@@ -426,13 +495,25 @@ function renderDetalleCC() {
     const correosDestinoActual = state.overrides.correosDestino ?? correosDestinoDefault.join(', ');
 
     container.innerHTML = `
+        <div style="background:white; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05); margin-bottom:20px; text-align:left;">
+            <h3 style="color:var(--color-primary); margin:0 0 16px 0; font-size:16px;">
+                ID PROMETEO: <span style="font-weight:400; color:#666;">${escapeHtml(String(sol.ID_PROMETEO || '-'))}</span>
+            </h3>
+            <div style="display:grid; grid-template-columns: repeat(${esExtraordinario ? 3 : 4}, 1fr); gap:20px;">
+                ${campoHTML('CAMPAÑA', sol.CAMPANA)}
+                ${campoHTML('COLEGIO', lead[COLUMNAS.COLEGIO])}
+                ${campoHTML('CÓDIGO MODULAR', lead[COLUMNAS.CODIGO_MODULAR])}
+                ${esExtraordinario ? campoHTML('INSTITUCIÓN DE PROCEDENCIA', lead[COLUMNAS.INSTITUCION_PROCEDENCIA]) : ''}
+                ${esExtraordinario ? campoHTML('CARRERA DE PROCEDENCIA', lead[COLUMNAS.CARRERA_PROCEDENCIA]) : ''}
+                ${esExtraordinario ? campoHTML('BOLETA DE PROCEDENCIA', lead[COLUMNAS.BOLETA_PROCEDENCIA]) : ''}
+                ${esExtraordinarioConva ? campoHTML('EN QUE CICLO SE QUEDO', lead[COLUMNAS.CICLO_QUEDO]) : ''}
+                ${esExtraordinarioConva ? campoHTML('TIEMPO OFRECIDO', lead[COLUMNAS.TIEMPO_OFRECIDO]) : ''}
+                ${campoHTML('MÉTODO DE PAGO', lead[COLUMNAS.METODO_PAGO])}
+            </div>
+        </div>
         <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; text-align:left;">
             <div style="flex:1 1 380px; background:white; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,0.06); padding:24px;">
-                <p style="font-size:12px; color:#999; margin:0 0 16px 0;">
-                    ID Prometeo: <strong>${escapeHtml(sol.ID_PROMETEO)}</strong> &nbsp;|&nbsp;
-                    Campaña: <strong>${escapeHtml(sol.CAMPANA)}</strong><br>
-                    Colegio: <strong>${escapeHtml(lead[COLUMNAS.COLEGIO])} (${escapeHtml(lead[COLUMNAS.CODIGO_MODULAR] || '-')})</strong>
-                </p>
+                <h3 style="font-size:16px; color:var(--color-primary); margin:0 0 16px 0;">Datos de la boleta</h3>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
                     <label class="cc-campo">Tipo de Alumno
                         <select id="ccTipoAlumno">
@@ -499,10 +580,6 @@ function renderDetalleCC() {
                         </select>
                     </label>
                 </div>
-
-                <p style="font-size:11px; color:#999; margin-top:14px;">
-                    Estos campos son solo para esta solicitud de Condiciones Comerciales — no modifican la ficha real del lead.
-                </p>
 
                 <div id="ccReferidosBlockVista2" style="display:none; margin-top:20px; border-top:1px solid #eee; padding-top:16px;">
                     <h4 id="ccReferidosTitulo" style="font-size:13px; margin-bottom:4px;"></h4>

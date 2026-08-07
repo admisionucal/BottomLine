@@ -3,7 +3,7 @@
 // ================================================================
 
 // ----- URL DE LA API (Google Apps Script) -----
-export const API_URL = 'https://script.google.com/macros/s/AKfycbzOCF7JOLntBu1OITA1RE9HSLG5mkJgwK06x1UaxaAU3fmoCWUrUOPNhM8RKTUnFP_2/exec';
+export const API_URL = 'https://script.google.com/macros/s/AKfycbw2uoproyz_cWAT7egWzpuE8JCfHEG2Ex_Ct0oQJ3slW_cOQ3NmCOQ7mkMdHPM6dKuziw/exec';
 
 // ----- MAPEO DE COLUMNAS DE GOOGLE SHEETS -----
 // Centraliza todos los nombres de columnas para evitar strings mágicos.
@@ -32,6 +32,7 @@ export const COLUMNAS = {
     TIPO_INSTITUCION_PROCEDENCIA: 'TIPO_INSTITUCION_PROCEDENCIA',
     CARRERA_PROCEDENCIA: 'CARRERA_PROCEDENCIA',
     TIEMPO_OFRECIDO: 'TIEMPO_OFRECIDO',
+    CICLO_QUEDO: 'CICLO_QUEDO',
     DESCUENTO_PRECIOS: 'DESCUENTO_PRECIOS',
     COLEGIO: 'COLEGIO',
     CODIGO_MODULAR: 'CODIGO MODULAR',
@@ -44,6 +45,7 @@ export const COLUMNAS = {
     COMENTARIOS_HISTORIAL: 'COMENTARIOS_HISTORIAL',
     TIPO_ALUMNO: 'TIPO_ALUMNO',
     NUMERO_CUOTAS: 'NUMERO_CUOTAS',
+    METODO_PAGO: 'METODO_PAGO',
 
     // Perfilamiento
     POR_QUE_ELIGIO_CARRERA: 'POR_QUE_ELIGIO_CARRERA',
@@ -128,7 +130,8 @@ export const SELECT_OPTIONS = {
     ],
     tiempo: ['Traslado +2', '2 años', '2 años y medio', '3 años', '3 años y medio', '4 años'],
     tipoAlumno: ['ALUMNO REGULAR', 'ALUMNO ETU'],
-    cuotas: ['5 cuotas', '6 cuotas']
+    cuotas: ['5 cuotas', '6 cuotas'],
+    metodoPago: ['LINK DE PAGO', 'POS', 'Cargo']
 };
 
 export const TIPOS_INSTITUCION_PROCEDENCIA = ['UNIVERSIDAD', 'INSTITUTO'];
