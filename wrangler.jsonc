@@ -1,7 +1,15 @@
 {
-  "name": "bottomline", // el nombre de tu proyecto
+  "main": "./src/index.ts", // el nombre de tu proyecto
+  "name": "bottomline", // supabase
   "compatibility_date": "2026-07-09", // la fecha de hoy
+  "compatibility_flags": ["nodejs_compat"], // necesario para clientes de Postgres como 'postgres' o 'pg'
   "assets": {
     "directory": "./" // carpeta donde está tu index.html (./ si está en la raíz)
-  }
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "el-id-que-te-dio-el-comando"
+    }
+  ]
 }
