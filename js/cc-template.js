@@ -220,7 +220,7 @@ export function construirDatosCC(lead, campana, overrides = {}) {
     d.mostrar100Primera = beneficioPrimeraLower.indexOf('reconocemos') !== -1;
     d.mostrarBeneficio500 = beneficioPrimeraLower.indexOf('500') !== -1;
 
-    // ===== HORARIOS (solo Semi-Presencial / Virtual) =====
+    // ===== HORARIOS (solo Semi-Presencial / Remoto) =====
     d.horarioHTML = construirHorarioHTML(d);
 
     // ===== VALIDACIÓN MÍNIMA PARA HABILITAR "ENVIAR" =====
@@ -247,10 +247,10 @@ function construirHorarioHTML(d) {
               <span><b>Horario:</b> Diurno ${horario}</span>
             </p>`;
     }
-    if (d.modalidadEstudio === 'Virtual' && d.carrera === 'Diseño Digital de Interiores') {
+    if (d.modalidadEstudio === 'Remoto' && d.carrera === 'Diseño Digital de Interiores') {
         return `<p><b>Horario:</b> Nocturno<br>Lunes a viernes: 6:00 p.m. - 10:00 p.m.<br>Sábado: 4:00 p.m. - 10:00 p.m.</p>`;
     }
-    if (d.modalidadEstudio === 'Virtual') {
+    if (d.modalidadEstudio === 'Remoto') {
         return `<p><b>Horario:</b> Nocturno<br>Lunes a viernes: 7:00 p.m. - 10:00 p.m.<br>Sábado: 4:00 p.m. - 10:00 p.m.</p>`;
     }
     return '';
@@ -625,7 +625,7 @@ function construirConsideracionesHTML(d) {
         items.push(`La matrícula puede contemplar ajustes en el itinerario académico con el objetivo de asegurar una adecuada experiencia de aprendizaje.`);
     }
 
-    if (d.modalidadEstudio === 'Virtual') {
+    if (d.modalidadEstudio === 'Remoto') {
         items.push(`En casos excepcionales y por necesidades académicas, la Universidad podrá realizar ajustes en el horario informado, comunicándolo de manera oportuna al estudiante.`);
     }
 

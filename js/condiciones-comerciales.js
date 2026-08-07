@@ -444,7 +444,7 @@ function renderDetalleCC() {
     // se agrega igual como opción seleccionable en vez de perderlo o
     // disfrazarlo con el "Semi-Presencial" que el navegador marca por
     // defecto cuando ningún <option> trae "selected".
-    const modalidadOpcionesCC = ['Semi-Presencial', 'Virtual'];
+    const modalidadOpcionesCC = ['Semi-Presencial', 'Remoto'];
     if (modalidadActual && !modalidadOpcionesCC.includes(modalidadActual)) modalidadOpcionesCC.push(modalidadActual);
     const matriculaActual = state.overrides.montoMatricula ?? (lead['MATRICULA_FINAL'] ?? '');
     const examenActual = state.overrides.montoExamen ?? (lead['ADMISION_FINAL'] ?? '');
