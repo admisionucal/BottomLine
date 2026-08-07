@@ -405,11 +405,6 @@ async function mostrarVistaDetalle(idSolicitud, solicitudPrecargada) {
         ]);
 
         if (!resultLead.success) throw new Error(resultLead.error || 'No se pudo cargar el lead');
-        // Temporal: getLeadDetail ya devuelve un desglose de tiempos por tramo
-        // (búsqueda TextFinder, lectura de bottom, mapa de asesores, etc.).
-        // Revisa la consola del navegador (F12) para ver dónde se va el tiempo
-        // al abrir un detalle. Se puede quitar este log cuando ya no haga falta.
-        if (resultLead.timings) console.log('[CC] getLeadDetail timings:', resultLead.timings);
 
         state.leadActual = resultLead.data;
         state.catalogoBeneficios = (resultCatalogos.success && resultCatalogos.data.beneficios) || [];

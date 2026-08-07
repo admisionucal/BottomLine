@@ -71,9 +71,6 @@ export class Sidebar {
                         <button type="button" class="nav-subitem" title="Calendario" onclick="window.mostrarAsistencia && mostrarAsistencia('calendario'); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">calendar_today</span> Calendario
                         </button>
-                        <button type="button" class="nav-subitem" id="navAsistenciaKPIs" title="KPIs" style="display:none;" onclick="window.mostrarAsistencia && mostrarAsistencia('kpis'); window.marcarSubitemActivo && marcarSubitemActivo(this);">
-                            <span class="material-symbols-outlined">query_stats</span> KPIs
-                        </button>
                         <button type="button" class="nav-subitem" id="navAsistenciaAnalisis" title="Análisis" style="display:none;" onclick="window.mostrarAsistencia && mostrarAsistencia('analisis'); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">bar_chart</span> Análisis
                         </button>
@@ -129,7 +126,7 @@ export class Sidebar {
         const user = getCurrentUser();
         if (!user || !esRolSupervisorOAdmision(user.rol)) return;
 
-        ['navUnificarIds', 'navCondicionesCC', 'navAsistenciaKPIs', 'navAsistenciaAnalisis', 'navAsistenciaMantenimiento']
+        ['navUnificarIds', 'navCondicionesCC', 'navAsistenciaAnalisis', 'navAsistenciaMantenimiento']
             .forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.style.display = '';

@@ -84,12 +84,12 @@ async function initAsistencia(tab) {
 
     const esAdmin = esRolSupervisorOAdmision(user.rol);
 
-    // KPIs/Análisis/Mantenimiento son exclusivos de SUPERVISOR/ADMISION;
+    // Análisis/Mantenimiento son exclusivos de SUPERVISOR/ADMISION;
     // Marcación es exclusiva de ASESOR. Calendario es de ambos — cada rol
     // ve una versión distinta (el ASESOR ve su propio historial/faltas, el
     // SUPERVISOR/ADMISION ve el resumen del equipo; la diferenciación ya
     // vive dentro de initPanelCalendario/renderCalendarioAsis*).
-    const tabsSoloAdmin = ['kpis', 'analisis', 'mantenimiento'];
+    const tabsSoloAdmin = ['analisis', 'mantenimiento'];
     const tabsAsesor = ['marcacion', 'calendario'];
     let tabFinal = tab || (esAdmin ? 'calendario' : 'marcacion');
     if (esAdmin && tabFinal === 'marcacion') tabFinal = 'calendario';
@@ -99,7 +99,6 @@ async function initAsistencia(tab) {
 
     switch (tabFinal) {
         case 'calendario': await initPanelCalendario(); break;
-        case 'kpis': await initPanelKpis(); break;
         case 'analisis': await initPanelAnalisis(); break;
         case 'mantenimiento': await initPanelMantenimiento(); break;
         default: await initPanelMarcacion(); break;
@@ -234,57 +233,6 @@ async function initPanelMarcacion() {
         getLocation();
         toggleLunchButtonsByDay();
         await loadTodayRecord();
-}
-
-async function initPanelKpis() {
-    const app = document.getElementById('asisApp');
-    app.innerHTML = `
-        <div class="asis-tab-panel active" id="tabPanel-kpis">
-            <div class="stat-row">
-                <div class="stat-card sc-green"><div class="stat-num" id="stPresentes">—</div><div class="stat-lbl">Presentes</div></div>
-                <div class="stat-card sc-warn"><div class="stat-num" id="stAlmuerzo">—</div><div class="stat-lbl">En almuerzo</div></div>
-                <div class="stat-card sc-purple"><div class="stat-num" id="stCompletos">—</div><div class="stat-lbl">Jornada completa</div></div>
-                <div class="stat-card sc-red"><div class="stat-num" id="stAusentes">—</div><div class="stat-lbl">Sin registrar</div></div>
-            </div>
-            <div class="filter-row">
-                <label class="cfg-label" style="margin:0;align-self:center;">Fecha</label>
-                <input type="date" id="fFechaKpis">
-                <select id="fEmp"><option value="">Todos los colaboradores</option></select>
-                <select id="fCampana"><option value="">Todas las campañas</option></select>
-                <button class="btn-refresh" id="btnActualizarKpis">↺ Actualizar</button>
-                <button class="btn-export" id="btnExportarKpis" style="margin-left:auto;"><span class="material-symbols-outlined" style="font-size:16px;">download</span> Exportar</button>
-            </div>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr>
-                        <th onclick="ordenarTablaKpis(0)">Colaborador</th>
-                        <th onclick="ordenarTablaKpis(1)">Campaña</th>
-                        <th onclick="ordenarTablaKpis(2)">Entrada</th>
-                        <th onclick="ordenarTablaKpis(3)">In. Almuerzo</th>
-                        <th onclick="ordenarTablaKpis(4)">Fin Almuerzo</th>
-                        <th onclick="ordenarTablaKpis(5)">Salida</th>
-                        <th>T. Trabajo</th><th>T. Almuerzo</th><th>Tipo</th><th>Estado</th>
-                    </tr></thead>
-                    <tbody id="bodyKpis"></tbody>
-                </table>
-            </div>
-        </div>
-    `;
-
-    const hoyPeru = nowPeru();
-    const fFecha = document.getElementById('fFechaKpis');
-    fFecha.value = `${hoyPeru.getFullYear()}-${String(hoyPeru.getMonth() + 1).padStart(2, '0')}-${String(hoyPeru.getDate()).padStart(2, '0')}`;
-
-    fFecha.addEventListener('change', () => cargarKpis());
-    document.getElementById('fEmp').addEventListener('change', () => cargarKpis());
-    document.getElementById('fCampana').addEventListener('change', () => { filtrarEmpleadosKpis(); cargarKpis(); });
-    document.getElementById('btnActualizarKpis').addEventListener('click', () => cargarKpis(true));
-    document.getElementById('btnExportarKpis').addEventListener('click', () => exportarKpisExcel());
-
-    if (await ensureEmpleadosCache()) {
-        poblarSelectEmpleados('fEmp', 'fCampana', 'Todos los colaboradores');
-    }
-    await cargarKpis();
 }
 
 async function initPanelAnalisis() {
@@ -1183,7 +1131,7 @@ async function getIP() {
     } catch { return '0.0.0.0'; }
 }
 
-// ===== EMPLEADOS (cache compartido entre KPIs / Análisis / Mantenimiento) =====
+// ===== EMPLEADOS (cache compartido entre Análisis / Mantenimiento) =====
 async function ensureEmpleadosCache() {
     if (state.empleadosCache.length) return true;
     try {
@@ -1215,103 +1163,11 @@ function normalizarFechaCorta(f) {
     return p.length === 3 ? p[0].padStart(2, '0') + '/' + p[1].padStart(2, '0') + '/' + p[2] : String(f).trim();
 }
 
-// ===== KPIs =====
-// El backend no filtra por fecha en getAsistenciaRegistros — devuelve todo el
-// histórico del filtro empleado/campaña — así que solo se vuelve a pedir
-// cuando cambia ese filtro o al forzar con "Actualizar"; cambiar solo la
-// fecha filtra en el navegador sobre el mismo set.
-let kpisCache = { key: null, data: null };
-let ultimosRegistrosHistoricos = [];
-
-async function cargarKpis(forzarRecarga = false) {
-    const fFecha = document.getElementById('fFechaKpis').value;
-    if (!fFecha) return;
-    const [y, m, d] = fFecha.split('-');
-    const fechaBuscada = `${d}/${m}/${y}`;
-    const fEmp = document.getElementById('fEmp').value;
-    const fCampana = document.getElementById('fCampana').value;
-    const cacheKey = `${fEmp}|${fCampana}`;
-    try {
-        let datos;
-        if (!forzarRecarga && kpisCache.key === cacheKey && kpisCache.data) {
-            datos = kpisCache.data;
-        } else {
-            const dRes = await callAPI('getAsistenciaRegistros', { empleado: fEmp, campaña: fCampana });
-            if (!dRes || !dRes.success) throw new Error((dRes && dRes.error) || 'El backend no devolvió una respuesta válida');
-            datos = dRes.data || [];
-            kpisCache = { key: cacheKey, data: datos };
-        }
-
-        const recsDelDia = (datos || []).filter(r => normalizarFechaCorta(r.fecha) === fechaBuscada);
-        const byUser = {};
-        recsDelDia.forEach(r => { byUser[r.usuario] = r; });
-
-        const empleados = state.empleadosCache.filter(u => u.rol !== 'admin' && (!fEmp || u.usuario === fEmp) && (!fCampana || u.campaña === fCampana));
-        let presentes = 0, enAlm = 0, completos = 0;
-        const tbody = document.getElementById('bodyKpis');
-        ultimosRegistrosHistoricos = [];
-        const filas = [];
-        empleados.forEach(u => {
-            const r = byUser[u.usuario] || {};
-            const tiene = !!(r.entrada && String(r.entrada).trim());
-            if (tiene) presentes++;
-            if (r.almuerzo && !r.regreso) enAlm++;
-            if (r.salida) completos++;
-            const estado = !tiene ? 'ausente' : r.salida ? 'completo' : (r.almuerzo && !r.regreso) ? 'almuerzo' : 'oficina';
-            const chipCls = estado === 'completo' ? 'chip-ok' : estado === 'ausente' ? 'chip-err' : estado === 'almuerzo' ? 'chip-warn' : 'chip-blue';
-            const chipTxt = { completo: 'Completo', ausente: 'Ausente', almuerzo: 'Almuerzo', oficina: 'En oficina' }[estado];
-            const foto = normalizarUrlFoto(u.foto) || `https://api.dicebear.com/7.x/initials/svg?seed=${(u.nombre || '?')[0]}&backgroundColor=0040A1`;
-            const tipoMarcacion = r.tipo || 'Remoto';
-            filas.push(`<tr>
-                <td><div style="display:flex;align-items:center;gap:8px;"><img src="${foto}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;"><span>${escapeHtml(u.nombre)}</span></div></td>
-                <td style="color:#888;">${escapeHtml(u.campaña)}</td>
-                <td>${r.entrada || '—'}</td><td>${r.almuerzo || '—'}</td><td>${r.regreso || '—'}</td><td>${r.salida || '—'}</td>
-                <td style="color:#FB923C;">${r.horasTrab ? horasLabel(parseFloat(r.horasTrab)) : '—'}</td>
-                <td>${r.horasAlm ? horasLabel(parseFloat(r.horasAlm)) : '—'}</td>
-                <td>${tipoMarcacion}</td><td><span class="chip ${chipCls}">${chipTxt}</span></td>
-            </tr>`);
-            ultimosRegistrosHistoricos.push({ fecha: fechaBuscada, nombre: u.nombre, campaña: u.campaña, ...r, estado: chipTxt });
-        });
-        tbody.innerHTML = empleados.length ? filas.join('') : '<tr><td colspan="10"><div class="empty-state">Sin colaboradores para este filtro</div></td></tr>';
-        document.getElementById('stPresentes').textContent = presentes;
-        document.getElementById('stAlmuerzo').textContent = enAlm;
-        document.getElementById('stCompletos').textContent = completos;
-        document.getElementById('stAusentes').textContent = empleados.length - presentes;
-    } catch (e) {
-        console.error('cargarKpis:', e);
-        showToast('Error al cargar KPIs: ' + (e.message || e), 'err');
-    }
-}
-
-function filtrarEmpleadosKpis() {
-    const sel = document.getElementById('fCampana').value, target = document.getElementById('fEmp');
-    let opts = '<option value="">Todos los colaboradores</option>';
-    state.empleadosCache.filter(u => u.rol !== 'admin' && (!sel || u.campaña === sel)).forEach(u => opts += `<option value="${u.usuario}">${escapeHtml(u.nombre)}</option>`);
-    target.innerHTML = opts;
-}
-
 function filtrarEmpleadosAnalisis() {
     const sel = document.getElementById('fCampanaAnalisis').value, target = document.getElementById('fEmpAnalisis');
     let opts = '<option value="">Todos los empleados</option>';
     state.empleadosCache.filter(u => u.rol !== 'admin' && (!sel || u.campaña === sel)).forEach(u => opts += `<option value="${u.usuario}">${escapeHtml(u.nombre)}</option>`);
     target.innerHTML = opts;
-}
-
-function ordenarTablaKpis(columna) {
-    const tbody = document.getElementById('bodyKpis');
-    const filas = Array.from(tbody.querySelectorAll('tr'));
-    const tabla = tbody.closest('table');
-    const ths = tabla.querySelectorAll('thead th');
-    const th = ths[columna];
-    if (!th) return;
-    const asc = !th.classList.contains('asc');
-    ths.forEach(h => h.classList.remove('asc', 'desc'));
-    filas.sort((a, b) => {
-        const aVal = a.cells[columna]?.textContent.trim() || '', bVal = b.cells[columna]?.textContent.trim() || '';
-        return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-    });
-    filas.forEach(f => tbody.appendChild(f));
-    th.classList.add(asc ? 'asc' : 'desc');
 }
 
 // XLSX ya se carga siempre desde el <head> (tanto en dashboard.html embebido
@@ -1330,30 +1186,6 @@ function ensureXLSX() {
         });
     }
     return xlsxCargando;
-}
-
-async function exportarKpisExcel() {
-    if (!ultimosRegistrosHistoricos.length) { showToast('No hay datos para exportar', 'err'); return; }
-    try { await ensureXLSX(); } catch (e) { showToast(e.message, 'err'); return; }
-    const filas = ultimosRegistrosHistoricos.map(r => ({
-        'Fecha': r.fecha || '',
-        'Colaborador': r.nombre || '',
-        'Campaña': r.campaña || '',
-        'Entrada': r.entrada || '',
-        'Inicio Almuerzo': r.almuerzo || '',
-        'Fin Almuerzo': r.regreso || '',
-        'Salida': r.salida || '',
-        'H. Trabajo': r.horasTrab ? horasLabel(parseFloat(r.horasTrab)) : '—',
-        'H. Almuerzo': r.horasAlm ? horasLabel(parseFloat(r.horasAlm)) : '—',
-        'Ubicación': r.direccion || '—',
-        'Tipo': r.tipo || 'Remoto',
-        'Estado': r.estado || ''
-    }));
-    const ws = XLSX.utils.json_to_sheet(filas);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Asistencia');
-    XLSX.writeFile(wb, 'kpis_asistencia.xlsx');
-    showToast('Exportado a Excel', 'ok');
 }
 
 // ===== ANÁLISIS =====
@@ -1576,7 +1408,6 @@ function guardarRestricciones() {
 }
 
 // Exponer al scope global: se invocan desde onclick="" en HTML generado dinámicamente.
-window.ordenarTablaKpis = ordenarTablaKpis;
 window.toggleColabActivo = toggleColabActivo;
 
 // ===== API =====
