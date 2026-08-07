@@ -1,20 +1,16 @@
 {
 	"name": "bottomline", // el nombre de tu proyecto
-	"compatibility_date": "2026-08-07", // la fecha de hoy
-	"compatibility_flags": ["nodejs_compat"],
+	"compatibility_date": "2026-07-09", // la fecha de hoy
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
 	"assets": {
-		"directory": "./",
-    "binding": "ASSETS",
-    "run_worker_first": ["/api", "/api/*"]
+		"directory": "./" // carpeta donde está tu index.html (./ si está en la raíz)
 	},
 	"hyperdrive": [
 		{
 			"binding": "RUMBO_DB",
 			"id": "ad45b66fa51a443dae413625ff859a4b"
 		}
-	],
-
-  "vars": {
-    "APPS_SCRIPT_URL": "https://script.google.com/macros/s/AKfycbw2uoproyz_cWAT7egWzpuE8JCfHEG2Ex_Ct0oQJ3slW_cOQ3NmCOQ7mkMdHPM6dKuziw/exec"
-  }
+	]
 }
