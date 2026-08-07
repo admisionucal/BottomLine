@@ -131,7 +131,7 @@ export const SELECT_OPTIONS = {
     tiempo: ['Traslado +2', '2 años', '2 años y medio', '3 años', '3 años y medio', '4 años'],
     tipoAlumno: ['ALUMNO REGULAR', 'ALUMNO ETU'],
     cuotas: ['5 cuotas', '6 cuotas'],
-    metodoPago: ['LINK DE PAGO', 'POS', 'Cargo']
+    metodoPago: ['LINK DE PAGO', 'POS', 'CARGO']
 };
 
 export const TIPOS_INSTITUCION_PROCEDENCIA = ['UNIVERSIDAD', 'INSTITUTO'];
