@@ -295,7 +295,7 @@ function buildBodyContentHTML(d) {
   ${d.mostrar6Cuotas && d.boleta6C ? `
   <p><b>${escapeHtml(d.boleta6CLabel)}:</b> ${escapeHtml(d.boleta6C)} (por cuota)</p>` : ''}
 
-  <p><b>Modalidad:</b> ${escapeHtml(d.modalidadEstudio)}</p>
+  <p><b>Modalidad:</b> ${escapeHtml(d.modalidadEstudio === "Remoto" ? "Virtual" : d.modalidadEstudio)}</p>
 
   ${d.horarioHTML}
 
