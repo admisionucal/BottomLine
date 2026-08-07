@@ -625,7 +625,7 @@ function construirConsideracionesHTML(d) {
         items.push(`La matrícula puede contemplar ajustes en el itinerario académico con el objetivo de asegurar una adecuada experiencia de aprendizaje.`);
     }
 
-    if (d.modalidadEstudio === 'Remoto') {
+    if (d.modalidadEstudio === 'Virtual') {
         items.push(`En casos excepcionales y por necesidades académicas, la Universidad podrá realizar ajustes en el horario informado, comunicándolo de manera oportuna al estudiante.`);
     }
 
