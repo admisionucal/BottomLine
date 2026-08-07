@@ -57,10 +57,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // Cargar catálogos si no existen
-    if (!cacheGet(CACHE_KEYS.BOLETAS) || !cacheGet(CACHE_KEYS.BENEFICIOS) || !cacheGet(CACHE_KEYS.INSTITUCIONES_PROCEDENCIA) || !cacheGet(CACHE_KEYS.CARRERAS_PROCEDENCIA)) {
-        await cargarCatalogos();
-    }
+    // Los catálogos (BOLETAS, BENEFICIOS, INSTITUCIONES/CARRERAS_PROCEDENCIA)
+    await cargarCatalogos();
     state.catalogoBoletas = cacheGet(CACHE_KEYS.BOLETAS) || [];
     state.catalogoBeneficios = cacheGet(CACHE_KEYS.BENEFICIOS) || [];
     state.catalogoInstitucionesProcedencia = cacheGet(CACHE_KEYS.INSTITUCIONES_PROCEDENCIA) || [];
