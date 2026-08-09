@@ -1,0 +1,87 @@
+import { getClient } from './lib/db';
+import { jsonError, type Env } from './types';
+import { login, logout } from './routes/auth';
+import {
+  marcarAsistencia,
+  getAsistenciaRegistroHoy,
+  getAsistenciaRegistros,
+  getAsistenciaEmpleados,
+} from './routes/asistencia';
+import { getLeads } from './routes/leads';
+import { saveBottom, addComment } from './routes/bottom';
+
+// Acciones ya migradas a Postgres. Todo lo que NO esté aquí se reenvía
+// automáticamente a tu Apps Script actual (fallback transparente).
+const ACCIONES_LOCALES: Record<string, (client: any, body: any) => Promise<Response>> = {
+  login,
+  logout,
+  marcarAsistencia,
+  getAsistenciaRegistroHoy,
+  getAsistenciaRegistros,
+  getAsistenciaEmpleados,
+  getLeads,
+  saveBottom,
+  addComment,
+};
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+
+    // Prueba de humo de la Fase 1 (la dejamos, no estorba).
+    if (url.pathname === '/api/ping') {
+      const client = await getClient(env);
+      try {
+        const r = await client.query('select now() as ahora');
+        return Response.json({ success: true, hora_servidor: r.rows[0].ahora });
+      } finally {
+        await client.end();
+      }
+    }
+
+    // Único endpoint de la app, mismo contrato que tu doPost actual.
+    if (url.pathname === '/api' && request.method === 'POST') {
+      let body: any;
+      try {
+        body = await request.json();
+      } catch {
+        return jsonError('Body inválido, se esperaba JSON.');
+      }
+
+      const action = body?.action;
+      const handler = ACCIONES_LOCALES[action];
+
+      if (handler) {
+        const client = await getClient(env);
+        try {
+          return await handler(client, body);
+        } catch (err: any) {
+          return jsonError('Error interno: ' + err.message, 500);
+        } finally {
+          await client.end();
+        }
+      }
+
+      // Fallback: acción todavía no migrada -> se reenvía tal cual a Apps Script.
+      return proxyAAppsScript(request, body, env);
+    }
+
+    // Cualquier otra ruta: sitio estático, igual que siempre.
+    return env.ASSETS.fetch(request);
+  },
+};
+
+async function proxyAAppsScript(originalRequest: Request, body: any, env: Env): Promise<Response> {
+  const resp = await fetch(env.APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  // Se reenvía la respuesta de Apps Script tal cual, para que el frontend
+  // no note ninguna diferencia entre acciones locales y las reenviadas.
+  const text = await resp.text();
+  return new Response(text, {
+    status: resp.status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
