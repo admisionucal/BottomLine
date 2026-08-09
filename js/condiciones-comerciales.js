@@ -2,12 +2,12 @@
 // CONDICIONES COMERCIALES - Módulo de solicitudes CC (Supervisor/Admisión)
 // ================================================================
 
-import { API_URL, esRolSupervisorOAdmision, COLUMNAS, CACHE_KEYS, BCC_DEFAULT_CC, SELECT_OPTIONS, CARRERAS_ETU } from '../core/constants.js';
+import { API_URL, esRolSupervisorOAdmision, COLUMNAS, CACHE_KEYS, BCC_DEFAULT_CC, SELECT_OPTIONS } from '../core/constants.js';
 
 import {
     getCurrentUser, getUserCampanas, getSessionToken,
     cacheGet, cacheSet, cacheRemove,
-    escapeHtml, formatearFecha
+    escapeHtml, formatearFecha, getEspecializacionETU
 } from '../core/utils.js';
 
 import { Sidebar, renderTable, Toast, createMultiSelect } from '../core/components.js';
@@ -449,7 +449,7 @@ function renderDetalleCC() {
     const beneficioRawActual = state.overrides.beneficioPrimeraRaw ?? (lead[COLUMNAS.BENEFICIO_ADICIONAL] ?? '');
     const tipoAlumnoActual = state.overrides.tipoAlumno ?? (lead[COLUMNAS.TIPO_ALUMNO] || 'ALUMNO REGULAR');
     const cuotasActual = state.overrides.cuotas ?? (lead[COLUMNAS.NUMERO_CUOTAS] || '5 cuotas');
-    const esCarreraElegibleETU = !!CARRERAS_ETU[carreraActual];
+    const esCarreraElegibleETU = !!getEspecializacionETU(carreraActual);
 
     const modalidadIngresoLead = String(lead[COLUMNAS.MODALIDAD_INGRESO] || '').toLowerCase();
     const tipoIngresoDefault = modalidadIngresoLead.indexOf('con conva') !== -1

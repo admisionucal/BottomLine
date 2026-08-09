@@ -28,7 +28,7 @@ let state = {
     pagesPerBlock: 20,
     terminoBusqueda: '',
     filtros: {
-        carrera: [], ingreso: [], beneficio: [], modalidad: [], asesor: [],
+        carrera: [], ingreso: [], beneficio: [], modalidad: [], asesor: [], perfil: [],
         status: [STATUS.VP_VIVA, STATUS.PP_VIVA]
     },
     campana: '',
@@ -399,7 +399,7 @@ window.addEventListener('multiselect-change', (e) => {
 function applyFilters() {
     const user = getCurrentUser();
     const esAdmin = esRolSupervisorOAdmision(user.rol);
-    const { carrera, ingreso, beneficio, modalidad, asesor, status } = state.filtros;
+    const { carrera, ingreso, beneficio, modalidad, asesor, status, perfil } = state.filtros;
 
     state.leadsFiltered = state.leadsRaw.filter(lead => {
         // Filtros multi-select
@@ -411,6 +411,7 @@ function applyFilters() {
         // nunca por el Nombre_Aux que se muestra en la tabla.
         if (esAdmin && asesor.length > 0 && !asesor.includes(lead[COLUMNAS.ASESOR_NOMBRE_RAW] || '')) return false;
         if (status.length > 0 && !status.includes(lead[COLUMNAS.STATUS_GESTION] || '')) return false;
+        if (perfil.length > 0 && !perfil.includes((lead.PERFILAMIENTO_COMPLETO || {}).estado || '')) return false;
 
         // Búsqueda por texto
         if (state.terminoBusqueda) {
@@ -431,44 +432,15 @@ function applyFilters() {
     renderTabla();
     guardarEstadoFiltros();
 
-    // Se difiere al siguiente tick a propósito: si populateFilters()
-    // reconstruye el DOM del panel de forma síncrona, dentro del mismo
-    // click que originó este cambio, compite con "cerrarMultiSelectFuera"
-    // (enganchado en el document desde que se abrió el dropdown), que
-    // todavía sigue evaluando ESE MISMO click. Esa función compara contra
-    // el checkbox original para decidir si el click fue "adentro" del
-    // panel -- pero si ya lo reemplazamos, no lo encuentra, interpreta
-    // que fue "afuera" y cierra el panel recién reabierto, en el mismo
-    // instante. Difiriendo la reconstrucción, ese listener termina de
-    // evaluarse contra el checkbox original (que todavía existe) antes
-    // de que lo reemplacemos.
     setTimeout(populateFilters, 0);
 }
 
 function populateFilters() {
     const user = getCurrentUser();
     const esAdmin = esRolSupervisorOAdmision(user.rol);
-
-    // createMultiSelect() reconstruye el <div class="multiselect"> desde
-    // cero (para recalcular qué opciones siguen disponibles según los
-    // demás filtros activos, tipo filtros en cascada). Eso borra la clase
-    // "open" del panel que el usuario pueda tener abierto en ese
-    // instante — sin restaurarla, el dropdown se cierra solo después de
-    // cada click y da la impresión de que el filtro solo deja elegir una
-    // opción a la vez.
     const panelAbierto = document.querySelector('.multiselect-panel.open');
     const idAbierto = panelAbierto ? panelAbierto.closest('.multiselect')?.id : null;
 
-    // getValues recibe DOS claves porque son cosas distintas: `columna` es
-    // el nombre real de la columna en el lead (COLUMNAS.CARRERA = 'CARRERA',
-    // para leer su valor), y `filtroKey` es la clave en minúscula de
-    // state.filtros (carrera/ingreso/beneficio/modalidad/status, para que
-    // leadPasaFiltrosSin pueda excluir ESTE filtro de sí mismo). Antes se
-    // pasaba solo `columna` a leadPasaFiltrosSin, que hacía
-    // `filtros['CARRERA'] = []` — una propiedad que no existe — en vez de
-    // vaciar `filtros.carrera` (la real); el filtro nunca se excluía de sí
-    // mismo, así que apenas elegías una opción, esa quedaba como la única
-    // disponible para seguir eligiendo (efecto "solo permite una opción").
     const getValues = (columna, filtroKey) => {
         return state.leadsRaw
             .filter(lead => leadPasaFiltrosSin(lead, filtroKey, esAdmin))
@@ -482,6 +454,7 @@ function populateFilters() {
     createMultiSelect('filterBeneficio', getValues(COLUMNAS.BENEFICIO, 'beneficio'), state.filtros.beneficio, 'Todos');
     createMultiSelect('filterModalidad', getValues(COLUMNAS.MODALIDAD, 'modalidad'), state.filtros.modalidad, 'Todas');
     createMultiSelect('filterStatus', getValues(COLUMNAS.STATUS_GESTION, 'status'), state.filtros.status, 'Todos', STATUS_LABELS);
+    createMultiSelect('filterPerfil', ['Pendiente Asesor', 'Pendiente Supervisor', 'Completo'], state.filtros.perfil, 'Todos');
 
     if (esAdmin) {
         // Value = Nombre crudo (identifica al asesor sin ambigüedad).
@@ -509,7 +482,7 @@ function leadPasaFiltrosSin(lead, filtroExcluido, esAdmin) {
     filtros[filtroExcluido] = [];
     if (!esAdmin) filtros.asesor = [];
 
-    const { carrera, ingreso, beneficio, modalidad, asesor, status } = filtros;
+    const { carrera, ingreso, beneficio, modalidad, asesor, status, perfil } = filtros;
 
     if (carrera.length > 0 && !carrera.includes(lead[COLUMNAS.CARRERA] || lead[COLUMNAS.PROGRAMA] || '')) return false;
     if (ingreso.length > 0 && !ingreso.includes(lead[COLUMNAS.MODALIDAD_INGRESO] || '')) return false;
@@ -517,6 +490,7 @@ function leadPasaFiltrosSin(lead, filtroExcluido, esAdmin) {
     if (modalidad.length > 0 && !modalidad.includes(lead[COLUMNAS.MODALIDAD] || '')) return false;
     if (esAdmin && asesor.length > 0 && !asesor.includes(lead[COLUMNAS.ASESOR_NOMBRE_RAW] || '')) return false;
     if (status.length > 0 && !status.includes(lead[COLUMNAS.STATUS_GESTION] || '')) return false;
+    if (perfil.length > 0 && !perfil.includes((lead.PERFILAMIENTO_COMPLETO || {}).estado || '')) return false;
 
     return true;
 }
@@ -566,12 +540,9 @@ function renderTabla() {
         const beneficio = lead[COLUMNAS.BENEFICIO] || 'NO';
         const beneficioAdicional = lead[COLUMNAS.BENEFICIO_ADICIONAL] || 'NO';
 
-        const perfil = lead.PERFILAMIENTO_COMPLETO || { respondidas: 0, total: 0, completo: false };
-        const bottomLabel = perfil.completo
-            ? '<span class="bottom-check completo">Check</span>'
-            : perfil.respondidas > 0
-                ? `<span class="bottom-check parcial">${perfil.respondidas}/${perfil.total}</span>`
-                : '<span class="bottom-check vacio">-</span>';
+        const perfil = lead.PERFILAMIENTO_COMPLETO || { estado: 'Pendiente Asesor' };
+        const perfilClases = { 'Completo': 'completo', 'Pendiente Supervisor': 'parcial', 'Pendiente Asesor': 'vacio' };
+        const bottomLabel = `<span class="bottom-check ${perfilClases[perfil.estado] || 'vacio'}">${perfil.estado}</span>`;
 
         const row = [
             bottomLabel,

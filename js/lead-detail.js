@@ -5,7 +5,7 @@
 import {
     API_URL, COLUMNAS, STATUS, STATUS_LABELS, STATUS_CLASES,
     CACHE_KEYS, SELECT_OPTIONS, PRECIOS_BASE,
-    esRolSupervisorOAdmision, TIPOS_INSTITUCION_PROCEDENCIA, CARRERAS_ETU
+    esRolSupervisorOAdmision, TIPOS_INSTITUCION_PROCEDENCIA
 } from '../core/constants.js';
 
 import {
@@ -14,7 +14,7 @@ import {
     escapeHtml, normalizarTexto, parseNumero,
     diffHoras, horasLabel,
     parsearFechaFlexible, fechaAClaveISO,
-    hoyDDMMYYYY, nowPeru
+    hoyDDMMYYYY, nowPeru, getEspecializacionETU
 } from '../core/utils.js';
 
 import { Sidebar, Toast, Modal } from '../core/components.js';
@@ -401,7 +401,7 @@ function renderVista1() {
     `;
 
     // Campos editables
-    const esCarreraElegibleETU = !!CARRERAS_ETU[carrera];
+    const esCarreraElegibleETU = !!getEspecializacionETU(carrera);
     html += campoEditableHTML('Tipo de Alumno',
         selectSimpleHTML('selectTipoAlumno', SELECT_OPTIONS.tipoAlumno, tipoAlumnoActual, bloqueado) +
         `<span id="tipoAlumnoHint" style="display:${(tipoAlumnoActual === 'ALUMNO ETU' && !esCarreraElegibleETU) ? 'block' : 'none'}; font-size:11px; color:#d32f2f; margin-top:4px;">

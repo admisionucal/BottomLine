@@ -2,7 +2,7 @@
 // UTILS - Funciones utilitarias reutilizables y caché
 // ================================================================
 
-import { CACHE_KEYS } from './constants.js';
+import { CACHE_KEYS, CARRERAS_ETU } from './constants.js';
 
 // ================================================================
 // FORMATEO Y PARSING
@@ -149,6 +149,13 @@ export function parsearHistorial(raw) {
     } catch (e) {
         return [];
     }
+}
+
+/** Especialización ETU normalizada */
+export function getEspecializacionETU(carrera) {
+    const norm = normalizarTexto(carrera);
+    const clave = Object.keys(CARRERAS_ETU).find(k => normalizarTexto(k) === norm);
+    return clave ? CARRERAS_ETU[clave] : '';
 }
 
 // ================================================================

@@ -3,7 +3,7 @@
 // ================================================================
 
 // ----- URL DE LA API (Google Apps Script) -----
-export const API_URL = 'https://script.google.com/macros/s/AKfycbysXyDJBExhy6YyWNamg6YeUzqapAyAIWbsPECQYWBDZUdCqfZ-g52RAyfoqSYLLR_NvQ/exec';
+export const API_URL = 'https://script.google.com/macros/s/AKfycbz1CU3vKeJ4tQ0C_VEGn5SeCOMg4UeUwXP62EojB4pFXABNc19QrAs091nVe9TzheFSAw/exec';
 
 // ----- MAPEO DE COLUMNAS DE GOOGLE SHEETS -----
 // Centraliza todos los nombres de columnas para evitar strings mágicos.
@@ -137,11 +137,6 @@ export const SELECT_OPTIONS = {
 export const TIPOS_INSTITUCION_PROCEDENCIA = ['UNIVERSIDAD', 'INSTITUTO'];
 
 // ----- MAPEO CARRERA -> ESPECIALIZACIÓN ETU -----
-// Solo estas carreras pueden marcarse como "ALUMNO ETU". El nombre de la
-// especialización (columna derecha) es el que sale impreso en las
-// Condiciones Comerciales cuando corresponde. Hardcodeado a propósito
-// (igual que en el script viejo de Cargos): no depende de ningún catálogo
-// de Sheets, así que si se agrega/quita una carrera ETU hay que tocar
 // este objeto directamente.
 export const CARRERAS_ETU = {
     'Diseño Digital de Interiores': 'Diseño Digital e Interiorismo',
@@ -153,13 +148,9 @@ export const CARRERAS_ETU = {
 };
 
 // ----- COPIA OCULTA (BCC) POR DEFECTO PARA ENVÍO DE CC, POR CAMPAÑA -----
-// Único lugar donde se define esta lista — condiciones-comerciales.js la
-// usa para pintar los checkboxes de Vista 2. Todos van marcados por
-// defecto (incluido onboarding), pero el supervisor puede desmarcar
-// cualquiera antes de enviar — nada va forzado.
 export const BCC_DEFAULT_CC = {
     '26.2': ['onboarding@ucal.edu.pe', 'azamora@ucal.edu.pe', 'renriquez@ucal.edu.pe'],
-    '27.1': ['onboarding@ucal.edu.pe', 'mquiroz@ucal.edu.pe']
+    '27.1': ['onboarding@ucal.edu.pe', 'mquiroz@ucal.edu.pe', 'renriquez@ucal.edu.pe']
 };
 
 // ----- CLAVES DE CACHÉ (sessionStorage) -----

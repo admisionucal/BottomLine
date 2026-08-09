@@ -2,8 +2,8 @@
 // CC TEMPLATE - Construcción de datos y render del PDF de Condiciones Comerciales
 // ================================================================
 
-import { COLUMNAS, CARRERAS_ETU } from '../core/constants.js';
-import { escapeHtml, parseNumero, normalizarTexto } from '../core/utils.js';
+import { COLUMNAS } from '../core/constants.js';
+import { escapeHtml, parseNumero, normalizarTexto, getEspecializacionETU } from '../core/utils.js';
 
 let logoDataUri = null;
 
@@ -57,7 +57,7 @@ export function construirDatosCC(lead, campana, overrides = {}) {
 
     // ===== TIPO DE ALUMNO (ETU) =====
     d.tipoAlumno = overrides.tipoAlumno ?? (lead[COLUMNAS.TIPO_ALUMNO] || 'ALUMNO REGULAR');
-    d.carreraETU = CARRERAS_ETU[d.carrera] || '';
+    d.carreraETU = getEspecializacionETU(d.carrera);
     d.programaETU = d.tipoAlumno === 'ALUMNO ETU' && !!d.carreraETU;
 
     // ===== NÚMERO DE CUOTAS =====
