@@ -35,6 +35,7 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
 
   let actualizados = 0;
   let errores = 0;
+  let primerError: string | null = null;
 
   for (const leadRaw of leads) {
     const idPrometeo = String(leadRaw['ID PROMETEO'] || '').trim();
@@ -47,8 +48,9 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
     }
 
     const cols = Object.keys(columnas);
-    const placeholders = cols.map((_, i) => `$${i + 4}`);
-    const sets = cols.map((c, i) => `${c} = $${i + 4}`);
+    // Solo 2 parámetros fijos preceden a las columnas aquí (idPrometeo=$1,
+    // campana=$2), así que las columnas dinámicas empiezan en $3, no en $4.
+    const sets = cols.map((c, i) => `${c} = $${i + 3}`);
 
     try {
       // Igual patrón que en la migración manual: si el lead no existe en la
@@ -70,10 +72,12 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
         [idPrometeo, campana, ...cols.map((c) => columnas[c])]
       );
       actualizados++;
-    } catch (e) {
+    } catch (e: any) {
       errores++;
+      console.log(`Error actualizando lead ${idPrometeo}: ${e.message}`);
+      if (!primerError) primerError = `ID ${idPrometeo}: ${e.message}`;
     }
   }
 
-  return jsonOk({ actualizados, errores, total: leads.length });
+  return jsonOk({ actualizados, errores, total: leads.length, primerError });
 }
