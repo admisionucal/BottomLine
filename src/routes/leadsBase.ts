@@ -37,6 +37,7 @@ export async function actualizarLeadsBase(client: Client, body: JsonBody, env: E
 
   let procesados = 0;
   const idsDeEsteLote: string[] = [];
+  let primerError: string | null = null;
 
   for (const fila of filas) {
     const idPrometeo = String(fila['ID PROMETEO'] || '').trim();
@@ -56,8 +57,8 @@ export async function actualizarLeadsBase(client: Client, body: JsonBody, env: E
     }
 
     const cols = Object.keys(columnas);
-    const placeholders = cols.map((_, i) => `$${i + 5}`);
-    const sets = cols.map((c, i) => `${c} = $${i + 5}`);
+    const placeholders = cols.map((_, i) => `$${i + 4}`);
+    const sets = cols.map((c, i) => `${c} = $${i + 4}`);
 
     try {
       await client.query(
@@ -68,8 +69,11 @@ export async function actualizarLeadsBase(client: Client, body: JsonBody, env: E
         [idPrometeo, campana, JSON.stringify(extra), ...cols.map((c) => columnas[c])]
       );
       procesados++;
-    } catch (_e) {
-      // seguimos con el resto del lote
+    } catch (e: any) {
+      // Ya no lo tragamos en silencio: lo dejamos en el log para poder
+      // diagnosticar si algo vuelve a fallar.
+      console.log(`Error insertando lead ${idPrometeo}: ${e.message}`);
+      if (!primerError) primerError = `ID ${idPrometeo}: ${e.message}`;
     }
   }
 
@@ -103,5 +107,5 @@ export async function actualizarLeadsBase(client: Client, body: JsonBody, env: E
     await client.query(`delete from import_base_seen where campana = $1 and fecha = current_date`, [campana]);
   }
 
-  return jsonOk({ procesados, marcadosAusentes, total: filas.length });
+  return jsonOk({ procesados, marcadosAusentes, total: filas.length, primerError });
 }
