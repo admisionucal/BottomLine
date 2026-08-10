@@ -26,8 +26,13 @@
             display: flex;
             flex-wrap: wrap;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             margin-bottom: 20px;
+        }
+
+        .lead-header .info {
+            flex: 1 1 auto;
+            min-width: 0;
         }
 
         .lead-header .info h2 {
@@ -35,22 +40,56 @@
             color: var(--color-primary);
         }
 
-        .lead-header .info .sub {
-            color: #777;
-            font-size: 14px;
-            margin-top: 4px;
+        .lead-header-top {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+            flex-wrap: wrap;
         }
 
-        .lead-header .info .sub span {
-            background: #e8eaf6;
-            padding: 2px 12px;
-            border-radius: 12px;
-            margin-right: 8px;
+        .lead-header .campo-label {
+            color: #888;
+            font-size: 12px;
+            display: block;
+            text-transform: uppercase;
+            font-weight: 600;
         }
 
-        .lead-header .info .sub .colegio-tag {
-            background: #fff3e0;
-            color: #e65100;
+        .lead-header .campo-valor {
+            color: #222;
+            font-size: 15px;
+            display: block;
+            margin-top: 2px;
+        }
+
+        .lead-header .lead-datos-id {
+            display: grid;
+            grid-template-columns: repeat(3, max-content);
+            gap: 4px 20px;
+        }
+
+        .lead-header .lead-datos-id > div {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .lead-header .lead-datos-id .campo-label {
+            display: inline;
+            white-space: nowrap;
+        }
+
+        .lead-header .lead-datos-id .campo-valor {
+            display: inline;
+            margin-top: 0;
+        }
+
+        .lead-header .lead-datos-detalle {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(220px, 1fr));
+            gap: 20px 64px;
+            margin-top: 18px;
+            width: 100%;
         }
 
         .status-large {
@@ -476,12 +515,61 @@
                 <!-- LEAD HEADER -->
                 <div class="lead-header" id="leadHeader">
                     <div class="info">
-                        <h2 id="leadNombre">Cargando...</h2>
-                        <div class="sub" id="leadSub">
-                            <span id="leadId">ID: ---</span>
-                            <span id="leadCarrera">---</span>
-                            <span id="leadModalidad">---</span>
-                            <span id="leadAsesor">---</span>
+                        <div class="lead-header-top">
+                            <h2 id="leadNombre">Cargando...</h2>
+                            <div class="lead-datos-grid lead-datos-id">
+                                <div>
+                                    <span class="campo-label">ID</span>
+                                    <strong class="campo-valor" id="leadId">---</strong>
+                                </div>
+                                <div>
+                                    <span class="campo-label">Canal</span>
+                                    <strong class="campo-valor" id="leadCanal">---</strong>
+                                </div>
+                                <div id="leadAsesorWrap">
+                                    <span class="campo-label">Asesor</span>
+                                    <strong class="campo-valor" id="leadAsesor">---</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="lead-datos-grid lead-datos-detalle">
+                            <div>
+                                <span class="campo-label">N° Documento</span>
+                                <strong class="campo-valor" id="leadDocumento">-</strong>
+                            </div>
+                            <div>
+                                <span class="campo-label">Celular</span>
+                                <strong class="campo-valor" id="leadCelular">-</strong>
+                            </div>
+                            <div>
+                                <span class="campo-label">Correo</span>
+                                <strong class="campo-valor" id="leadCorreo">-</strong>
+                            </div>
+                            <div>
+                                <span class="campo-label">Campaña</span>
+                                <strong class="campo-valor" id="leadCampana">---</strong>
+                            </div>
+                            <div>
+                                <span class="campo-label">Carrera</span>
+                                <strong class="campo-valor" id="leadCarrera">---</strong>
+                            </div>
+                            <div>
+                                <span class="campo-label">Modalidad</span>
+                                <strong class="campo-valor" id="leadModalidad">---</strong>
+                            </div>
+                            <div>
+                                <span class="campo-label">Colegio</span>
+                                <strong class="campo-valor" id="leadColegio">---</strong>
+                            </div>
+                            <div>
+                                <span class="campo-label">Boleta del Colegio</span>
+                                <strong class="campo-valor" id="leadBoletaColegio">---</strong>
+                            </div>
+                            <div>
+                                <span class="campo-label">Tipo Ingreso</span>
+                                <strong class="campo-valor" id="leadTipoIngreso">---</strong>
+                            </div>
                         </div>
                     </div>
                     <div class="status-large vp" id="statusBadge">Cargando...</div>
@@ -489,7 +577,7 @@
 
                 <!-- TABS -->
                 <div class="tabs">
-                    <button class="active" data-tab="vista1">Datos</button>
+                    <button class="active" data-tab="vista1">Boleta</button>
                     <button data-tab="vista2">Perfilamiento</button>
                     <button data-tab="historial">Historial</button>
                     <button data-tab="pagos">Pagos</button>

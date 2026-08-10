@@ -12,6 +12,7 @@ export const COLUMNAS = {
     ID_PROMETEO: 'ID PROMETEO',
     NOMBRES: 'NOMBRES',
     NOMBRE: 'NOMBRE',
+    CANAL: 'SUBCANAL 2',
     ASESOR_ULTIMO_CONTACTO: 'ASESOR ULT TIP DF SN CONTC',
     ASESOR_NOMBRE_RAW: 'ASESOR_NOMBRE_RAW',
     ASESOR_EMAIL: 'ASESOR_EMAIL',
@@ -46,6 +47,7 @@ export const COLUMNAS = {
     TIPO_ALUMNO: 'TIPO_ALUMNO',
     NUMERO_CUOTAS: 'NUMERO_CUOTAS',
     METODO_PAGO: 'METODO_PAGO',
+    RINDE_EXAMEN_SUFICIENCIA: 'RINDE_EXAMEN_SUFICIENCIA',
 
     // Perfilamiento
     POR_QUE_ELIGIO_CARRERA: 'POR_QUE_ELIGIO_CARRERA',
@@ -131,7 +133,8 @@ export const SELECT_OPTIONS = {
     tiempo: ['Traslado +2', '2 años', '2 años y medio', '3 años', '3 años y medio', '4 años', '4 años y medio', '5 años'],
     tipoAlumno: ['ALUMNO REGULAR', 'ALUMNO ETU'],
     cuotas: ['5 cuotas', '6 cuotas'],
-    metodoPago: ['LINK DE PAGO', 'POS', 'CARGO']
+    metodoPago: ['LINK DE PAGO', 'POS', 'CARGO'],
+    rindeExamenSuficiencia: ['NO', 'SI']
 };
 
 export const TIPOS_INSTITUCION_PROCEDENCIA = ['UNIVERSIDAD', 'INSTITUTO'];
