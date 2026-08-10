@@ -4,6 +4,9 @@ export interface Env {
   // URL de tu Apps Script actual. Se usa como "fallback" para las acciones
   // que todavía no migramos a Postgres (getLeads, enviarCC, etc.)
   APPS_SCRIPT_URL: string;
+  // Secreto compartido para endpoints server-to-server (scripts de importación),
+  // que no tienen sesión de usuario real.
+  IMPORT_SECRET: string;
 }
 
 export type JsonBody = Record<string, any>;
