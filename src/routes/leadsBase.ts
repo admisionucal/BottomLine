@@ -56,7 +56,7 @@ export async function actualizarLeadsBase(client: Client, body: JsonBody, env: E
       }
     }
 
-    const cols = Object.keys(columnas);
+    const cols = Object.keys(columnas).filter((c) => c !== 'id_prometeo');
     const placeholders = cols.map((_, i) => `$${i + 4}`);
     const sets = cols.map((c, i) => `${c} = $${i + 4}`);
 
