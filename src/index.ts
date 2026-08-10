@@ -9,10 +9,12 @@ import {
 } from './routes/asistencia';
 import { getLeads } from './routes/leads';
 import { saveBottom, addComment } from './routes/bottom';
+import { actualizarLeadsHoy } from './routes/leadsHoy';
+import { actualizarLeadsBase } from './routes/leadsBase';
 
 // Acciones ya migradas a Postgres. Todo lo que NO esté aquí se reenvía
 // automáticamente a tu Apps Script actual (fallback transparente).
-const ACCIONES_LOCALES: Record<string, (client: any, body: any) => Promise<Response>> = {
+const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env) => Promise<Response>> = {
   login,
   logout,
   marcarAsistencia,
@@ -22,6 +24,8 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any) => Promise<Respo
   getLeads,
   saveBottom,
   addComment,
+  actualizarLeadsHoy,
+  actualizarLeadsBase,
 };
 
 export default {
@@ -54,7 +58,7 @@ export default {
       if (handler) {
         const client = await getClient(env);
         try {
-          return await handler(client, body);
+          return await handler(client, body, env);
         } catch (err: any) {
           return jsonError('Error interno: ' + err.message, 500);
         } finally {

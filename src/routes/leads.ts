@@ -1,122 +1,107 @@
 import type { Client } from 'pg';
-import { jsonOk, jsonError, type JsonBody } from '../types';
-import { exigirSesion } from '../lib/session';
+import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 
-const ESTADOS_VP_PP = ['VALORES_VALORACIONES_POSITIVAS_VIVA', 'VALORES_PROMESA_DE_PAGO_VIVA'];
+// Mismo mapeo que usamos en el script manual de migración (migrar_leads.js).
+const MAPEO_LEADS: Record<string, string> = {
+  'ID PROMETEO': 'id_prometeo',
+  'NOMBRES': 'nombres',
+  'TELEFONO 2': 'telefono2',
+  'TELEFONO 3': 'telefono3',
+  'EMAIL': 'email',
+  'NOMBRE DEL COLEGIO': 'colegio',
+  'CODIGO MODULAR': 'codigo_modular',
+  'CARRERA': 'programa',
+  'PROGRAMA': 'programa',
+  'NUMERO DE DOCUMENTO': 'numero_documento',
+  'MODALIDAD': 'modalidad',
+  'MODALIDAD INGRESO': 'modalidad_ingreso',
+  'BOLETA DE COLEGIO': 'boleta_colegio',
+  'FECHA HORA DE REGISTRO': 'fecha_hora_registro',
+  'ASESOR ULT TIP DF SN CONTC': 'asesor',
+  'STATUS DE GESTION': 'status_gestion',
+  'FECHA COMPROMISO DE PAGO': 'fecha_compromiso_pago',
+  '# DE VPs DIF TI INTE': 'vps_dif_ti_inte',
+};
 
-export async function getLeads(client: Client, body: JsonBody) {
-  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ASESOR', 'ADMISION']);
-  if (!sesion) return jsonError(error!);
+// Este endpoint se llama en varios lotes (chunks) desde Apps Script para un
+// mismo import diario. `esUltimoChunk` indica cuándo ya se mandaron todas
+// las filas, para recién ahí marcar en_base=false a los IDs que no vinieron.
+export async function actualizarLeadsBase(client: Client, body: JsonBody, env: Env) {
+  if (!env.IMPORT_SECRET || body.secret !== env.IMPORT_SECRET) {
+    return jsonError('No autorizado.', 401);
+  }
 
-  const esAdmin = sesion.rol === 'SUPERVISOR' || sesion.rol === 'ADMISION';
-  const campana = body.campana;
-  if (!campana) return jsonError('Falta especificar la campaña.');
+  const campana = String(body.campana || '').trim();
+  const filas = Array.isArray(body.filas) ? body.filas : [];
+  if (!campana) return jsonError('Falta campaña.');
 
-  const filtros = body.filtros || {};
+  let procesados = 0;
+  const idsDeEsteLote: string[] = [];
 
-  // Igual que tu código: un ASESOR solo ve sus propios leads en VP/PP;
-  // un admin ve todo lo "visible" (con vps_dif != 0 o en VP/PP hoy).
-  const params: any[] = [campana];
-  const condiciones: string[] = ['l.campana = $1'];
+  for (const fila of filas) {
+    const idPrometeo = String(fila['ID PROMETEO'] || '').trim();
+    if (!idPrometeo) continue;
+    idsDeEsteLote.push(idPrometeo);
 
-  if (esAdmin) {
-    condiciones.push(`(l.vps_dif_ti_inte <> 0 or (l.actualizado_hoy_en is not null and l.status_gestion = any($${params.push(ESTADOS_VP_PP)})))`);
-  } else {
-    condiciones.push(`l.status_gestion = any($${params.push(ESTADOS_VP_PP)})`);
-    if (sesion.nombre) {
-      condiciones.push(`lower(l.asesor) = lower($${params.push(sesion.nombre)})`);
+    const columnas: Record<string, any> = {};
+    const extra: Record<string, any> = {};
+
+    for (const [colSheet, valor] of Object.entries(fila)) {
+      const colPg = MAPEO_LEADS[colSheet];
+      if (colPg) {
+        columnas[colPg] = valor === '' ? null : valor;
+      } else if (colSheet !== 'ID PROMETEO') {
+        extra[colSheet] = valor;
+      }
+    }
+
+    const cols = Object.keys(columnas);
+    const placeholders = cols.map((_, i) => `$${i + 5}`);
+    const sets = cols.map((c, i) => `${c} = $${i + 5}`);
+
+    try {
+      await client.query(
+        `insert into leads (id_prometeo, campana, en_base, extra, ${cols.join(', ')})
+         values ($1, $2, true, $3::jsonb, ${placeholders.join(', ')})
+         on conflict (id_prometeo, campana) do update set
+           en_base = true, extra = $3::jsonb, ${sets.join(', ')}, actualizado_en = now()`,
+        [idPrometeo, campana, JSON.stringify(extra), ...cols.map((c) => columnas[c])]
+      );
+      procesados++;
+    } catch (_e) {
+      // seguimos con el resto del lote
     }
   }
 
-  if (filtros.carrera && filtros.carrera !== 'Todas') {
-    condiciones.push(`l.programa = $${params.push(filtros.carrera)}`);
-  }
-  if (filtros.ingreso && filtros.ingreso !== 'Todos') {
-    condiciones.push(`l.modalidad_ingreso = $${params.push(filtros.ingreso)}`);
-  }
-  if (filtros.modalidad && filtros.modalidad !== 'Todas') {
-    condiciones.push(`l.modalidad = $${params.push(filtros.modalidad)}`);
-  }
-  if (filtros.status && filtros.status !== 'Todos') {
-    condiciones.push(`l.status_gestion = $${params.push(filtros.status)}`);
-  }
-  if (filtros.beneficio && filtros.beneficio !== 'Todos') {
-    condiciones.push(`coalesce(b.beneficio, 'NO') = $${params.push(filtros.beneficio)}`);
+  // Guardamos temporalmente los IDs vistos hoy para esta campaña, en una
+  // tabla auxiliar simple, para poder comparar al final (último chunk)
+  // sin tener que mandar TODOS los IDs de golpe en un solo request gigante.
+  if (idsDeEsteLote.length > 0) {
+    await client.query(
+      `insert into import_base_seen (campana, id_prometeo, fecha)
+       select $1, unnest($2::text[]), current_date
+       on conflict do nothing`,
+      [campana, idsDeEsteLote]
+    );
   }
 
-  // pagos solo se aplica (y solo se selecciona) para roles admin, igual que hoy.
-  const selectPagos = esAdmin
-    ? `p.status_pago_final, p.fecha_pago_completo, p.fecha_promesa_pago,`
-    : `null as status_pago_final, null as fecha_pago_completo, null as fecha_promesa_pago,`;
+  let marcadosAusentes = 0;
+  if (body.esUltimoChunk) {
+    const result = await client.query(
+      `update leads set en_base = false, actualizado_en = now()
+       where campana = $1
+         and en_base = true
+         and id_prometeo not in (
+           select id_prometeo from import_base_seen where campana = $1 and fecha = current_date
+         )
+       returning id_prometeo`,
+      [campana]
+    );
+    marcadosAusentes = result.rowCount || 0;
 
-  const sql = `
-    select
-      l.id_prometeo, l.campana, l.nombres, l.telefono2, l.telefono3, l.email,
-      l.colegio, l.codigo_modular, l.programa, l.numero_documento, l.modalidad,
-      l.modalidad_ingreso, l.boleta_colegio, l.fecha_hora_registro, l.asesor,
-      coalesce(u.nombre_aux, l.asesor, '-') as asesor_nombre,
-      -- Si hay pago con status final, prevalece sobre el status normal
-      -- (misma regla que "statusPagoFinal === 'PAGO COMPLETO' ...").
-      case when ${esAdmin} and p.status_pago_final in ('PAGO COMPLETO', 'PAGO FRACCIONADO')
-           then p.status_pago_final else l.status_gestion end as status_gestion,
-      l.fecha_compromiso_pago,
-      (l.actualizado_hoy_en is not null) as actualizado_hoy,
-      l.extra,
-      ${selectPagos}
-      coalesce(b.beneficio, 'NO') as beneficio,
-      coalesce(b.beneficio_adicional, 'NO') as beneficio_adicional,
-      b.por_que_eligio_carrera, b.que_busca_universidad, b.quien_financiara,
-      b.acciones_definidas, b.que_le_falta, b.otras_opciones,
-      (
-        (case when nullif(trim(b.por_que_eligio_carrera), '') is not null then 1 else 0 end) +
-        (case when nullif(trim(b.que_busca_universidad), '') is not null then 1 else 0 end) +
-        (case when nullif(trim(b.quien_financiara), '') is not null then 1 else 0 end) +
-        (case when nullif(trim(b.acciones_definidas), '') is not null then 1 else 0 end) +
-        (case when nullif(trim(b.que_le_falta), '') is not null then 1 else 0 end) +
-        (case when nullif(trim(b.otras_opciones), '') is not null then 1 else 0 end)
-      ) as perfilamiento_respondidas
-    from leads l
-    left join leads_bottom b on b.id_prometeo = l.id_prometeo and b.campana = l.campana
-    left join leads_pagos p on p.id_prometeo = l.id_prometeo and p.campana = l.campana
-    left join usuarios u on lower(u.usuario) = lower(l.asesor) or lower(u.nombre) = lower(l.asesor)
-    where ${condiciones.join(' and ')}
-    order by l.actualizado_en desc
-  `;
+    // Limpieza: ya no necesitamos el registro de "vistos hoy" de este día.
+    await client.query(`delete from import_base_seen where campana = $1 and fecha = current_date`, [campana]);
+  }
 
-  const result = await client.query(sql, params);
-
-  const data = result.rows.map((r) => ({
-    'ID PROMETEO': r.id_prometeo,
-    'CAMPAÑA': r.campana,
-    NOMBRES: r.nombres,
-    'TELEFONO 2': r.telefono2,
-    'TELEFONO 3': r.telefono3,
-    EMAIL: r.email,
-    'NOMBRE DEL COLEGIO': r.colegio,
-    'CODIGO MODULAR': r.codigo_modular,
-    PROGRAMA: r.programa,
-    CARRERA: r.programa,
-    'NUMERO DE DOCUMENTO': r.numero_documento,
-    MODALIDAD: r.modalidad,
-    'MODALIDAD INGRESO': r.modalidad_ingreso,
-    'BOLETA DE COLEGIO': r.boleta_colegio,
-    'FECHA HORA DE REGISTRO': r.fecha_hora_registro,
-    ASESOR_NOMBRE_RAW: r.asesor || '',
-    'ASESOR ULT TIP DF SN CONTC': r.asesor_nombre,
-    'STATUS DE GESTION': r.status_gestion,
-    'FECHA COMPROMISO DE PAGO': r.fecha_compromiso_pago,
-    ACTUALIZADO_HOY: r.actualizado_hoy,
-    'FECHA DE PAGO COMPLETO': r.fecha_pago_completo,
-    'FECHA DE PROMESA DE PAGO': r.fecha_promesa_pago,
-    BENEFICIO: r.beneficio,
-    BENEFICIO_ADICIONAL: r.beneficio_adicional,
-    PERFILAMIENTO_COMPLETO: {
-      respondidas: Number(r.perfilamiento_respondidas),
-      total: 6,
-      completo: Number(r.perfilamiento_respondidas) === 6,
-    },
-    ...(r.extra || {}),
-  }));
-
-  return jsonOk({ data });
+  return jsonOk({ procesados, marcadosAusentes, total: filas.length });
 }
