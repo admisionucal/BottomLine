@@ -30,6 +30,13 @@ export async function getLeads(client: Client, body: JsonBody) {
   const params: any[] = [campana];
   const condiciones: string[] = ['l.campana = $1'];
 
+  // Un lead se muestra si: sigue en la base actual (en_base=true), O si el
+  // scraper de Prometeo lo tocó HOY MISMO (leads "solo hoy", legítimos aunque
+  // aún no estén en la base). Si ya no está en base y no se tocó hoy, es un
+  // lead viejo que salió del extracto — se deja de mostrar (equivalente a que
+  // Sheets ya no lo tenga en la hoja base), pero su bottom/historial no se pierde.
+  condiciones.push(`(l.en_base = true or l.actualizado_hoy_en::date = current_date)`);
+
   if (esAdmin) {
     condiciones.push(`(l.vps_dif_ti_inte <> 0 or (l.actualizado_hoy_en is not null and l.status_gestion = any($${params.push(ESTADOS_VP_PP)})))`);
   } else {
@@ -82,10 +89,10 @@ export async function getLeads(client: Client, body: JsonBody) {
         (case when nullif(trim(b.por_que_eligio_carrera), '') is not null then 1 else 0 end) +
         (case when nullif(trim(b.que_busca_universidad), '') is not null then 1 else 0 end) +
         (case when nullif(trim(b.quien_financiara), '') is not null then 1 else 0 end) +
-        (case when nullif(trim(b.acciones_definidas), '') is not null then 1 else 0 end) +
         (case when nullif(trim(b.que_le_falta), '') is not null then 1 else 0 end) +
         (case when nullif(trim(b.otras_opciones), '') is not null then 1 else 0 end)
-      ) as perfilamiento_respondidas
+      ) as perfil_asesor_respondidas,
+      (nullif(trim(b.acciones_definidas), '') is not null) as perfil_supervisor_completo
     from leads l
     left join usuarios u on lower(u.usuario) = lower(l.asesor) or lower(u.nombre) = lower(l.asesor)
     -- leads_bottom ahora es por (id_prometeo, campana, asesor_email): mostramos
@@ -124,11 +131,18 @@ export async function getLeads(client: Client, body: JsonBody) {
     'FECHA DE PROMESA DE PAGO': r.fecha_promesa_pago,
     BENEFICIO: r.beneficio,
     BENEFICIO_ADICIONAL: r.beneficio_adicional,
-    PERFILAMIENTO_COMPLETO: {
-      respondidas: Number(r.perfilamiento_respondidas),
-      total: 6,
-      completo: Number(r.perfilamiento_respondidas) === 6,
-    },
+    PERFILAMIENTO_COMPLETO: (() => {
+      const asesorResp = Number(r.perfil_asesor_respondidas);
+      const supCompleto = !!r.perfil_supervisor_completo;
+      const asesorCompleto = asesorResp === 5;
+      const estado = !asesorCompleto ? 'Pendiente Asesor' : !supCompleto ? 'Pendiente Supervisor' : 'Completo';
+      return {
+        respondidas: asesorResp + (supCompleto ? 1 : 0),
+        total: 6,
+        completo: estado === 'Completo',
+        estado,
+      };
+    })(),
     ...(r.extra || {}),
   }));
 
