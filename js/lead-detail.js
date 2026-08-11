@@ -270,18 +270,51 @@ function renderAll() {
 
 function renderHeaderLead() {
     const lead = state.lead;
+    const user = getCurrentUser();
+
     const id = obtenerCampo(lead, COLUMNAS.ID_PROMETEO) || '---';
     const nombre = obtenerCampo(lead, COLUMNAS.NOMBRES) || 'Sin Nombre';
-    const carrera = obtenerCampo(lead, COLUMNAS.CARRERA, COLUMNAS.PROGRAMA) || '-';
-    const modalidad = obtenerCampo(lead, COLUMNAS.MODALIDAD) || '-';
+    const canal = obtenerCampo(lead, COLUMNAS.CANAL) || '-';
     const asesor = obtenerCampo(lead, COLUMNAS.ASESOR_NOMBRE, COLUMNAS.ASESOR_ULTIMO_CONTACTO) || '-';
     const status = lead[COLUMNAS.STATUS_GESTION] || 'SIN_STATUS';
 
+    const dni = obtenerCampo(lead, COLUMNAS.DNI) || '-';
+    const celular1 = obtenerCampo(lead, COLUMNAS.TELEFONO_2) || '';
+    const celular2 = obtenerCampo(lead, COLUMNAS.TELEFONO_3) || '';
+    const celularesTexto = [celular1, celular2].filter(Boolean).join(' / ') || '-';
+    const correo = obtenerCampo(lead, COLUMNAS.EMAIL) || '-';
+
+    const carrera = obtenerCampo(lead, COLUMNAS.CARRERA, COLUMNAS.PROGRAMA) || '-';
+    const modalidad = obtenerCampo(lead, COLUMNAS.MODALIDAD) || '-';
+
+    const colegio = obtenerCampo(lead, COLUMNAS.COLEGIO, 'NOMBRE DEL COLEGIO', 'Nombre del colegio') || '-';
+    const boletaColegioRaw = obtenerCampo(lead, COLUMNAS.BOLETA_COLEGIO);
+    const boletaColegio = (boletaColegioRaw === null || boletaColegioRaw === '') ? '0' : boletaColegioRaw;
+    const tipoIngreso = String(obtenerCampo(lead, COLUMNAS.MODALIDAD_INGRESO) || '').trim() || '-';
+
     document.getElementById('leadId').textContent = id;
     document.getElementById('leadNombre').textContent = nombre;
+    document.getElementById('leadCanal').textContent = canal;
+
+    const asesorWrap = document.getElementById('leadAsesorWrap');
+    if (esRolSupervisorOAdmision(user.rol)) {
+        document.getElementById('leadAsesor').textContent = asesor;
+        asesorWrap.style.display = '';
+    } else {
+        asesorWrap.style.display = 'none';
+    }
+
+    document.getElementById('leadDocumento').textContent = dni;
+    document.getElementById('leadCelular').textContent = celularesTexto;
+    document.getElementById('leadCorreo').textContent = correo;
+
+    document.getElementById('leadCampana').textContent = state.campana;
     document.getElementById('leadCarrera').textContent = carrera;
     document.getElementById('leadModalidad').textContent = modalidad;
-    document.getElementById('leadAsesor').textContent = asesor;
+
+    document.getElementById('leadColegio').textContent = colegio;
+    document.getElementById('leadBoletaColegio').textContent = boletaColegio;
+    document.getElementById('leadTipoIngreso').textContent = tipoIngreso;
 
     const badge = document.getElementById('statusBadge');
     badge.textContent = STATUS_LABELS[status] || status;
@@ -333,9 +366,11 @@ function renderVista1() {
     const tipoAlumnoActual = obtenerCampo(lead, COLUMNAS.TIPO_ALUMNO) || 'ALUMNO REGULAR';
     const cuotasActual = obtenerCampo(lead, COLUMNAS.NUMERO_CUOTAS) || '5 cuotas';
     const metodoPagoActual = obtenerCampo(lead, COLUMNAS.METODO_PAGO) || '';
+    const rindeExamenActual = obtenerCampo(lead, COLUMNAS.RINDE_EXAMEN_SUFICIENCIA) || 'NO';
+    const mostrarRindeExamen = (caso === 1 && normalizarTexto(modalidad) === 'remoto') || caso === 3;
     const boletaFinal = obtenerCampo(lead, COLUMNAS.BOLETA_FINAL) || '-';
     const boletaColegioRaw = obtenerCampo(lead, COLUMNAS.BOLETA_COLEGIO);
-    const boletaColegio = (boletaColegioRaw === null || boletaColegioRaw === '') ? '-' : boletaColegioRaw;
+    const boletaColegio = (boletaColegioRaw === null || boletaColegioRaw === '') ? '0' : boletaColegioRaw;
     const celular1 = obtenerCampo(lead, COLUMNAS.TELEFONO_2) || '';
     const celular2 = obtenerCampo(lead, COLUMNAS.TELEFONO_3) || '';
     const celularesTexto = [celular1, celular2].filter(Boolean).join(' / ') || '-';
@@ -376,27 +411,8 @@ function renderVista1() {
     let html = `
         <div style="display:flex; gap:20px; align-items:stretch; flex-wrap:wrap;">
             <div style="flex:1 1 600px; display:flex; flex-direction:column; gap:20px;">
-                <div style="background:white; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05)">
-                    <h2 style="color:var(--color-primary); margin-bottom:4px; font-size:22px;">${escapeHtml(nombre)}</h2>
-                    <p style="color:#666; margin-bottom:20px;">
-                        <strong>N° Documento:</strong> ${escapeHtml(dni)} &nbsp;|&nbsp;
-                        <strong>Celular:</strong> ${escapeHtml(celularesTexto)} &nbsp;|&nbsp;
-                        <strong>Correo:</strong> ${escapeHtml(correo)}
-                    </p>
-                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:20px;">
-                        ${campoHTML('Campaña', state.campana)}
-                        ${campoHTML('Carrera', carrera)}
-                        ${campoHTML('Modalidad', modalidad)}
-                        ${campoHTML('Colegio', colegio)}
-                        ${campoHTML('Boleta del Colegio', boletaColegio)}
-                        ${campoHTML('Tipo Ingreso', tipoIngreso || '-')}
-                    </div>
-                </div>
-
                 <div style="background:white; padding:24px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
-                    <h3 style="color:var(--color-accent); margin-bottom:4px; font-size:16px;">
-                        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">edit</span> Datos de la boleta
-                    </h3>
+                    <h3 style="color:var(--color-accent); font-size:18px; margin:0;">Datos de la boleta</h3>
                     <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:20px;" id="bloqueEditableFicha">
     `;
 
@@ -448,6 +464,10 @@ function renderVista1() {
     html += campoEditableHTML('Beneficio Adicional', selectConValorHTML('selectBeneficioAdicional', opcionesAdicional, valorAdicionalCombo, bloqueado));
     html += campoEditableHTML('Beneficio Enganche', selectConValorHTML('selectBeneficioEnganche', opcionesEnganche, valorEngancheCombo, bloqueado));
     html += campoEditableHTML('Método de Pago', selectSimpleHTML('selectMetodoPago', SELECT_OPTIONS.metodoPago, metodoPagoActual, bloqueado));
+
+    if (mostrarRindeExamen) {
+        html += campoEditableHTML('¿Rinde Examen de Suficiencia?', selectSimpleHTML('selectRindeExamenSuficiencia', SELECT_OPTIONS.rindeExamenSuficiencia, rindeExamenActual, bloqueado));
+    }
 
     html += `
                     </div>
@@ -1267,6 +1287,7 @@ async function guardarFicha(idPrometeo) {
     if (getVal('selectCuotas') !== undefined) data[COLUMNAS.NUMERO_CUOTAS] = getVal('selectCuotas');
     if (getVal('selectMetodoPago') !== undefined) data[COLUMNAS.METODO_PAGO] = getVal('selectMetodoPago');
     if (getVal('selectDescuento') !== undefined) data[COLUMNAS.DESCUENTO_PRECIOS] = getVal('selectDescuento');
+    if (getVal('selectRindeExamenSuficiencia') !== undefined) data[COLUMNAS.RINDE_EXAMEN_SUFICIENCIA] = getVal('selectRindeExamenSuficiencia');
 
     if (getVal('selectBoletaBeneficio') !== undefined) {
         const raw = getVal('selectBoletaBeneficio');

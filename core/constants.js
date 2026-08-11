@@ -3,7 +3,7 @@
 // ================================================================
 
 // ----- URL DE LA API (Google Apps Script) -----
-//export const API_URL = 'https://script.google.com/macros/s/AKfycbz1CU3vKeJ4tQ0C_VEGn5SeCOMg4UeUwXP62EojB4pFXABNc19QrAs091nVe9TzheFSAw/exec';
+//export const API_URL = 'https://script.google.com/macros/s/AKfycbwVkIBh-f9ImW7_UWxdLmeL8rxbWQ06IP2aJm6Bp-SEo6gEXVw5jivTMLUIZoHaOxRClg/exec';
 export const API_URL = 'https://migracion-postgres-bottomline.admisionucal.workers.dev/api';
 
 // ----- MAPEO DE COLUMNAS DE GOOGLE SHEETS -----
@@ -13,6 +13,7 @@ export const COLUMNAS = {
     ID_PROMETEO: 'ID PROMETEO',
     NOMBRES: 'NOMBRES',
     NOMBRE: 'NOMBRE',
+    CANAL: 'SUBCANAL 2',
     ASESOR_ULTIMO_CONTACTO: 'ASESOR ULT TIP DF SN CONTC',
     ASESOR_NOMBRE_RAW: 'ASESOR_NOMBRE_RAW',
     ASESOR_EMAIL: 'ASESOR_EMAIL',
@@ -47,6 +48,7 @@ export const COLUMNAS = {
     TIPO_ALUMNO: 'TIPO_ALUMNO',
     NUMERO_CUOTAS: 'NUMERO_CUOTAS',
     METODO_PAGO: 'METODO_PAGO',
+    RINDE_EXAMEN_SUFICIENCIA: 'RINDE_EXAMEN_SUFICIENCIA',
 
     // Perfilamiento
     POR_QUE_ELIGIO_CARRERA: 'POR_QUE_ELIGIO_CARRERA',
@@ -129,10 +131,11 @@ export const SELECT_OPTIONS = {
         { value: '80',  label: 'Matrícula S/95 - E. Admisión S/50' },
         { value: '100', label: 'Matrícula S/0 - E. Admisión S/0' }
     ],
-    tiempo: ['Traslado +2', '2 años', '2 años y medio', '3 años', '3 años y medio', '4 años'],
+    tiempo: ['Traslado +2', '2 años', '2 años y medio', '3 años', '3 años y medio', '4 años', '4 años y medio', '5 años'],
     tipoAlumno: ['ALUMNO REGULAR', 'ALUMNO ETU'],
     cuotas: ['5 cuotas', '6 cuotas'],
-    metodoPago: ['LINK DE PAGO', 'POS', 'CARGO']
+    metodoPago: ['LINK DE PAGO', 'POS', 'CARGO'],
+    rindeExamenSuficiencia: ['NO', 'SI']
 };
 
 export const TIPOS_INSTITUCION_PROCEDENCIA = ['UNIVERSIDAD', 'INSTITUTO'];
