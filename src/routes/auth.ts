@@ -1,5 +1,5 @@
 import type { Client } from 'pg';
-import { jsonOk, jsonError, type JsonBody } from '../types';
+import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 import { hashPassword, verificarPassword } from '../lib/crypto';
 import {
   crearSesion,
@@ -9,7 +9,7 @@ import {
   limpiarIntentosFallidos,
 } from '../lib/session';
 
-export async function login(client: Client, body: JsonBody) {
+export async function login(client: Client, body: JsonBody, env: Env) {
   const usuarioNorm = String(body.usuario || '').trim().toLowerCase();
 
   if (await loginBloqueado(client, usuarioNorm)) {
@@ -68,6 +68,28 @@ export async function login(client: Client, body: JsonBody) {
     nombre: user.nombre_aux || user.nombre,
   });
 
+  // Registramos el mismo token en Apps Script, para que las acciones
+  // todavía no migradas (que se reenvían allá) también lo reconozcan.
+  let debugSesionExterna: any = null;
+  try {
+    const respAS = await fetch(env.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'registrarSesionExterna',
+        token,
+        usuario: user.usuario,
+        email: emailUser,
+        rol: user.rol,
+        nombre: user.nombre_aux || user.nombre,
+      }),
+    });
+    const textoAS = await respAS.text();
+    debugSesionExterna = { status: respAS.status, body: textoAS };
+  } catch (e: any) {
+    debugSesionExterna = { error: e.message };
+  }
+
   return jsonOk({
     user: {
       usuario: user.usuario || '',
@@ -82,10 +104,23 @@ export async function login(client: Client, body: JsonBody) {
       foto: user.foto || '',
       token,
     },
+    // TEMPORAL para diagnóstico — lo quitamos una vez resuelto.
+    _debugSesionExterna: debugSesionExterna,
   });
 }
 
-export async function logout(client: Client, body: JsonBody) {
+export async function logout(client: Client, body: JsonBody, env: Env) {
   await eliminarSesion(client, body.sessionToken);
+
+  // También cerramos la sesión en Apps Script, para no dejar tokens vivos
+  // ahí después de que el usuario cerró sesión en el Worker.
+  try {
+    await fetch(env.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'logout', sessionToken: body.sessionToken }),
+    });
+  } catch (_e) {}
+
   return jsonOk();
 }
