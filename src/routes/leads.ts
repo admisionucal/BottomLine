@@ -14,6 +14,17 @@ export async function getLeads(client: Client, body: JsonBody) {
 
   const filtros = body.filtros || {};
 
+  // Igual que getNombreAsesorPorEmail() en code.gs: se resuelve el NOMBRE
+  // COMPLETO (no nombre_aux) buscando por email, en cada request — no se
+  // confía en lo que quedó guardado en la sesión al momento del login.
+  let nombreAsesor: string | null = null;
+  if (!esAdmin && sesion.email) {
+    const r = await client.query(`select nombre from usuarios where lower(email) = lower($1) limit 1`, [
+      sesion.email,
+    ]);
+    nombreAsesor = r.rows[0]?.nombre || null;
+  }
+
   // Igual que tu código: un ASESOR solo ve sus propios leads en VP/PP;
   // un admin ve todo lo "visible" (con vps_dif != 0 o en VP/PP hoy).
   const params: any[] = [campana];
@@ -23,8 +34,8 @@ export async function getLeads(client: Client, body: JsonBody) {
     condiciones.push(`(l.vps_dif_ti_inte <> 0 or (l.actualizado_hoy_en is not null and l.status_gestion = any($${params.push(ESTADOS_VP_PP)})))`);
   } else {
     condiciones.push(`l.status_gestion = any($${params.push(ESTADOS_VP_PP)})`);
-    if (sesion.nombre) {
-      condiciones.push(`lower(l.asesor) = lower($${params.push(sesion.nombre)})`);
+    if (nombreAsesor) {
+      condiciones.push(`lower(l.asesor) = lower($${params.push(nombreAsesor)})`);
     }
   }
 
@@ -76,9 +87,12 @@ export async function getLeads(client: Client, body: JsonBody) {
         (case when nullif(trim(b.otras_opciones), '') is not null then 1 else 0 end)
       ) as perfilamiento_respondidas
     from leads l
-    left join leads_bottom b on b.id_prometeo = l.id_prometeo and b.campana = l.campana
-    left join leads_pagos p on p.id_prometeo = l.id_prometeo and p.campana = l.campana
     left join usuarios u on lower(u.usuario) = lower(l.asesor) or lower(u.nombre) = lower(l.asesor)
+    -- leads_bottom ahora es por (id_prometeo, campana, asesor_email): mostramos
+    -- la fila del asesor ACTUALMENTE asignado al lead (resuelto por nombre -> email).
+    left join leads_bottom b on b.id_prometeo = l.id_prometeo and b.campana = l.campana
+      and lower(b.asesor_email) = lower(u.email)
+    left join leads_pagos p on p.id_prometeo = l.id_prometeo and p.campana = l.campana
     where ${condiciones.join(' and ')}
     order by l.actualizado_en desc
   `;

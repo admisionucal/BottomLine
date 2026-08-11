@@ -70,9 +70,10 @@ export async function login(client: Client, body: JsonBody, env: Env) {
 
   // Registramos el mismo token en Apps Script, para que las acciones
   // todavía no migradas (que se reenvían allá) también lo reconozcan.
-  let debugSesionExterna: any = null;
+  // "Best effort": si esto falla, el login igual continúa; solo afectaría
+  // a acciones no migradas, no a las que ya corren en Postgres.
   try {
-    const respAS = await fetch(env.APPS_SCRIPT_URL, {
+    await fetch(env.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -84,10 +85,8 @@ export async function login(client: Client, body: JsonBody, env: Env) {
         nombre: user.nombre_aux || user.nombre,
       }),
     });
-    const textoAS = await respAS.text();
-    debugSesionExterna = { status: respAS.status, body: textoAS };
-  } catch (e: any) {
-    debugSesionExterna = { error: e.message };
+  } catch (_e) {
+    // No bloqueamos el login por esto.
   }
 
   return jsonOk({
@@ -104,8 +103,6 @@ export async function login(client: Client, body: JsonBody, env: Env) {
       foto: user.foto || '',
       token,
     },
-    // TEMPORAL para diagnóstico — lo quitamos una vez resuelto.
-    _debugSesionExterna: debugSesionExterna,
   });
 }
 
