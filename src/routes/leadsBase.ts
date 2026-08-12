@@ -57,16 +57,24 @@ export async function actualizarLeadsBase(client: Client, body: JsonBody, env: E
     }
 
     const cols = Object.keys(columnas).filter((c) => c !== 'id_prometeo');
-    const placeholders = cols.map((_, i) => `$${i + 4}`);
-    const sets = cols.map((c, i) => `${c} = $${i + 4}`);
+    const placeholders = cols.map((_, i) => `$${i + 6}`);
+    const sets = cols.map((c, i) => `${c} = $${i + 6}`);
 
     try {
       await client.query(
-        `insert into leads (id_prometeo, campana, en_base, extra, ${cols.join(', ')})
-         values ($1, $2, true, $3::jsonb, ${placeholders.join(', ')})
+        `insert into leads (id_prometeo, campana, en_base, extra, asesor_base, status_base, ${cols.join(', ')})
+         values ($1, $2, true, $3::jsonb, $4, $5, ${placeholders.join(', ')})
          on conflict (id_prometeo, campana) do update set
-           en_base = true, extra = $3::jsonb, ${sets.join(', ')}, actualizado_en = now()`,
-        [idPrometeo, campana, JSON.stringify(extra), ...cols.map((c) => columnas[c])]
+           en_base = true, extra = $3::jsonb, asesor_base = $4, status_base = $5,
+           ${sets.join(', ')}, actualizado_en = now()`,
+        [
+          idPrometeo,
+          campana,
+          JSON.stringify(extra),
+          columnas['asesor'] ?? null,
+          columnas['status_gestion'] ?? null,
+          ...cols.map((c) => columnas[c]),
+        ]
       );
       procesados++;
     } catch (e: any) {

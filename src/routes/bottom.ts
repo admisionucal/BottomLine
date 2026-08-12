@@ -100,12 +100,12 @@ export async function saveBottom(client: Client, body: JsonBody) {
   }
 
   await client.query(
-    `insert into leads_bottom (id_prometeo, campana, asesor, asesor_email, ${columnas.join(', ')}, fecha_ult_modificacion)
-     values ($1, $2, $3, $${columnas.length + 4}, ${placeholders.join(', ')}, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'))
+    `insert into leads_bottom (id_prometeo, campana, asesor_email, ${columnas.join(', ')}, fecha_ult_modificacion)
+     values ($1, $2, $3, ${placeholders.join(', ')}, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'))
      on conflict (id_prometeo, campana) do update set
-       asesor_email = $${columnas.length + 4}, ${sets.join(', ')},
+       asesor_email = $3, ${sets.join(', ')},
        actualizado_en = now(), fecha_ult_modificacion = to_char(now(), 'YYYY-MM-DD HH24:MI:SS')`,
-    [idPrometeo, campana, sesion.nombre || '', ...valores, asesorEmail]
+    [idPrometeo, campana, asesorEmail, ...valores]
   );
 
   return jsonOk({ message: 'Guardado correctamente.' });
@@ -134,13 +134,13 @@ export async function addComment(client: Client, body: JsonBody) {
   // Se agrega al FINAL del array (orden cronológico), igual que
   // historial.push(...) en el código real — no al inicio.
   const result = await client.query(
-    `insert into leads_bottom (id_prometeo, campana, asesor, comentarios_historial)
-     values ($1, $2, $3, jsonb_build_array($4::jsonb))
+    `insert into leads_bottom (id_prometeo, campana, comentarios_historial)
+     values ($1, $2, jsonb_build_array($3::jsonb))
      on conflict (id_prometeo, campana) do update set
-       comentarios_historial = coalesce(leads_bottom.comentarios_historial, '[]'::jsonb) || jsonb_build_array($4::jsonb),
+       comentarios_historial = coalesce(leads_bottom.comentarios_historial, '[]'::jsonb) || jsonb_build_array($3::jsonb),
        actualizado_en = now()
      returning comentarios_historial`,
-    [idPrometeo, campana, sesion.nombre || '', JSON.stringify(nuevoComentario)]
+    [idPrometeo, campana, JSON.stringify(nuevoComentario)]
   );
 
   return jsonOk({ data: { COMENTARIOS_HISTORIAL: JSON.stringify(result.rows[0].comentarios_historial) } });

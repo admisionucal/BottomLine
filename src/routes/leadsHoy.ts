@@ -4,21 +4,61 @@ import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 // Mapea las claves que manda actualizar_leads_hoy.gs (COLUMNAS_HOY) a columnas reales.
 const MAPEO_HOY: Record<string, string> = {
   'NOMBRES': 'nombres',
-  'TELEFONO 2': 'telefono2',
-  'TELEFONO 3': 'telefono3',
+  'TELEFONO 3': 'telefono3', // OJO: TELEFONO 2 NO se mergea en el código real, solo TELEFONO 3.
   'EMAIL': 'email',
   'NOMBRE DEL COLEGIO': 'colegio',
-  'CODIGO MODULAR': 'codigo_modular',
   'PROGRAMA': 'programa',
-  'NUMERO DE DOCUMENTO': 'numero_documento',
   'MODALIDAD': 'modalidad',
   'MODALIDAD INGRESO': 'modalidad_ingreso',
   'BOLETA DE COLEGIO': 'boleta_colegio',
-  'FECHA HORA DE REGISTRO': 'fecha_hora_registro',
-  'ASESOR ULT TIP DF SN CONTC': 'asesor',
-  'STATUS DE GESTION': 'status_gestion',
-  'FECHA COMPROMISO DE PAGO': 'fecha_compromiso_pago',
 };
+
+const ESTADOS_VIVOS = new Set(['VALORES_VALORACIONES_POSITIVAS_VIVA', 'VALORES_PROMESA_DE_PAGO_VIVA']);
+const VALORES_NO_MERGE = new Set(['', 'NO DEFINIDO', '-', 'SIN INFORMACION', 'SIN INFORMACIÓN']);
+
+function statusEsVivo(status: any): boolean {
+  return ESTADOS_VIVOS.has(String(status || '').trim());
+}
+
+function esValorMerge(valor: any): boolean {
+  if (valor === undefined || valor === null) return false;
+  return !VALORES_NO_MERGE.has(String(valor).trim().toUpperCase());
+}
+
+// Idénticas a hoyOverrideEsConfiable() / permitirActualizarAsignacionDetail() en code.gs.
+function hoyOverrideEsConfiable(
+  statusHoy: any,
+  asesorBase: string,
+  encontradoEnBase: boolean,
+  statusBase: any,
+  asesorHoy: any
+): boolean {
+  if (!statusEsVivo(statusHoy)) return false;
+  if (!encontradoEnBase) return true;
+  if (!statusEsVivo(statusBase)) return true;
+
+  const aBase = String(asesorBase || '').trim().toLowerCase();
+  if (!aBase) return false;
+
+  const aHoy = String(asesorHoy || '').trim().toLowerCase();
+  return aHoy !== '' && aHoy === aBase;
+}
+
+function permitirActualizarAsignacion(
+  statusHoy: any,
+  asesorBase: string,
+  encontradoEnBase: boolean,
+  statusBase: any,
+  asesorHoy: any
+): boolean {
+  if (!statusEsVivo(statusHoy)) return true;
+  if (!encontradoEnBase) return true;
+  if (!statusEsVivo(statusBase)) return true;
+
+  const aBase = String(asesorBase || '').trim().toLowerCase();
+  const aHoy = String(asesorHoy || '').trim().toLowerCase();
+  return aHoy !== '' && aHoy === aBase;
+}
 
 // Este endpoint no usa sesión de usuario (lo llama un script server-to-server,
 // no un navegador), así que se protege con un secreto compartido simple.
@@ -41,17 +81,6 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
     const idPrometeo = String(leadRaw['ID PROMETEO'] || '').trim();
     if (!idPrometeo) continue;
 
-    const columnas: Record<string, any> = {};
-    for (const [claveSheet, valor] of Object.entries(leadRaw)) {
-      const colPg = MAPEO_HOY[claveSheet];
-      if (colPg) columnas[colPg] = valor === '' ? null : valor;
-    }
-
-    const cols = Object.keys(columnas);
-    // Solo 2 parámetros fijos preceden a las columnas aquí (idPrometeo=$1,
-    // campana=$2), así que las columnas dinámicas empiezan en $3, no en $4.
-    const sets = cols.map((c, i) => `${c} = $${i + 3}`);
-
     try {
       // Igual patrón que en la migración manual: si el lead no existe en la
       // base todavía, se crea un registro mínimo (en_base=false) para no
@@ -62,6 +91,46 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
          on conflict (id_prometeo, campana) do nothing`,
         [idPrometeo, campana]
       );
+
+      // Traemos la referencia ESTABLE (asesor_base/status_base, que solo
+      // toca el import diario) — no el asesor/status actual, que puede ya
+      // estar modificado por una corrida anterior de este mismo scraper.
+      const ref = await client.query(
+        `select en_base, asesor_base, status_base from leads where id_prometeo = $1 and campana = $2`,
+        [idPrometeo, campana]
+      );
+      const encontradoEnBase = !!ref.rows[0]?.en_base;
+      const asesorBase = ref.rows[0]?.asesor_base || '';
+      const statusBase = ref.rows[0]?.status_base || '';
+
+      const statusHoy = leadRaw['STATUS DE GESTION'];
+      const asesorHoy = leadRaw['ASESOR ULT TIP DF SN CONTC'];
+
+      const confiable = hoyOverrideEsConfiable(statusHoy, asesorBase, encontradoEnBase, statusBase, asesorHoy);
+      const permitirAsesor = permitirActualizarAsignacion(statusHoy, asesorBase, encontradoEnBase, statusBase, asesorHoy);
+
+      const columnas: Record<string, any> = {};
+
+      // STATUS: se mergea siempre que venga un valor válido (igual que el código real).
+      if (esValorMerge(statusHoy)) columnas.status_gestion = statusHoy;
+
+      // ASESOR: solo si la regla de asignación lo permite.
+      if (permitirAsesor && esValorMerge(asesorHoy)) columnas.asesor = asesorHoy;
+
+      // Resto de campos "simples": se mergean siempre que el valor sea válido,
+      // sin depender de "confiable" (igual que getLeads real).
+      for (const [claveSheet, colPg] of Object.entries(MAPEO_HOY)) {
+        const valor = leadRaw[claveSheet];
+        if (esValorMerge(valor)) columnas[colPg] = valor;
+      }
+
+      // FECHA COMPROMISO DE PAGO: caso especial, solo si "confiable".
+      if (confiable && esValorMerge(leadRaw['FECHA COMPROMISO DE PAGO'])) {
+        columnas.fecha_compromiso_pago = leadRaw['FECHA COMPROMISO DE PAGO'];
+      }
+
+      const cols = Object.keys(columnas);
+      const sets = cols.map((c, i) => `${c} = $${i + 3}`);
 
       await client.query(
         `update leads set
