@@ -10,6 +10,7 @@ import {
 import { getLeads } from './routes/leads';
 import { getLeadDetail } from './routes/leadDetail';
 import { saveBottom, addComment } from './routes/bottom';
+import { getCatalogos } from './routes/catalogos';
 import { actualizarLeadsHoy } from './routes/leadsHoy';
 import { actualizarLeadsBase } from './routes/leadsBase';
 
@@ -26,6 +27,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env) => Pro
   getLeadDetail,
   saveBottom,
   addComment,
+  getCatalogos,
   actualizarLeadsHoy,
   actualizarLeadsBase,
 };

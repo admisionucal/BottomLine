@@ -44,6 +44,39 @@ export async function saveBottom(client: Client, body: JsonBody) {
   if (!asesorEmail) return jsonError('Falta el email del asesor.');
 
   const data = body.data || {};
+
+  // Igual que validarTipoInstitucionProcedencia() real: si viene, debe ser
+  // exactamente UNIVERSIDAD o INSTITUTO.
+  if (data.TIPO_INSTITUCION_PROCEDENCIA !== undefined && String(data.TIPO_INSTITUCION_PROCEDENCIA).trim() !== '') {
+    const valor = String(data.TIPO_INSTITUCION_PROCEDENCIA).trim().toUpperCase();
+    if (valor !== 'UNIVERSIDAD' && valor !== 'INSTITUTO') {
+      return jsonError('TIPO_INSTITUCION_PROCEDENCIA debe ser UNIVERSIDAD o INSTITUTO');
+    }
+    data.TIPO_INSTITUCION_PROCEDENCIA = valor;
+  }
+
+  // Igual que upsertInstitucionProcedencia()/upsertCarreraProcedencia(): si
+  // el asesor escribe una institución/carrera nueva, se agrega sola al catálogo.
+  const normalizarCatalogo = (v: string) => v.trim().toUpperCase().replace(/\s+/g, ' ');
+
+  if (data.INSTITUCION_PROCEDENCIA !== undefined && String(data.INSTITUCION_PROCEDENCIA).trim() !== '') {
+    const nombreNorm = normalizarCatalogo(String(data.INSTITUCION_PROCEDENCIA));
+    await client.query(
+      `insert into catalogo_instituciones_procedencia (nombre, tipo) values ($1, $2)
+       on conflict (nombre) do nothing`,
+      [nombreNorm, data.TIPO_INSTITUCION_PROCEDENCIA || '']
+    );
+    data.INSTITUCION_PROCEDENCIA = nombreNorm;
+  }
+  if (data.CARRERA_PROCEDENCIA !== undefined && String(data.CARRERA_PROCEDENCIA).trim() !== '') {
+    const nombreNorm = normalizarCatalogo(String(data.CARRERA_PROCEDENCIA));
+    await client.query(
+      `insert into catalogo_carreras_procedencia (nombre) values ($1) on conflict (nombre) do nothing`,
+      [nombreNorm]
+    );
+    data.CARRERA_PROCEDENCIA = nombreNorm;
+  }
+
   const columnas: string[] = [];
   const valores: any[] = [];
 
@@ -101,10 +134,10 @@ export async function saveBottom(client: Client, body: JsonBody) {
 
   await client.query(
     `insert into leads_bottom (id_prometeo, campana, asesor_email, ${columnas.join(', ')}, fecha_ult_modificacion)
-     values ($1, $2, $3, ${placeholders.join(', ')}, to_char(now(), 'YYYY-MM-DD HH24:MI:SS'))
+     values ($1, $2, $3, ${placeholders.join(', ')}, now())
      on conflict (id_prometeo, campana) do update set
        asesor_email = $3, ${sets.join(', ')},
-       actualizado_en = now(), fecha_ult_modificacion = to_char(now(), 'YYYY-MM-DD HH24:MI:SS')`,
+       actualizado_en = now(), fecha_ult_modificacion = now()`,
     [idPrometeo, campana, asesorEmail, ...valores]
   );
 
