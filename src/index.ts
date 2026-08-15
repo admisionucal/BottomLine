@@ -11,8 +11,29 @@ import { getLeads } from './routes/leads';
 import { getLeadDetail } from './routes/leadDetail';
 import { saveBottom, addComment } from './routes/bottom';
 import { getCatalogos } from './routes/catalogos';
+import { getLeadPayments } from './routes/leadPayments';
+import { getResumenVpPp } from './routes/resumenVpPp';
+import { searchLeads } from './routes/searchLeads';
+import { unifyIds } from './routes/unifyIds';
 import { actualizarLeadsHoy } from './routes/leadsHoy';
 import { actualizarLeadsBase } from './routes/leadsBase';
+import {
+  getSolicitudPendiente,
+  getSolicitudesPendientesCampana,
+  createSolicitud,
+  resolveSolicitud,
+  cancelarSolicitud,
+} from './routes/solicitudes';
+import { exigirSesion } from './lib/session';
+import { jsonError } from './types';
+
+// Igual que getLeadsConAprobacion(body) en code.gs: mismo getLeads, pero
+// solo accesible para SUPERVISOR/ADMISION.
+async function getLeadsConAprobacion(client: any, body: any, env: Env) {
+  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
+  if (!sesion) return jsonError(error!);
+  return getLeads(client, body);
+}
 
 // Acciones ya migradas a Postgres. Todo lo que NO esté aquí se reenvía
 // automáticamente a tu Apps Script actual (fallback transparente).
@@ -24,10 +45,20 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env) => Pro
   getAsistenciaRegistros,
   getAsistenciaEmpleados,
   getLeads,
+  getLeadsConAprobacion,
   getLeadDetail,
   saveBottom,
   addComment,
   getCatalogos,
+  getLeadPayments,
+  getResumenVpPp,
+  searchLeads,
+  unifyIds,
+  getSolicitudPendiente,
+  getSolicitudesPendientesCampana,
+  createSolicitud,
+  resolveSolicitud,
+  cancelarSolicitud,
   actualizarLeadsHoy,
   actualizarLeadsBase,
 };
