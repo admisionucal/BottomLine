@@ -629,6 +629,10 @@ function construirConsideracionesHTML(d) {
         items.push(`En casos excepcionales y por necesidades académicas, la Universidad podrá realizar ajustes en el horario informado, comunicándolo de manera oportuna al estudiante.`);
     }
 
+    if (!d.mostrarTrasladoConvalidacion) {
+        items.push(`Aquellos alumnos que cuenten con exoneración parcial o total del examen de admisión deberán rendirlo dentro de los treinta (30) días calendario posteriores al pago de la primera cuota. De no cumplir con ello, el monto correspondiente al examen será cobrado íntegramente en la tercera cuota.`);
+    }
+    
     items.push(`Los horarios del primer ciclo son asignados por la universidad sin opción a cambios o ajustes. A partir del segundo ciclo, los alumnos podrán elegir sus horarios en función a la apertura de cursos y disponibilidad de horarios.`);
     items.push(`Los descuentos sobre los conceptos de examen de admisión, matrícula y/o primera boleta solo aplicarán para el primer período académico regular del semestre de ingreso del alumno.`);
     items.push(`Los buses son exclusivos para estudiantes y operan con horarios y paraderos fijos según las rutas establecidas. Para el semestre ${escapeHtml(d.periodo)}, los horarios y paraderos serán confirmados antes del inicio de clases.`);
