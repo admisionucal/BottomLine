@@ -24,6 +24,8 @@ import {
   resolveSolicitud,
   cancelarSolicitud,
 } from './routes/solicitudes';
+import { getSolicitudesCC, getSolicitudCC, getSolicitudesCCCount } from './routes/solicitudesCCRead';
+import { actualizarSolicitudCC } from './routes/solicitudCCDualWrite';
 import { exigirSesion } from './lib/session';
 import { jsonError } from './types';
 
@@ -59,6 +61,10 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env) => Pro
   createSolicitud,
   resolveSolicitud,
   cancelarSolicitud,
+  getSolicitudesCC,
+  getSolicitudCC,
+  getSolicitudesCCCount,
+  actualizarSolicitudCC,
   actualizarLeadsHoy,
   actualizarLeadsBase,
 };
