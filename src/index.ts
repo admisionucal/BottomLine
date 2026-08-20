@@ -27,7 +27,6 @@ import {
 import { getSolicitudesCC, getSolicitudCC, getSolicitudesCCCount } from './routes/solicitudesCCRead';
 import { actualizarSolicitudCC } from './routes/solicitudCCDualWrite';
 import { exigirSesion } from './lib/session';
-import { jsonError } from './types';
 
 // Igual que getLeadsConAprobacion(body) en code.gs: mismo getLeads, pero
 // solo accesible para SUPERVISOR/ADMISION.
