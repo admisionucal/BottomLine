@@ -3,7 +3,7 @@
 // ================================================================
 
 // ----- URL DE LA API (Google Apps Script) -----
-export const API_URL = 'https://script.google.com/macros/s/AKfycbx3WN96wuzlIcM3eXYg7xbUFvDrtUHcnbzOZhyyO87jYOiuOjiql_gD1jXsvCW0y2sSGw/exec';
+export const API_URL = 'https://script.google.com/macros/s/AKfycbyw9iCfon2BRy9TjIeVAgKhw0Xf8KF23XvRUv5rI567c3120ssf-cO4hbL4g-ma_yav0A/exec';
 
 // ----- MAPEO DE COLUMNAS DE GOOGLE SHEETS -----
 // Centraliza todos los nombres de columnas para evitar strings mágicos.
@@ -48,6 +48,7 @@ export const COLUMNAS = {
     NUMERO_CUOTAS: 'NUMERO_CUOTAS',
     METODO_PAGO: 'METODO_PAGO',
     RINDE_EXAMEN_SUFICIENCIA: 'RINDE_EXAMEN_SUFICIENCIA',
+    DOLOR_NECESIDAD: 'DOLOR_NECESIDAD',
 
     // Perfilamiento
     POR_QUE_ELIGIO_CARRERA: 'POR_QUE_ELIGIO_CARRERA',
@@ -171,4 +172,5 @@ export const CACHE_KEYS = {
     BENEFICIOS: 'bl_beneficios',
     INSTITUCIONES_PROCEDENCIA: 'bl_instituciones_procedencia',
     CARRERAS_PROCEDENCIA: 'bl_carreras_procedencia',
+    DOLORES_NECESIDADES: 'bl_dolores_necesidades',
 };

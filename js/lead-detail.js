@@ -34,6 +34,7 @@ const state = {
     catalogoBeneficios: [],
     catalogoInstitucionesProcedencia: [],
     catalogoCarrerasProcedencia: [],
+    catalogoDoloresNecesidades: [],
     solicitudCC: null
 };
 
@@ -63,6 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.catalogoBeneficios = cacheGet(CACHE_KEYS.BENEFICIOS) || [];
     state.catalogoInstitucionesProcedencia = cacheGet(CACHE_KEYS.INSTITUCIONES_PROCEDENCIA) || [];
     state.catalogoCarrerasProcedencia = cacheGet(CACHE_KEYS.CARRERAS_PROCEDENCIA) || [];
+    state.catalogoDoloresNecesidades = cacheGet(CACHE_KEYS.DOLORES_NECESIDADES) || [];
 
     // Configurar tabs
     document.querySelectorAll('.tabs button[data-tab]').forEach(btn => {
@@ -130,6 +132,7 @@ async function cargarCatalogos() {
             cacheSet(CACHE_KEYS.BENEFICIOS, result.data?.beneficios || []);
             cacheSet(CACHE_KEYS.INSTITUCIONES_PROCEDENCIA, result.data?.institucionesProcedencia || []);
             cacheSet(CACHE_KEYS.CARRERAS_PROCEDENCIA, result.data?.carrerasProcedencia || []);
+            cacheSet(CACHE_KEYS.DOLORES_NECESIDADES, result.data?.doloresNecesidades || []);
         }
     } catch (e) {
         console.error('Error cargando catálogos:', e);
@@ -162,6 +165,21 @@ async function actualizarCatalogoProcedencia() {
         }
     } catch (e) {
         console.error('Error actualizando catálogo de instituciones/carreras de procedencia:', e);
+    }
+}
+
+// Se llama tras crear un nuevo valor de Dolor/Necesidad, para que el <select>
+// lo muestre de inmediato sin esperar a un refresco completo de página.
+async function actualizarCatalogoDolor() {
+    try {
+        const result = await callAPI('getCatalogos');
+        if (result.success) {
+            const dolores = result.data?.doloresNecesidades || [];
+            cacheSet(CACHE_KEYS.DOLORES_NECESIDADES, dolores);
+            state.catalogoDoloresNecesidades = dolores;
+        }
+    } catch (e) {
+        console.error('Error actualizando catálogo de Dolor/Necesidad:', e);
     }
 }
 
@@ -778,31 +796,50 @@ function filasCatalogoSinRango(catalogo, tipoIngreso) {
     });
 }
 
+// Arma la lista de rangos únicos de un TIPO_INGRESO, ordenados por
+// BOLETA_PROCEDENCIA_MAX ascendente. Se agrupa SOLO por MAX (no por el par
+// min-max): si en la hoja BOLETAS quedó una fila ancha "catch-all" que
+// traslapa con el desglose fino (ej. 0-1249 conviviendo con 1100-1149,
+// 1150-1199, 1200-1249...), la fila ancha comparte el mismo MAX que una de
+// las finas y por lo tanto queda descartada automáticamente (se conserva la
+// que aparece primero en la hoja). Esto evita tener que editar/depurar la
+// hoja manualmente: basta con que el desglose fino exista antes en el orden
+// de filas para que gane.
+function rangosUnicosOrdenados(filasTipo) {
+    const rangosMap = new Map(); // key: MAX
+    filasTipo.forEach(fila => {
+        const min = parseNumero(fila.BOLETA_PROCEDENCIA_MIN);
+        const max = parseNumero(fila.BOLETA_PROCEDENCIA_MAX);
+        if (isNaN(min) || isNaN(max)) return;
+        if (!rangosMap.has(max)) rangosMap.set(max, { min, max });
+    });
+    return Array.from(rangosMap.values()).sort((a, b) => a.max - b.max);
+}
+
+// El rango que le corresponde a `ref` es el de MENOR MAX que aún lo cubre
+// (equivalente a una tabla de tramos/tax-bracket: se busca el primer
+// "hasta X" que alcance). Como los rangos ya vienen ordenados por MAX
+// ascendente, el primer match es siempre el más ajustado — sin necesidad de
+// comparar amplitudes ni de que la hoja esté libre de filas anchas legacy.
+function encontrarIndiceRango(rangosOrdenadosPorMax, ref) {
+    return rangosOrdenadosPorMax.findIndex(r => ref >= r.min && ref <= r.max);
+}
+
 function filasCatalogoFiltradas(catalogo, tipoIngreso, referencia) {
     const tipoNorm = normalizarTexto(tipoIngreso);
     const ref = parseNumero(referencia);
     if (isNaN(ref)) return [];
 
     const filasTipo = (catalogo || []).filter(fila => normalizarTexto(fila.TIPO_INGRESO || '') === tipoNorm);
+    const rangosOrdenados = rangosUnicosOrdenados(filasTipo);
 
-    const rangosMap = new Map();
-    filasTipo.forEach(fila => {
-        const min = parseNumero(fila.BOLETA_PROCEDENCIA_MIN);
-        const max = parseNumero(fila.BOLETA_PROCEDENCIA_MAX);
-        if (isNaN(min) || isNaN(max)) return;
-        const key = min + '-' + max;
-        if (!rangosMap.has(key)) rangosMap.set(key, { min, max });
-    });
-    const rangosOrdenados = Array.from(rangosMap.values()).sort((a, b) => a.min - b.min);
-
-    const indiceMatch = rangosOrdenados.findIndex(r => ref >= r.min && ref <= r.max);
+    const indiceMatch = encontrarIndiceRango(rangosOrdenados, ref);
     if (indiceMatch === -1) return [];
 
     const rangosPermitidos = rangosOrdenados.slice(indiceMatch, indiceMatch + 3);
     return filasTipo.filter(fila => {
-        const min = parseNumero(fila.BOLETA_PROCEDENCIA_MIN);
         const max = parseNumero(fila.BOLETA_PROCEDENCIA_MAX);
-        return rangosPermitidos.some(r => r.min === min && r.max === max);
+        return rangosPermitidos.some(r => r.max === max);
     });
 }
 
@@ -812,25 +849,15 @@ function filasCatalogoRangosInferiores(catalogo, tipoIngreso, referencia) {
     if (isNaN(ref)) return [];
 
     const filasTipo = (catalogo || []).filter(fila => normalizarTexto(fila.TIPO_INGRESO || '') === tipoNorm);
+    const rangosOrdenados = rangosUnicosOrdenados(filasTipo);
 
-    const rangosMap = new Map();
-    filasTipo.forEach(fila => {
-        const min = parseNumero(fila.BOLETA_PROCEDENCIA_MIN);
-        const max = parseNumero(fila.BOLETA_PROCEDENCIA_MAX);
-        if (isNaN(min) || isNaN(max)) return;
-        const key = min + '-' + max;
-        if (!rangosMap.has(key)) rangosMap.set(key, { min, max });
-    });
-    const rangosOrdenados = Array.from(rangosMap.values()).sort((a, b) => a.min - b.min);
-
-    const indiceMatch = rangosOrdenados.findIndex(r => ref >= r.min && ref <= r.max);
+    const indiceMatch = encontrarIndiceRango(rangosOrdenados, ref);
     if (indiceMatch <= 0) return [];
 
     const rangosInferiores = rangosOrdenados.slice(0, indiceMatch);
     return filasTipo.filter(fila => {
-        const min = parseNumero(fila.BOLETA_PROCEDENCIA_MIN);
         const max = parseNumero(fila.BOLETA_PROCEDENCIA_MAX);
-        return rangosInferiores.some(r => r.min === min && r.max === max);
+        return rangosInferiores.some(r => r.max === max);
     });
 }
 
@@ -1388,12 +1415,17 @@ function renderVista2() {
         { id: 'inputQueBusca', label: '¿Qué busca en una universidad?', value: lead[COLUMNAS.QUE_BUSCA_UNIVERSIDAD] || '' },
         { id: 'inputQuienFinancia', label: '¿Quién financiará la carrera?', value: lead[COLUMNAS.QUIEN_FINANCIARA] || '' },
         { id: 'inputQueLeFalta', label: '¿Qué le falta para tomar una decisión?', value: lead[COLUMNAS.QUE_LE_FALTA] || '' },
-        { id: 'inputOtrasOpciones', label: '¿Cuáles son sus otras opciones?', value: lead[COLUMNAS.OTRAS_OPCIONES] || '' },
+        { id: 'inputOtrasOpciones', label: '¿Cuáles son sus otras opciones?', value: lead[COLUMNAS.OTRAS_OPCIONES] || '' }
+    ];
+
+    // Comentarios pasa a ocupar el ancho completo (igual que Acciones Definidas);
+    // el espacio normal que dejaba libre lo toma el bloque de Dolor/Necesidad.
+    const camposFinales = [
         { id: 'inputComentariosPerfil', label: 'Comentarios', value: lead[COLUMNAS.COMENTARIOS_PERFIL] || '' }
     ];
 
     if (esAdmin) {
-        campos.push({ id: 'inputAccionesDefinidas', label: 'Acciones Definidas', value: lead[COLUMNAS.ACCIONES_DEFINIDAS] || '' });
+        camposFinales.push({ id: 'inputAccionesDefinidas', label: 'Acciones Definidas', value: lead[COLUMNAS.ACCIONES_DEFINIDAS] || '' });
     }
 
     let html = `
@@ -1410,9 +1442,19 @@ function renderVista2() {
     `;
 
     campos.forEach(c => {
-        const esAccionesDefinidas = c.id === 'inputAccionesDefinidas';
         html += `
-            <div${esAccionesDefinidas ? ' style="grid-column: 1 / -1;"' : ''}>
+            <div>
+                <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">${c.label}</label>
+                <textarea id="${c.id}" class="campo-editable-input" style="width:100%; min-height:60px; padding:10px 12px; border:1px solid var(--color-border); border-radius:6px; font-size:14px; font-family:inherit; resize:vertical;" ${bloqueado ? 'disabled' : ''}>${escapeHtml(c.value)}</textarea>
+            </div>
+        `;
+    });
+
+    html += dolorNecesidadHTML(lead, bloqueado);
+
+    camposFinales.forEach(c => {
+        html += `
+            <div style="grid-column: 1 / -1;">
                 <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">${c.label}</label>
                 <textarea id="${c.id}" class="campo-editable-input" style="width:100%; min-height:60px; padding:10px 12px; border:1px solid var(--color-border); border-radius:6px; font-size:14px; font-family:inherit; resize:vertical;" ${bloqueado ? 'disabled' : ''}>${escapeHtml(c.value)}</textarea>
             </div>
@@ -1431,10 +1473,101 @@ function renderVista2() {
     container.innerHTML = html;
 
     document.getElementById('btnGuardarPerfil')?.addEventListener('click', () => guardarPerfilamiento(id));
+    document.getElementById('selectDolorNecesidad')?.addEventListener('change', onCambioDolorNecesidad);
+}
+
+function dolorNecesidadHTML(lead, bloqueado) {
+    const valorActual = lead[COLUMNAS.DOLOR_NECESIDAD] || '';
+    const catalogo = state.catalogoDoloresNecesidades || [];
+    const coincide = catalogo.some(d => String(d.nombre) === String(valorActual));
+
+    const opciones = catalogo.map(d =>
+        `<option value="${escapeHtml(d.nombre)}" ${String(d.nombre) === String(valorActual) ? 'selected' : ''}>${escapeHtml(d.nombre)}</option>`
+    ).join('');
+
+    // Si el valor guardado ya no calza con ningún ítem del catálogo (o todavía
+    // no hay nada guardado), se agrega un placeholder para no inducir a error,
+    // igual que se hace en selectConValorHTML.
+    let placeholder = '';
+    if (valorActual && !coincide) {
+        placeholder = `<option value="${escapeHtml(valorActual)}" selected>${escapeHtml(valorActual)}</option>`;
+    } else if (!valorActual) {
+        placeholder = '<option value="" selected disabled hidden>-- Seleccionar --</option>';
+    }
+
+    const itemActual = catalogo.find(d => String(d.nombre) === String(valorActual));
+    const descripcionActual = itemActual ? (itemActual.descripcion || '') : '';
+
+    return `
+        <div>
+            <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Dolor / Necesidad</label>
+            <select id="selectDolorNecesidad" class="campo-editable-select" ${bloqueado ? 'disabled' : ''}>
+                ${placeholder}${opciones}<option value="__nuevo__">+ Agregar nueva...</option>
+            </select>
+            <div id="dolorDescripcionDisplay" style="margin-top:6px; font-size:12px; color:#777; ${descripcionActual ? '' : 'display:none;'}">${escapeHtml(descripcionActual)}</div>
+            <div id="dolorNuevoWrap" style="margin-top:8px; display:none;">
+                <input type="text" id="inputDolorNuevoNombre" class="campo-editable-input"
+                       placeholder="Nombre (máx. 5 palabras)" style="width:100%; margin-bottom:6px;" ${bloqueado ? 'disabled' : ''}>
+                <textarea id="inputDolorNuevaDescripcion" class="campo-editable-input" placeholder="Descripción"
+                          style="width:100%; min-height:50px; padding:8px 10px; border:1px solid var(--color-border); border-radius:6px; font-size:13px; font-family:inherit; resize:vertical;" ${bloqueado ? 'disabled' : ''}></textarea>
+                <span id="dolorNuevoError" style="color:#c62828; font-size:12px; display:none;"></span>
+            </div>
+        </div>
+    `;
+}
+
+function onCambioDolorNecesidad() {
+    const select = document.getElementById('selectDolorNecesidad');
+    const wrapNuevo = document.getElementById('dolorNuevoWrap');
+    const display = document.getElementById('dolorDescripcionDisplay');
+    if (!select || !wrapNuevo || !display) return;
+
+    const errorEl = document.getElementById('dolorNuevoError');
+    if (errorEl) errorEl.style.display = 'none';
+
+    if (select.value === '__nuevo__') {
+        wrapNuevo.style.display = 'block';
+        display.style.display = 'none';
+    } else {
+        wrapNuevo.style.display = 'none';
+        const item = (state.catalogoDoloresNecesidades || []).find(d => String(d.nombre) === select.value);
+        display.textContent = item ? (item.descripcion || '') : '';
+        display.style.display = (item && item.descripcion) ? 'block' : 'none';
+    }
 }
 
 async function guardarPerfilamiento(idPrometeo) {
     const getVal = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+
+    // Dolor / Necesidad: si está en modo "agregar nueva", valida nombre (máx. 5
+    // palabras) y descripción antes de armar el payload; si no, usa el valor
+    // ya elegido del catálogo tal cual.
+    const selectDolor = document.getElementById('selectDolorNecesidad');
+    let dolorNecesidadValor = '';
+    let dolorDescripcionNueva = '';
+
+    if (selectDolor) {
+        if (selectDolor.value === '__nuevo__') {
+            dolorNecesidadValor = getVal('inputDolorNuevoNombre').trim();
+            dolorDescripcionNueva = getVal('inputDolorNuevaDescripcion').trim();
+            const errorEl = document.getElementById('dolorNuevoError');
+
+            const mostrarErrorDolor = (msg) => {
+                if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'inline'; }
+            };
+
+            if (!dolorNecesidadValor || !dolorDescripcionNueva) {
+                mostrarErrorDolor('Completa el nombre y la descripción del nuevo Dolor/Necesidad.');
+                return;
+            }
+            if (dolorNecesidadValor.split(/\s+/).filter(Boolean).length > 5) {
+                mostrarErrorDolor('El nombre debe tener máximo 5 palabras.');
+                return;
+            }
+        } else {
+            dolorNecesidadValor = selectDolor.value;
+        }
+    }
 
     const data = {
         [COLUMNAS.POR_QUE_ELIGIO_CARRERA]: getVal('inputPorQueEligio'),
@@ -1443,8 +1576,12 @@ async function guardarPerfilamiento(idPrometeo) {
         [COLUMNAS.QUE_LE_FALTA]: getVal('inputQueLeFalta'),
         [COLUMNAS.OTRAS_OPCIONES]: getVal('inputOtrasOpciones'),
         [COLUMNAS.COMENTARIOS_PERFIL]: getVal('inputComentariosPerfil'),
+        [COLUMNAS.DOLOR_NECESIDAD]: dolorNecesidadValor,
         [COLUMNAS.FECHA_ULT_MODIFICACION]: new Date().toISOString()
     };
+    // Campo transitorio: solo viaja al backend para crear el ítem nuevo en el
+    // catálogo DOLOR; no se guarda como columna en bottom{campaña}.
+    if (dolorDescripcionNueva) data['DOLOR_DESCRIPCION_NUEVA'] = dolorDescripcionNueva;
 
     const acciones = document.getElementById('inputAccionesDefinidas');
     if (acciones) data[COLUMNAS.ACCIONES_DEFINIDAS] = acciones.value;
@@ -1464,6 +1601,7 @@ async function guardarPerfilamiento(idPrometeo) {
         });
 
         if (result.success) {
+            if (dolorDescripcionNueva) await actualizarCatalogoDolor();
             Object.assign(state.lead, data);
             sincronizarCache();
             document.getElementById('perfilGuardadoMsg').innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">check_circle</span> Guardado correctamente';
@@ -1586,8 +1724,8 @@ window.abrirSnapshot = function(idx) {
 
     const user = getCurrentUser();
     const camposVisibles = esRolSupervisorOAdmision(user.rol)
-        ? ['POR_QUE_ELIGIO_CARRERA', 'QUE_BUSCA_UNIVERSIDAD', 'QUIEN_FINANCIARA', 'QUE_LE_FALTA', 'OTRAS_OPCIONES', 'COMENTARIOS_PERFIL', 'ACCIONES_DEFINIDAS']
-        : ['POR_QUE_ELIGIO_CARRERA', 'QUE_BUSCA_UNIVERSIDAD', 'QUIEN_FINANCIARA', 'QUE_LE_FALTA', 'OTRAS_OPCIONES', 'COMENTARIOS_PERFIL'];
+        ? ['POR_QUE_ELIGIO_CARRERA', 'QUE_BUSCA_UNIVERSIDAD', 'QUIEN_FINANCIARA', 'QUE_LE_FALTA', 'OTRAS_OPCIONES', 'DOLOR_NECESIDAD', 'COMENTARIOS_PERFIL', 'ACCIONES_DEFINIDAS']
+        : ['POR_QUE_ELIGIO_CARRERA', 'QUE_BUSCA_UNIVERSIDAD', 'QUIEN_FINANCIARA', 'QUE_LE_FALTA', 'OTRAS_OPCIONES', 'DOLOR_NECESIDAD', 'COMENTARIOS_PERFIL'];
 
     const labels = {
         POR_QUE_ELIGIO_CARRERA: '¿Por qué eligió la carrera?',
@@ -1595,6 +1733,7 @@ window.abrirSnapshot = function(idx) {
         QUIEN_FINANCIARA: '¿Quién financiará la carrera?',
         QUE_LE_FALTA: '¿Qué le falta para tomar una decisión?',
         OTRAS_OPCIONES: '¿Cuáles son sus otras opciones?',
+        DOLOR_NECESIDAD: 'Dolor / Necesidad',
         COMENTARIOS_PERFIL: 'Comentarios',
         ACCIONES_DEFINIDAS: 'Acciones Definidas'
     };
