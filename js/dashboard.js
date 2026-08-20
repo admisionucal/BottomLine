@@ -392,8 +392,14 @@ async function loadLeads(forceRefresh = false) {
 // escucharlo en toda la app.
 window.addEventListener('multiselect-change', (e) => {
     const { key, values } = e.detail;
-    if (Object.prototype.hasOwnProperty.call(state.filtros, key)) {
-        state.filtros[key] = values;
+    // Comparación case-insensitive: el key llega como
+    // containerId.replace('filter','').toLowerCase() (ej. "filterDolorNecesidad"
+    // -> "dolornecesidad"), pero las claves de state.filtros son camelCase
+    // (ej. "dolorNecesidad"). Sin esto, cualquier filtro con más de una
+    // palabra en su nombre nunca hace match y se queda sin efecto.
+    const filtroKey = Object.keys(state.filtros).find(k => k.toLowerCase() === key.toLowerCase());
+    if (filtroKey) {
+        state.filtros[filtroKey] = values;
         applyFilters();
     }
 });
