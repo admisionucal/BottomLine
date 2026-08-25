@@ -6,7 +6,7 @@ export async function getCatalogos(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ASESOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
 
-  const [boletas, beneficios, instituciones, carreras] = await Promise.all([
+  const [boletas, beneficios, instituciones, carreras, dolores] = await Promise.all([
     client.query(
       `select tipo_ingreso as "TIPO_INGRESO",
               boleta_procedencia_min as "BOLETA_PROCEDENCIA_MIN",
@@ -22,6 +22,7 @@ export async function getCatalogos(client: Client, body: JsonBody) {
     ),
     client.query(`select nombre, tipo from catalogo_instituciones_procedencia order by nombre`),
     client.query(`select nombre from catalogo_carreras_procedencia order by nombre`),
+    client.query(`select nombre, descripcion from catalogo_dolor_necesidad order by nombre`),
   ]);
 
   return jsonOk({
@@ -30,6 +31,7 @@ export async function getCatalogos(client: Client, body: JsonBody) {
       beneficios: beneficios.rows,
       institucionesProcedencia: instituciones.rows.map((r) => ({ nombre: r.nombre, tipo: r.tipo })),
       carrerasProcedencia: carreras.rows.map((r) => r.nombre),
+      doloresNecesidades: dolores.rows.map((r) => ({ nombre: r.nombre, descripcion: r.descripcion })),
     },
   });
 }

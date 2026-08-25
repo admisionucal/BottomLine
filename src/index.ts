@@ -1,3 +1,4 @@
+
 import { getClient } from './lib/db';
 import { jsonError, type Env } from './types';
 import { login, logout } from './routes/auth';
@@ -11,6 +12,7 @@ import { getLeads } from './routes/leads';
 import { getLeadDetail } from './routes/leadDetail';
 import { saveBottom, addComment } from './routes/bottom';
 import { getCatalogos } from './routes/catalogos';
+import { obtenerBottomParaCC } from './routes/obtenerBottomParaCC';
 import { getLeadPayments } from './routes/leadPayments';
 import { getResumenVpPp } from './routes/resumenVpPp';
 import { searchLeads } from './routes/searchLeads';
@@ -51,6 +53,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env) => Pro
   saveBottom,
   addComment,
   getCatalogos,
+  obtenerBottomParaCC,
   getLeadPayments,
   getResumenVpPp,
   searchLeads,
@@ -129,3 +132,5 @@ async function proxyAAppsScript(originalRequest: Request, body: any, env: Env): 
     headers: { 'Content-Type': 'application/json' },
   });
 }
+
+

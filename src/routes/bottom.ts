@@ -1,3 +1,4 @@
+
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
@@ -10,34 +11,37 @@ const CAMPOS_BOTTOM_EDITABLES = [
   'numero_cuotas', 'metodo_pago',
   'por_que_eligio_carrera', 'que_busca_universidad', 'quien_financiara',
   'acciones_definidas', 'que_le_falta', 'otras_opciones', 'comentarios_perfil',
-  // Agregados: montos y aprobación (columnas nuevas de bottom{campaña})
+  'dolor_necesidad',
+  // Montos y aprobación (columnas nuevas de bottom{campaña})
   'descuento_matricula', 'matricula_final',
   'descuento_admision', 'admision_final', 'rinde_examen_suficiencia',
   'estado_aprobacion', 'aprobado_por', 'fecha_aprobacion',
 ] as const;
 
 // Mismo array CAMPOS_PERFIL que en code.gs: si se toca cualquiera de estos,
-// se guarda una "foto" completa de los 7 en el historial (perfil_snapshot).
+// se guarda una "foto" completa en el historial (perfil_snapshot).
 const CAMPOS_PERFIL = [
   'por_que_eligio_carrera', 'que_busca_universidad', 'quien_financiara',
   'acciones_definidas', 'que_le_falta', 'otras_opciones', 'comentarios_perfil',
+  'dolor_necesidad',
 ] as const;
 
 function esRolSupervisorOAdmision(rol: string) {
   return rol === 'SUPERVISOR' || rol === 'ADMISION';
 }
 
+function normalizarCatalogo(v: string) {
+  return v.trim().toUpperCase().replace(/\s+/g, ' ');
+}
+
 export async function saveBottom(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ASESOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
 
-  // El frontend manda "idPrometeo", no "id" — igual que body.idPrometeo en saveBottomInterno.
   const idPrometeo = String(body.idPrometeo || '').trim();
   const campana = String(body.campana || '').trim();
   if (!idPrometeo || !campana) return jsonError('Falta id o campaña.');
 
-  // Misma regla que el código real: un SUPERVISOR/ADMISION puede guardar a
-  // nombre de otro asesor (body.asesorEmail); un ASESOR siempre usa su propio email.
   const asesorEmail = esRolSupervisorOAdmision(sesion.rol)
     ? String(body.asesorEmail || sesion.email).trim()
     : sesion.email.trim();
@@ -45,8 +49,7 @@ export async function saveBottom(client: Client, body: JsonBody) {
 
   const data = body.data || {};
 
-  // Igual que validarTipoInstitucionProcedencia() real: si viene, debe ser
-  // exactamente UNIVERSIDAD o INSTITUTO.
+  // Igual que validarTipoInstitucionProcedencia() real.
   if (data.TIPO_INSTITUCION_PROCEDENCIA !== undefined && String(data.TIPO_INSTITUCION_PROCEDENCIA).trim() !== '') {
     const valor = String(data.TIPO_INSTITUCION_PROCEDENCIA).trim().toUpperCase();
     if (valor !== 'UNIVERSIDAD' && valor !== 'INSTITUTO') {
@@ -55,10 +58,7 @@ export async function saveBottom(client: Client, body: JsonBody) {
     data.TIPO_INSTITUCION_PROCEDENCIA = valor;
   }
 
-  // Igual que upsertInstitucionProcedencia()/upsertCarreraProcedencia(): si
-  // el asesor escribe una institución/carrera nueva, se agrega sola al catálogo.
-  const normalizarCatalogo = (v: string) => v.trim().toUpperCase().replace(/\s+/g, ' ');
-
+  // Igual que upsertInstitucionProcedencia()/upsertCarreraProcedencia().
   if (data.INSTITUCION_PROCEDENCIA !== undefined && String(data.INSTITUCION_PROCEDENCIA).trim() !== '') {
     const nombreNorm = normalizarCatalogo(String(data.INSTITUCION_PROCEDENCIA));
     await client.query(
@@ -77,6 +77,30 @@ export async function saveBottom(client: Client, body: JsonBody) {
     data.CARRERA_PROCEDENCIA = nombreNorm;
   }
 
+  // Igual que upsertDolorNecesidad(): si ya existe en el catálogo, se reusa
+  // tal cual; si es nuevo, exige descripción y máximo 5 palabras.
+  if (data.DOLOR_NECESIDAD !== undefined && String(data.DOLOR_NECESIDAD).trim() !== '') {
+    const nombreNorm = normalizarCatalogo(String(data.DOLOR_NECESIDAD));
+    const existente = await client.query(`select nombre from catalogo_dolor_necesidad where nombre = $1`, [
+      nombreNorm,
+    ]);
+    if (existente.rows.length === 0) {
+      const cantidadPalabras = nombreNorm.split(/\s+/).filter(Boolean).length;
+      if (cantidadPalabras > 5) {
+        return jsonError('El nombre de Dolor/Necesidad debe tener máximo 5 palabras.');
+      }
+      const descripcionNueva = String(data.DOLOR_DESCRIPCION_NUEVA || '').trim();
+      if (!descripcionNueva) {
+        return jsonError('Debes indicar una descripción para el nuevo Dolor/Necesidad.');
+      }
+      await client.query(`insert into catalogo_dolor_necesidad (nombre, descripcion) values ($1, $2)`, [
+        nombreNorm,
+        descripcionNueva,
+      ]);
+    }
+    data.DOLOR_NECESIDAD = nombreNorm;
+  }
+
   const columnas: string[] = [];
   const valores: any[] = [];
 
@@ -89,15 +113,19 @@ export async function saveBottom(client: Client, body: JsonBody) {
   }
 
   // ¿Se tocó algún campo de perfilamiento? Si sí, armamos el snapshot
-  // completo (igual que saveBottomInterno), leyendo primero los valores
-  // actuales para los campos del perfil que NO vinieron en este guardado.
+  // completo, leyendo primero los valores actuales para los campos que
+  // NO vinieron en este guardado.
   const tocaPerfil = CAMPOS_PERFIL.some((c) => Object.prototype.hasOwnProperty.call(data, c.toUpperCase()));
   let historialAppend: any = null;
 
   if (tocaPerfil) {
+    // OJO: leads_bottom ahora tiene una fila POR ASESOR (id_prometeo, campana,
+    // asesor_email), así que hay que filtrar también por asesor_email o
+    // se podría leer (y pisar) el snapshot de otro asesor.
     const actual = await client.query(
-      `select ${CAMPOS_PERFIL.join(', ')} from leads_bottom where id_prometeo = $1 and campana = $2`,
-      [idPrometeo, campana]
+      `select ${CAMPOS_PERFIL.join(', ')} from leads_bottom
+       where id_prometeo = $1 and campana = $2 and asesor_email = $3`,
+      [idPrometeo, campana, asesorEmail]
     );
     const filaActual = actual.rows[0] || {};
 
@@ -135,8 +163,8 @@ export async function saveBottom(client: Client, body: JsonBody) {
   await client.query(
     `insert into leads_bottom (id_prometeo, campana, asesor_email, ${columnas.join(', ')}, fecha_ult_modificacion)
      values ($1, $2, $3, ${placeholders.join(', ')}, now())
-     on conflict (id_prometeo, campana) do update set
-       asesor_email = $3, ${sets.join(', ')},
+     on conflict (id_prometeo, campana, asesor_email) do update set
+       ${sets.join(', ')},
        actualizado_en = now(), fecha_ult_modificacion = now()`,
     [idPrometeo, campana, asesorEmail, ...valores]
   );
@@ -153,9 +181,15 @@ export async function addComment(client: Client, body: JsonBody) {
   const texto = String(body.comentario || '').trim();
   if (!idPrometeo || !campana || !texto) return jsonError('Falta id, campaña o texto del comentario.');
 
-  // Misma estructura exacta que genera addComment() en code.gs, para que
-  // getLeadDetail (todavía en Apps Script) y el futuro getLeadDetail en
-  // Postgres puedan leer el historial sin diferencias de formato.
+  // leads_bottom exige asesor_email (es parte de la llave primaria y es
+  // NOT NULL). Mismo criterio de resolución que saveBottom: un
+  // SUPERVISOR/ADMISION puede comentar en nombre de otro asesor si lo manda
+  // explícito; un ASESOR siempre comenta en su propia fila.
+  const asesorEmail = esRolSupervisorOAdmision(sesion.rol)
+    ? String(body.asesorEmail || sesion.email).trim()
+    : sesion.email.trim();
+  if (!asesorEmail) return jsonError('Falta el email del asesor.');
+
   const nuevoComentario = {
     tipo: 'comentario',
     fecha: new Date().toISOString(),
@@ -164,17 +198,17 @@ export async function addComment(client: Client, body: JsonBody) {
     texto,
   };
 
-  // Se agrega al FINAL del array (orden cronológico), igual que
-  // historial.push(...) en el código real — no al inicio.
   const result = await client.query(
-    `insert into leads_bottom (id_prometeo, campana, comentarios_historial)
-     values ($1, $2, jsonb_build_array($3::jsonb))
-     on conflict (id_prometeo, campana) do update set
-       comentarios_historial = coalesce(leads_bottom.comentarios_historial, '[]'::jsonb) || jsonb_build_array($3::jsonb),
+    `insert into leads_bottom (id_prometeo, campana, asesor_email, comentarios_historial)
+     values ($1, $2, $3, jsonb_build_array($4::jsonb))
+     on conflict (id_prometeo, campana, asesor_email) do update set
+       comentarios_historial = coalesce(leads_bottom.comentarios_historial, '[]'::jsonb) || jsonb_build_array($4::jsonb),
        actualizado_en = now()
      returning comentarios_historial`,
-    [idPrometeo, campana, JSON.stringify(nuevoComentario)]
+    [idPrometeo, campana, asesorEmail, JSON.stringify(nuevoComentario)]
   );
 
   return jsonOk({ data: { COMENTARIOS_HISTORIAL: JSON.stringify(result.rows[0].comentarios_historial) } });
 }
+
+

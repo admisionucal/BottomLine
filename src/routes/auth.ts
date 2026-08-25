@@ -1,3 +1,4 @@
+
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 import { hashPassword, verificarPassword } from '../lib/crypto';
@@ -48,10 +49,14 @@ export async function login(client: Client, body: JsonBody, env: Env) {
   let campanas: string[] = [];
   const raw = String(user.campana || '');
   if (raw.toLowerCase() === 'todas') {
-    // Nota: la tabla leads_campanas todavía no existe (se crea en Fase 3-4).
-    // Mientras tanto, si esta query falla, devolvemos [] sin romper el login.
+    // No existe (ni hace falta) una tabla aparte de campañas: 'leads' ya
+    // tiene la columna 'campana', así que basta con los valores distintos
+    // que ya existen ahí. Se mantiene el try/catch como red de seguridad
+    // para no romper el login si la tabla aún no tiene datos.
     try {
-      const camResult = await client.query(`select distinct campana from leads_campanas`);
+      const camResult = await client.query(
+        `select distinct campana from leads where campana is not null and campana <> '' order by campana`
+      );
       campanas = camResult.rows.map((r) => r.campana).filter(Boolean);
     } catch (_e) {
       campanas = [];
@@ -121,3 +126,4 @@ export async function logout(client: Client, body: JsonBody, env: Env) {
 
   return jsonOk();
 }
+

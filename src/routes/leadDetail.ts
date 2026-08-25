@@ -1,3 +1,4 @@
+
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
@@ -89,11 +90,18 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
     }
   }
 
-  // Bottom: una sola fila por lead (igual que ya garantiza tu saveBottomInterno actual).
-  const bottomResult = await client.query(`select * from leads_bottom where id_prometeo = $1 and campana = $2`, [
-    idTarget,
-    campana,
-  ]);
+  // Bottom: desde el fix de esquema (04_fix_leads_bottom_asesor.sql) puede
+  // haber una fila POR ASESOR para el mismo lead. Priorizamos la fila del
+  // asesor de la sesión actual (si existe); si no existe (p.ej. un
+  // SUPERVISOR/ADMISION viendo un lead que nunca tocó, o un asesor nuevo
+  // heredando el lead), caemos a la fila más reciente como snapshot general.
+  const bottomResult = await client.query(
+    `select * from leads_bottom
+     where id_prometeo = $1 and campana = $2
+     order by (asesor_email = $3) desc, actualizado_en desc
+     limit 1`,
+    [idTarget, campana, email]
+  );
   const bottomRow = bottomResult.rows[0] || {};
 
   const bottomUpper: Record<string, any> = {};
@@ -124,3 +132,5 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
 
   return jsonOk({ data: leadObj });
 }
+
+
