@@ -28,7 +28,7 @@ let state = {
     pagesPerBlock: 20,
     terminoBusqueda: '',
     filtros: {
-        carrera: [], ingreso: [], beneficio: [], modalidad: [], asesor: [], perfil: [],
+        carrera: [], ingreso: [], beneficio: [], modalidad: [], asesor: [], perfil: [], dolorNecesidad: [],
         status: [STATUS.VP_VIVA, STATUS.PP_VIVA]
     },
     campana: '',
@@ -205,7 +205,9 @@ async function loadCampanas(user) {
     const saved = cacheGet(CACHE_KEYS.FILTROS_ESTADO);
     if (saved && saved.campana && campanas.includes(saved.campana)) {
         select.value = saved.campana;
-        if (saved.filtros) state.filtros = saved.filtros;
+        // Merge (no overwrite) por si el caché quedó de una versión anterior
+        // que todavía no tenía la key "dolorNecesidad" (u otra futura).
+        if (saved.filtros) state.filtros = { ...state.filtros, ...saved.filtros };
         if (saved.busqueda) state.terminoBusqueda = saved.busqueda;
     }
 
@@ -390,8 +392,14 @@ async function loadLeads(forceRefresh = false) {
 // escucharlo en toda la app.
 window.addEventListener('multiselect-change', (e) => {
     const { key, values } = e.detail;
-    if (Object.prototype.hasOwnProperty.call(state.filtros, key)) {
-        state.filtros[key] = values;
+    // Comparación case-insensitive: el key llega como
+    // containerId.replace('filter','').toLowerCase() (ej. "filterDolorNecesidad"
+    // -> "dolornecesidad"), pero las claves de state.filtros son camelCase
+    // (ej. "dolorNecesidad"). Sin esto, cualquier filtro con más de una
+    // palabra en su nombre nunca hace match y se queda sin efecto.
+    const filtroKey = Object.keys(state.filtros).find(k => k.toLowerCase() === key.toLowerCase());
+    if (filtroKey) {
+        state.filtros[filtroKey] = values;
         applyFilters();
     }
 });
@@ -399,7 +407,7 @@ window.addEventListener('multiselect-change', (e) => {
 function applyFilters() {
     const user = getCurrentUser();
     const esAdmin = esRolSupervisorOAdmision(user.rol);
-    const { carrera, ingreso, beneficio, modalidad, asesor, status, perfil } = state.filtros;
+    const { carrera, ingreso, beneficio, modalidad, asesor, status, perfil, dolorNecesidad } = state.filtros;
 
     state.leadsFiltered = state.leadsRaw.filter(lead => {
         // Filtros multi-select
@@ -412,6 +420,7 @@ function applyFilters() {
         if (esAdmin && asesor.length > 0 && !asesor.includes(lead[COLUMNAS.ASESOR_NOMBRE_RAW] || '')) return false;
         if (status.length > 0 && !status.includes(lead[COLUMNAS.STATUS_GESTION] || '')) return false;
         if (perfil.length > 0 && !perfil.includes((lead.PERFILAMIENTO_COMPLETO || {}).estado || '')) return false;
+        if (dolorNecesidad.length > 0 && !dolorNecesidad.includes(lead[COLUMNAS.DOLOR_NECESIDAD] || '')) return false;
 
         // Búsqueda por texto
         if (state.terminoBusqueda) {
@@ -455,6 +464,7 @@ function populateFilters() {
     createMultiSelect('filterModalidad', getValues(COLUMNAS.MODALIDAD, 'modalidad'), state.filtros.modalidad, 'Todas');
     createMultiSelect('filterStatus', getValues(COLUMNAS.STATUS_GESTION, 'status'), state.filtros.status, 'Todos', STATUS_LABELS);
     createMultiSelect('filterPerfil', ['Pendiente Asesor', 'Pendiente Supervisor', 'Completo'], state.filtros.perfil, 'Todos');
+    createMultiSelect('filterDolorNecesidad', getValues(COLUMNAS.DOLOR_NECESIDAD, 'dolorNecesidad'), state.filtros.dolorNecesidad, 'Todos');
 
     if (esAdmin) {
         // Value = Nombre crudo (identifica al asesor sin ambigüedad).
@@ -482,7 +492,7 @@ function leadPasaFiltrosSin(lead, filtroExcluido, esAdmin) {
     filtros[filtroExcluido] = [];
     if (!esAdmin) filtros.asesor = [];
 
-    const { carrera, ingreso, beneficio, modalidad, asesor, status, perfil } = filtros;
+    const { carrera, ingreso, beneficio, modalidad, asesor, status, perfil, dolorNecesidad } = filtros;
 
     if (carrera.length > 0 && !carrera.includes(lead[COLUMNAS.CARRERA] || lead[COLUMNAS.PROGRAMA] || '')) return false;
     if (ingreso.length > 0 && !ingreso.includes(lead[COLUMNAS.MODALIDAD_INGRESO] || '')) return false;
@@ -491,6 +501,7 @@ function leadPasaFiltrosSin(lead, filtroExcluido, esAdmin) {
     if (esAdmin && asesor.length > 0 && !asesor.includes(lead[COLUMNAS.ASESOR_NOMBRE_RAW] || '')) return false;
     if (status.length > 0 && !status.includes(lead[COLUMNAS.STATUS_GESTION] || '')) return false;
     if (perfil.length > 0 && !perfil.includes((lead.PERFILAMIENTO_COMPLETO || {}).estado || '')) return false;
+    if (dolorNecesidad.length > 0 && !dolorNecesidad.includes(lead[COLUMNAS.DOLOR_NECESIDAD] || '')) return false;
 
     return true;
 }

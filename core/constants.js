@@ -3,7 +3,7 @@
 // ================================================================
 
 // ----- URL DE LA API (Google Apps Script) -----
-//export const API_URL = 'https://script.google.com/macros/s/AKfycbwVkIBh-f9ImW7_UWxdLmeL8rxbWQ06IP2aJm6Bp-SEo6gEXVw5jivTMLUIZoHaOxRClg/exec';
+//export const API_URL = 'https://script.google.com/macros/s/AKfycby7szo4sq4-ZG4yngiQmZ7wN9g3tuM5bmh2kNb5GAgAfhAAwGBtat8tsQke_qub6PAAwg/exec';
 export const API_URL = 'https://migracion-postgres-bottomline.admisionucal.workers.dev/api';
 
 // ----- MAPEO DE COLUMNAS DE GOOGLE SHEETS -----
@@ -49,6 +49,7 @@ export const COLUMNAS = {
     NUMERO_CUOTAS: 'NUMERO_CUOTAS',
     METODO_PAGO: 'METODO_PAGO',
     RINDE_EXAMEN_SUFICIENCIA: 'RINDE_EXAMEN_SUFICIENCIA',
+    DOLOR_NECESIDAD: 'DOLOR_NECESIDAD',
 
     // Perfilamiento
     POR_QUE_ELIGIO_CARRERA: 'POR_QUE_ELIGIO_CARRERA',
@@ -172,4 +173,5 @@ export const CACHE_KEYS = {
     BENEFICIOS: 'bl_beneficios',
     INSTITUCIONES_PROCEDENCIA: 'bl_instituciones_procedencia',
     CARRERAS_PROCEDENCIA: 'bl_carreras_procedencia',
+    DOLORES_NECESIDADES: 'bl_dolores_necesidades',
 };

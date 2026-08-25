@@ -332,21 +332,48 @@ export function createMultiSelect(containerId, options, selected = [], label = '
         </div>
     `;
 
+    const btn = container.querySelector('.multiselect-btn');
+    const getIndividualChecks = () => container.querySelectorAll('.multiselect-options input[type=checkbox]:not([data-todos])');
+
+    // Mantiene el texto del botón y el estado "has-selection" en sync con lo
+    // marcado, sin necesidad de reconstruir todo el innerHTML (eso cerraría
+    // el panel en cada click).
+    function actualizarBoton(values) {
+        const texto = values.length === 0
+            ? label
+            : values.length === 1
+                ? (labelsMap && labelsMap[values[0]] ? labelsMap[values[0]] : values[0])
+                : `${values.length} seleccionados`;
+        if (btn) {
+            btn.textContent = texto;
+            btn.classList.toggle('has-selection', values.length > 0);
+        }
+    }
+
     // Evento para "Todos"
     const chkTodos = container.querySelector('[data-todos]');
     if (chkTodos) {
         chkTodos.addEventListener('change', () => {
-            window.dispatchEvent(new CustomEvent('multiselect-change', { 
-                detail: { containerId, key: containerId.replace('filter', '').toLowerCase(), values: [] }
-            }));
+            if (chkTodos.checked) {
+                getIndividualChecks().forEach(c => { c.checked = false; });
+                actualizarBoton([]);
+                window.dispatchEvent(new CustomEvent('multiselect-change', { 
+                    detail: { containerId, key: containerId.replace('filter', '').toLowerCase(), values: [] }
+                }));
+            } else {
+                // No tiene sentido dejar "Todos" desmarcado sin nada más
+                // seleccionado: lo mantenemos marcado en ese caso.
+                chkTodos.checked = true;
+            }
         });
     }
 
     // Eventos para checkboxes individuales
-    container.querySelectorAll('.multiselect-options input[type=checkbox]:not([data-todos])').forEach(chk => {
+    getIndividualChecks().forEach(chk => {
         chk.addEventListener('change', () => {
-            const allChecks = container.querySelectorAll('.multiselect-options input[type=checkbox]:not([data-todos])');
-            const values = Array.from(allChecks).filter(c => c.checked).map(c => c.value);
+            const values = Array.from(getIndividualChecks()).filter(c => c.checked).map(c => c.value);
+            if (chkTodos) chkTodos.checked = values.length === 0;
+            actualizarBoton(values);
             window.dispatchEvent(new CustomEvent('multiselect-change', {
                 detail: { containerId, key: containerId.replace('filter', '').toLowerCase(), values }
             }));
