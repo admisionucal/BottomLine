@@ -1,4 +1,3 @@
-
 import { getClient } from './lib/db';
 import { jsonError, type Env } from './types';
 import { login, logout } from './routes/auth';
@@ -132,5 +131,3 @@ async function proxyAAppsScript(originalRequest: Request, body: any, env: Env): 
     headers: { 'Content-Type': 'application/json' },
   });
 }
-
-

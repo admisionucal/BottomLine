@@ -1,4 +1,3 @@
-
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 
@@ -42,5 +41,3 @@ export async function obtenerBottomParaCC(client: Client, body: JsonBody, env: E
 
   return jsonOk({ data });
 }
-
-

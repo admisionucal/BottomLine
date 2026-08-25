@@ -1,4 +1,3 @@
-
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 import { hashPassword, verificarPassword } from '../lib/crypto';
@@ -126,4 +125,3 @@ export async function logout(client: Client, body: JsonBody, env: Env) {
 
   return jsonOk();
 }
-

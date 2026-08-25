@@ -1,4 +1,3 @@
-
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
@@ -210,5 +209,3 @@ export async function addComment(client: Client, body: JsonBody) {
 
   return jsonOk({ data: { COMENTARIOS_HISTORIAL: JSON.stringify(result.rows[0].comentarios_historial) } });
 }
-
-

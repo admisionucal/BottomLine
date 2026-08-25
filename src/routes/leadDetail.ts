@@ -1,4 +1,3 @@
-
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
@@ -132,5 +131,3 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
 
   return jsonOk({ data: leadObj });
 }
-
-
