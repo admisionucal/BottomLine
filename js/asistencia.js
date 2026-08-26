@@ -669,8 +669,12 @@ async function cargarRegistrosCalendario() {
 
 function normalizarFecha(f) {
     if (!f) return '';
-    const p = String(f).trim().split('/');
-    return p.length === 3 ? p[0].padStart(2, '0') + '/' + p[1].padStart(2, '0') + '/' + p[2] : String(f).trim();
+    let s = String(f).trim();
+    if (s.indexOf('T') !== -1) s = s.split('T')[0]; // por si pg devuelve timestamp ISO
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`; // YYYY-MM-DD (Supabase) -> DD/MM/YYYY
+    const p = s.split('/');
+    return p.length === 3 ? p[0].padStart(2, '0') + '/' + p[1].padStart(2, '0') + '/' + p[2] : s;
 }
 
 // Color del día según puntualidad: verde = OK, naranja = tardanzas, rojo = mal.
