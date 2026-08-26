@@ -14,9 +14,6 @@ export async function getLeads(client: Client, body: JsonBody) {
 
   const filtros = body.filtros || {};
 
-  // Igual que getNombreAsesorPorEmail() en code.gs: se resuelve el NOMBRE
-  // COMPLETO (no nombre_aux) buscando por email, en cada request — no se
-  // confía en lo que quedó guardado en la sesión al momento del login.
   let nombreAsesor: string | null = null;
   if (!esAdmin && sesion.email) {
     const r = await client.query(`select nombre from usuarios where lower(email) = lower($1) limit 1`, [
@@ -25,16 +22,9 @@ export async function getLeads(client: Client, body: JsonBody) {
     nombreAsesor = r.rows[0]?.nombre || null;
   }
 
-  // Igual que tu código: un ASESOR solo ve sus propios leads en VP/PP;
-  // un admin ve todo lo "visible" (con vps_dif != 0 o en VP/PP hoy).
   const params: any[] = [campana];
   const condiciones: string[] = ['l.campana = $1'];
 
-  // Un lead se muestra si: sigue en la base actual (en_base=true), O si el
-  // scraper de Prometeo lo tocó HOY MISMO (leads "solo hoy", legítimos aunque
-  // aún no estén en la base). Si ya no está en base y no se tocó hoy, es un
-  // lead viejo que salió del extracto — se deja de mostrar (equivalente a que
-  // Sheets ya no lo tenga en la hoja base), pero su bottom/historial no se pierde.
   condiciones.push(`(l.en_base = true or l.actualizado_hoy_en::date = current_date)`);
 
   if (esAdmin) {
@@ -73,8 +63,6 @@ export async function getLeads(client: Client, body: JsonBody) {
       l.colegio, l.codigo_modular, l.programa, l.numero_documento, l.modalidad,
       l.modalidad_ingreso, l.boleta_colegio, l.fecha_hora_registro, l.asesor,
       coalesce(u.nombre_aux, l.asesor, '-') as asesor_nombre,
-      -- Si hay pago con status final, prevalece sobre el status normal
-      -- (misma regla que "statusPagoFinal === 'PAGO COMPLETO' ...").
       case when ${esAdmin} and p.status_pago_final in ('PAGO COMPLETO', 'PAGO FRACCIONADO')
            then p.status_pago_final else l.status_gestion end as status_gestion,
       l.fecha_compromiso_pago,
@@ -82,11 +70,6 @@ export async function getLeads(client: Client, body: JsonBody) {
       ${selectPagos}
       coalesce(b.beneficio, 'NO') as beneficio,
       coalesce(b.beneficio_adicional, 'NO') as beneficio_adicional,
-      -- Volcamos TODA la fila de leads_bottom como jsonb (igual que el
-      -- `for (var bk in bottomRow) leadObj[bk] = bottomRow[bk]` de code.gs),
-      -- en vez de listar columnas a mano una por una. Así ningún campo nuevo
-      -- que se agregue a leads_bottom se vuelve a "perder" en este endpoint.
-      -- Con left join, si no hay fila bottom, to_jsonb(b.*) da SQL NULL.
       to_jsonb(b.*) as bottom_data,
       (
         (case when nullif(trim(b.por_que_eligio_carrera), '') is not null then 1 else 0 end) +
@@ -98,8 +81,6 @@ export async function getLeads(client: Client, body: JsonBody) {
       (nullif(trim(b.acciones_definidas), '') is not null) as perfil_supervisor_completo
     from leads l
     left join usuarios u on lower(u.usuario) = lower(l.asesor) or lower(u.nombre) = lower(l.asesor)
-    -- leads_bottom ahora es por (id_prometeo, campana, asesor_email): mostramos
-    -- la fila del asesor ACTUALMENTE asignado al lead (resuelto por nombre -> email).
     left join leads_bottom b on b.id_prometeo = l.id_prometeo and b.campana = l.campana
       and lower(b.asesor_email) = lower(u.email)
     left join leads_pagos p on p.id_prometeo = l.id_prometeo and p.campana = l.campana
@@ -108,16 +89,6 @@ export async function getLeads(client: Client, body: JsonBody) {
   `;
 
   const result = await client.query(sql, params);
-
-  // Misma idea que el spread completo que ya usan getLeadDetail.ts y
-  // obtenerBottomParaCC.ts: cada columna de leads_bottom sale en mayúsculas
-  // tal cual (BOLETA_FINAL, TIPO_ALUMNO, DOLOR_NECESIDAD si existe la
-  // columna, etc.), sin lista hardcodeada que se pueda quedar corta.
-  // Excluimos BENEFICIO/BENEFICIO_ADICIONAL: esas dos ya salen más abajo con
-  // su default (`coalesce(..., 'NO')`); si las dejamos en el spread, el
-  // objeto conserva la posición de la primera aparición (no reordena), pero
-  // el VALOR se pisaría con el crudo de leads_bottom (null si no hay fila
-  // bottom), perdiendo el default. Todo lo demás sí se agrega tal cual.
   const CAMPOS_BOTTOM_YA_MANEJADOS = new Set(['BENEFICIO', 'BENEFICIO_ADICIONAL']);
   const bottomToUpper = (bottom: Record<string, unknown> | null): Record<string, unknown> => {
     if (!bottom) return {};
@@ -166,9 +137,6 @@ export async function getLeads(client: Client, body: JsonBody) {
         estado,
       };
     })(),
-    // Columnas nuevas de leads_bottom que no tienen un slot fijo arriba
-    // (BOLETA_FINAL, TIPO_ALUMNO, DOLOR_NECESIDAD, montos, aprobación, etc.)
-    // van al final, para no correr el orden de las columnas de siempre.
     ...bottomToUpper(r.bottom_data as Record<string, unknown> | null),
   }));
 
