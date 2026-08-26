@@ -57,11 +57,19 @@ function initUnificar() {
         new Sidebar({ active: 'bottomline', activeSubitem: 'navUnificarIds' });
     }
 
-    // Cargar campañas
+    // Cargar campañas. Se agrega "TODAS" al inicio: la unificación ya no
+    // exige que principal y secundarios estén en la misma campaña, así
+    // que la búsqueda tiene que poder abarcar todas de una vez.
     const campanas = getUserCampanas();
     const sel = document.getElementById('selectCampana');
     if (sel) {
         sel.innerHTML = '';
+
+        const optTodas = document.createElement('option');
+        optTodas.value = 'TODAS';
+        optTodas.textContent = 'Todas las campañas';
+        sel.appendChild(optTodas);
+
         campanas.forEach(c => {
             const opt = document.createElement('option');
             opt.value = c;
@@ -95,8 +103,6 @@ async function buscar() {
         return;
     }
 
-    state.campana = campana;
-
     const empty = document.getElementById('resultadosEmpty');
     const tableWrap = document.getElementById('resultadosTableWrap');
     empty.style.display = 'block';
@@ -104,22 +110,37 @@ async function buscar() {
     tableWrap.style.display = 'none';
 
     try {
-        const result = await callAPI('searchLeads', {
-            campana: campana,
+        const payload = {
             searchType: searchType,
-            searchValue: searchValue
-        });
+            searchValue: searchValue,
+            campana: campana
+        };
+        if (campana !== 'TODAS') {
+            state.campana = campana; // campaña por defecto de esta búsqueda
+        }
+
+        const result = await callAPI('searchLeads', payload);
 
         if (!result || !result.success) {
             empty.textContent = 'Error: ' + (result?.error || 'No se pudo completar la búsqueda');
             return;
         }
 
-        state.resultados = result.data || [];
+        // Cada resultado ya trae su propia CAMPANA (viene del backend).
+        // Si por algún motivo no viniera (compatibilidad con una versión
+        // vieja del backend), se le asigna la campaña seleccionada en el filtro.
+        state.resultados = (result.data || []).map(r => ({
+            ...r,
+            CAMPANA: r.CAMPANA || campana
+        }));
         renderResultados();
     } catch (e) {
         empty.textContent = 'Error de conexión: ' + e.message;
     }
+}
+
+function claveSeleccion(id, campana) {
+    return id + '|' + campana;
 }
 
 function renderResultados() {
@@ -140,17 +161,21 @@ function renderResultados() {
     let html = '';
     state.resultados.forEach(item => {
         const id = item[COLUMNAS.ID_PROMETEO];
+        const campanaItem = item.CAMPANA || state.campana;
         const nombre = item[COLUMNAS.NOMBRES] || 'Sin Nombre';
         const dni = item[COLUMNAS.DNI] || '-';
         const celular = item[COLUMNAS.TELEFONO_2] || '-';
         const activo = !!item.activo;
-        const marcado = state.seleccionados.has(id);
+        const key = claveSeleccion(id, campanaItem);
+        const marcado = state.seleccionados.has(key);
 
         html += `
             <tr class="${marcado ? 'marcado' : ''}">
                 <td><input type="checkbox" class="check" ${marcado ? 'checked' : ''}
-                    data-id="${escapeHtml(id)}" data-nombre="${escapeHtml(nombre)}" data-activo="${activo}"></td>
+                    data-id="${escapeHtml(id)}" data-campana="${escapeHtml(campanaItem)}"
+                    data-nombre="${escapeHtml(nombre)}" data-activo="${activo}"></td>
                 <td><strong>${escapeHtml(id)}</strong></td>
+                <td><span class="badge-campana">${escapeHtml(campanaItem)}</span></td>
                 <td>${escapeHtml(nombre)}</td>
                 <td>${escapeHtml(dni)}</td>
                 <td>${escapeHtml(celular)}</td>
@@ -165,12 +190,14 @@ function renderResultados() {
     tbody.querySelectorAll('.check').forEach(chk => {
         chk.addEventListener('change', () => {
             const id = chk.dataset.id;
+            const campana = chk.dataset.campana;
             const nombre = chk.dataset.nombre;
             const activo = chk.dataset.activo === 'true';
+            const key = claveSeleccion(id, campana);
             if (chk.checked) {
-                state.seleccionados.set(id, { id, nombre, activo });
+                state.seleccionados.set(key, { id, campana, nombre, activo });
             } else {
-                state.seleccionados.delete(id);
+                state.seleccionados.delete(key);
             }
             renderResultados();
             actualizarPanelSeleccion();
@@ -201,6 +228,7 @@ function actualizarPanelSeleccion() {
         `<div class="sel-item ${i.activo ? 'base' : ''}">
             ${i.activo ? '<span class="tag-base">Base</span>' : ''}
             <strong>${escapeHtml(i.id)}</strong>
+            <span class="campana-tag">${escapeHtml(i.campana)}</span>
             <span class="nombre">${escapeHtml(i.nombre)} — ${i.activo ? '✓ Activo' : '⚠ Huérfano'}</span>
         </div>`
     ).join('');
@@ -224,6 +252,8 @@ function actualizarPanelSeleccion() {
         return;
     }
 
+    // La campaña ya no importa para habilitar el botón: se puede unificar
+    // entre campañas distintas sin restricción.
     predominanteContainer.style.display = 'block';
     btnUnificar.disabled = false;
 }
@@ -242,8 +272,8 @@ async function unificar() {
 
     if (!activo || huerfanos.length === 0) return;
 
-    const listaHuerfanos = huerfanos.map(h => `${h.id} (${h.nombre})`).join('\n');
-    if (!confirm(`¿Confirmas la unificación definitiva?\n\nPrincipal (se mantiene): ${activo.id} (${activo.nombre})\n\nSe fusionará y archivará el historial de:\n${listaHuerfanos}`)) return;
+    const listaHuerfanos = huerfanos.map(h => `${h.id} (${h.campana}) — ${h.nombre}`).join('\n');
+    if (!confirm(`¿Confirmas la unificación definitiva?\n\nPrincipal (se mantiene): ${activo.id} (${activo.campana}) — ${activo.nombre}\n\nSe fusionará y se eliminará de leads:\n${listaHuerfanos}`)) return;
 
     const datosPredominantes = {
         historial: document.getElementById('historialSelect')?.value || 'ambos'
@@ -257,18 +287,18 @@ async function unificar() {
     }
 
     try {
-        const idsSecundarios = huerfanos.map(h => h.id);
         const payload = {
             idPrincipal: activo.id,
-            idsSecundarios: idsSecundarios,
-            campana: state.campana,
+            campanaPrincipal: activo.campana,
+            idsSecundarios: huerfanos.map(h => ({ id: h.id, campana: h.campana })),
             datosPredominantes: datosPredominantes,
             adminEmail: user.email
         };
 
         let result = await callAPI('unifyIds', payload);
 
-        // Si el backend pide confirmación (hay pagos registrados en algún secundario)
+        // El backend puede pedir confirmación extra si algún secundario
+        // tiene pagos registrados en leads_pagos.
         if (result && result.requiereConfirmacion) {
             const seguir = confirm(result.error + '\n\n¿Deseas continuar de todas formas?');
             if (!seguir) {
@@ -279,7 +309,7 @@ async function unificar() {
         }
 
         if (result.success) {
-            alert(`Unificación completada.\nPrincipal: ${activo.id}\n${huerfanos.length} registro(s) huérfano(s) archivado(s).`);
+            alert(`Unificación completada.\nPrincipal: ${activo.id} (${activo.campana})\n${huerfanos.length} registro(s) fusionado(s) y eliminado(s) de leads.`);
             cancelarSeleccion();
             document.getElementById('resultadosTableWrap').style.display = 'none';
             document.getElementById('resultadosEmpty').style.display = 'block';
@@ -303,7 +333,7 @@ async function unificar() {
 async function callAPI(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {
-        const response = await fetch(API_URL, {    
+        const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify(payload)
@@ -314,4 +344,3 @@ async function callAPI(action, data = {}) {
         return { success: false, error: error.message };
     }
 }
-
