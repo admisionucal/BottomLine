@@ -25,7 +25,7 @@ export async function getLeads(client: Client, body: JsonBody) {
   const params: any[] = [campana];
   const condiciones: string[] = ['l.campana = $1'];
 
-  condiciones.push(`(l.en_base = true or l.actualizado_hoy_en::date = current_date)`);
+  condiciones.push(`(l.en_base = true or (l.actualizado_hoy_en at time zone 'America/Lima')::date = (now() at time zone 'America/Lima')::date)`);
 
   if (esAdmin) {
     condiciones.push(`(l.vps_dif_ti_inte <> 0 or (l.actualizado_hoy_en is not null and l.status_gestion = any($${params.push(ESTADOS_VP_PP)})))`);

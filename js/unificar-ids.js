@@ -258,13 +258,25 @@ async function unificar() {
 
     try {
         const idsSecundarios = huerfanos.map(h => h.id);
-        const result = await callAPI('unifyIds', {
+        const payload = {
             idPrincipal: activo.id,
             idsSecundarios: idsSecundarios,
             campana: state.campana,
             datosPredominantes: datosPredominantes,
             adminEmail: user.email
-        });
+        };
+
+        let result = await callAPI('unifyIds', payload);
+
+        // Si el backend pide confirmación (hay pagos registrados en algún secundario)
+        if (result && result.requiereConfirmacion) {
+            const seguir = confirm(result.error + '\n\n¿Deseas continuar de todas formas?');
+            if (!seguir) {
+                alert('Unificación cancelada.');
+                return;
+            }
+            result = await callAPI('unifyIds', { ...payload, confirmado: true });
+        }
 
         if (result.success) {
             alert(`Unificación completada.\nPrincipal: ${activo.id}\n${huerfanos.length} registro(s) huérfano(s) archivado(s).`);
