@@ -52,7 +52,6 @@ export async function getLeads(client: Client, body: JsonBody) {
     condiciones.push(`coalesce(b.beneficio, 'NO') = $${params.push(filtros.beneficio)}`);
   }
 
-  // pagos solo se aplica (y solo se selecciona) para roles admin, igual que hoy.
   const selectPagos = esAdmin
     ? `p.status_pago_final, p.fecha_pago_completo, p.fecha_promesa_pago,`
     : `null as status_pago_final, null as fecha_pago_completo, null as fecha_promesa_pago,`;
@@ -76,7 +75,9 @@ export async function getLeads(client: Client, body: JsonBody) {
         (case when nullif(trim(b.que_busca_universidad), '') is not null then 1 else 0 end) +
         (case when nullif(trim(b.quien_financiara), '') is not null then 1 else 0 end) +
         (case when nullif(trim(b.que_le_falta), '') is not null then 1 else 0 end) +
-        (case when nullif(trim(b.otras_opciones), '') is not null then 1 else 0 end)
+        (case when nullif(trim(b.otras_opciones), '') is not null then 1 else 0 end) +
+        (case when nullif(trim(b.comentarios_perfil), '') is not null then 1 else 0 end) +
+        (case when nullif(trim(b.dolor_necesidad), '') is not null then 1 else 0 end)
       ) as perfil_asesor_respondidas,
       (nullif(trim(b.acciones_definidas), '') is not null) as perfil_supervisor_completo
     from leads l
@@ -128,11 +129,11 @@ export async function getLeads(client: Client, body: JsonBody) {
     PERFILAMIENTO_COMPLETO: (() => {
       const asesorResp = Number(r.perfil_asesor_respondidas);
       const supCompleto = !!r.perfil_supervisor_completo;
-      const asesorCompleto = asesorResp === 5;
+      const asesorCompleto = asesorResp === 7;
       const estado = !asesorCompleto ? 'Pendiente Asesor' : !supCompleto ? 'Pendiente Supervisor' : 'Completo';
       return {
         respondidas: asesorResp + (supCompleto ? 1 : 0),
-        total: 6,
+        total: 7,
         completo: estado === 'Completo',
         estado,
       };
