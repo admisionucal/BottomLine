@@ -80,7 +80,6 @@ export async function getLeads(client: Client, body: JsonBody) {
       l.fecha_compromiso_pago,
       (l.actualizado_hoy_en is not null) as actualizado_hoy,
       ${selectPagos}
-      to_jsonb(b) as bottom_raw,
       coalesce(b.beneficio, 'NO') as beneficio,
       coalesce(b.beneficio_adicional, 'NO') as beneficio_adicional,
       b.por_que_eligio_carrera, b.que_busca_universidad, b.quien_financiara,
@@ -106,53 +105,44 @@ export async function getLeads(client: Client, body: JsonBody) {
 
   const result = await client.query(sql, params);
 
-  const data = result.rows.map((r) => {
+  const data = result.rows.map((r) => ({
+    'ID PROMETEO': r.id_prometeo,
+    'CAMPAÑA': r.campana,
+    NOMBRES: r.nombres,
+    'TELEFONO 2': r.telefono2,
+    'TELEFONO 3': r.telefono3,
+    EMAIL: r.email,
+    'NOMBRE DEL COLEGIO': r.colegio,
+    'CODIGO MODULAR': r.codigo_modular,
+    PROGRAMA: r.programa,
+    CARRERA: r.programa,
+    'NUMERO DE DOCUMENTO': r.numero_documento,
+    MODALIDAD: r.modalidad,
+    'MODALIDAD INGRESO': r.modalidad_ingreso,
+    'BOLETA DE COLEGIO': r.boleta_colegio,
+    'FECHA HORA DE REGISTRO': r.fecha_hora_registro,
+    ASESOR_NOMBRE_RAW: r.asesor || '',
+    'ASESOR ULT TIP DF SN CONTC': r.asesor_nombre,
+    'STATUS DE GESTION': r.status_gestion,
+    'FECHA COMPROMISO DE PAGO': r.fecha_compromiso_pago,
+    ACTUALIZADO_HOY: r.actualizado_hoy,
+    'FECHA DE PAGO COMPLETO': r.fecha_pago_completo,
+    'FECHA DE PROMESA DE PAGO': r.fecha_promesa_pago,
+    BENEFICIO: r.beneficio,
+    BENEFICIO_ADICIONAL: r.beneficio_adicional,
+    PERFILAMIENTO_COMPLETO: (() => {
+      const asesorResp = Number(r.perfil_asesor_respondidas);
+      const supCompleto = !!r.perfil_supervisor_completo;
+      const asesorCompleto = asesorResp === 5;
+      const estado = !asesorCompleto ? 'Pendiente Asesor' : !supCompleto ? 'Pendiente Supervisor' : 'Completo';
+      return {
+        respondidas: asesorResp + (supCompleto ? 1 : 0),
+        total: 6,
+        completo: estado === 'Completo',
+        estado,
+      };
+    })(),
+  }));
 
-    const bottomCompleto = Object.fromEntries(
-      Object.entries(r.bottom_raw || {}).map(([key, value]) => [key.toUpperCase(), value]),
-    );
-
-    return {
-      ...bottomCompleto,
-
-      'ID PROMETEO': r.id_prometeo,
-      'CAMPAÑA': r.campana,
-      NOMBRES: r.nombres,
-      'TELEFONO 2': r.telefono2,
-      'TELEFONO 3': r.telefono3,
-      EMAIL: r.email,
-      'NOMBRE DEL COLEGIO': r.colegio,
-      'CODIGO MODULAR': r.codigo_modular,
-      PROGRAMA: r.programa,
-      CARRERA: r.programa,
-      'NUMERO DE DOCUMENTO': r.numero_documento,
-      MODALIDAD: r.modalidad,
-      'MODALIDAD INGRESO': r.modalidad_ingreso,
-      'BOLETA DE COLEGIO': r.boleta_colegio,
-      'FECHA HORA DE REGISTRO': r.fecha_hora_registro,
-      ASESOR_NOMBRE_RAW: r.asesor || '',
-      'ASESOR ULT TIP DF SN CONTC': r.asesor_nombre,
-      'STATUS DE GESTION': r.status_gestion,
-      'FECHA COMPROMISO DE PAGO': r.fecha_compromiso_pago,
-      ACTUALIZADO_HOY: r.actualizado_hoy,
-      'FECHA DE PAGO COMPLETO': r.fecha_pago_completo,
-      'FECHA DE PROMESA DE PAGO': r.fecha_promesa_pago,
-      BENEFICIO: r.beneficio,
-      BENEFICIO_ADICIONAL: r.beneficio_adicional,
-      PERFILAMIENTO_COMPLETO: (() => {
-        const asesorResp = Number(r.perfil_asesor_respondidas);
-        const supCompleto = !!r.perfil_supervisor_completo;
-        const asesorCompleto = asesorResp === 5;
-        const estado = !asesorCompleto ? 'Pendiente Asesor' : !supCompleto ? 'Pendiente Supervisor' : 'Completo';
-        return {
-          respondidas: asesorResp + (supCompleto ? 1 : 0),
-          total: 6,
-          completo: estado === 'Completo',
-          estado,
-        };
-      })(),
-    }
-  });
-
-    return jsonOk({ data });
+  return jsonOk({ data });
 }
