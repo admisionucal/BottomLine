@@ -79,7 +79,6 @@ export async function getLeads(client: Client, body: JsonBody) {
            then p.status_pago_final else l.status_gestion end as status_gestion,
       l.fecha_compromiso_pago,
       (l.actualizado_hoy_en is not null) as actualizado_hoy,
-      l.extra,
       ${selectPagos}
       coalesce(b.beneficio, 'NO') as beneficio,
       coalesce(b.beneficio_adicional, 'NO') as beneficio_adicional,
@@ -143,7 +142,6 @@ export async function getLeads(client: Client, body: JsonBody) {
         estado,
       };
     })(),
-    ...(r.extra || {}),
   }));
 
   return jsonOk({ data });

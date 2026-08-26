@@ -171,7 +171,14 @@ export function cacheGet(key) {
 
 /** Guarda un valor en el caché (lo serializa a JSON) */
 export function cacheSet(key, value) {
-    sessionStorage.setItem(key, JSON.stringify(value));
+    try {
+        sessionStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+        // No bloquear la carga de datos por un problema de caché (p.ej. cuota
+        // de sessionStorage excedida). Sin caché simplemente se vuelve a pedir
+        // a la API la próxima vez; no es un error de conexión real.
+        console.warn('cacheSet: no se pudo guardar en sessionStorage', key, e);
+    }
 }
 
 /** Elimina una clave del caché */
