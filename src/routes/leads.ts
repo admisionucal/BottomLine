@@ -82,8 +82,12 @@ export async function getLeads(client: Client, body: JsonBody) {
       ${selectPagos}
       coalesce(b.beneficio, 'NO') as beneficio,
       coalesce(b.beneficio_adicional, 'NO') as beneficio_adicional,
-      b.por_que_eligio_carrera, b.que_busca_universidad, b.quien_financiara,
-      b.acciones_definidas, b.que_le_falta, b.otras_opciones,
+      -- Volcamos TODA la fila de leads_bottom como jsonb (igual que el
+      -- `for (var bk in bottomRow) leadObj[bk] = bottomRow[bk]` de code.gs),
+      -- en vez de listar columnas a mano una por una. Así ningún campo nuevo
+      -- que se agregue a leads_bottom se vuelve a "perder" en este endpoint.
+      -- Con left join, si no hay fila bottom, to_jsonb(b.*) da SQL NULL.
+      to_jsonb(b.*) as bottom_data,
       (
         (case when nullif(trim(b.por_que_eligio_carrera), '') is not null then 1 else 0 end) +
         (case when nullif(trim(b.que_busca_universidad), '') is not null then 1 else 0 end) +
@@ -104,6 +108,26 @@ export async function getLeads(client: Client, body: JsonBody) {
   `;
 
   const result = await client.query(sql, params);
+
+  // Misma idea que el spread completo que ya usan getLeadDetail.ts y
+  // obtenerBottomParaCC.ts: cada columna de leads_bottom sale en mayúsculas
+  // tal cual (BOLETA_FINAL, TIPO_ALUMNO, DOLOR_NECESIDAD si existe la
+  // columna, etc.), sin lista hardcodeada que se pueda quedar corta.
+  // Excluimos BENEFICIO/BENEFICIO_ADICIONAL: esas dos ya salen más abajo con
+  // su default (`coalesce(..., 'NO')`); si las dejamos en el spread, el
+  // objeto conserva la posición de la primera aparición (no reordena), pero
+  // el VALOR se pisaría con el crudo de leads_bottom (null si no hay fila
+  // bottom), perdiendo el default. Todo lo demás sí se agrega tal cual.
+  const CAMPOS_BOTTOM_YA_MANEJADOS = new Set(['BENEFICIO', 'BENEFICIO_ADICIONAL']);
+  const bottomToUpper = (bottom: Record<string, unknown> | null): Record<string, unknown> => {
+    if (!bottom) return {};
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(bottom)) {
+      const clave = k.toUpperCase();
+      if (!CAMPOS_BOTTOM_YA_MANEJADOS.has(clave)) out[clave] = v;
+    }
+    return out;
+  };
 
   const data = result.rows.map((r) => ({
     'ID PROMETEO': r.id_prometeo,
@@ -142,6 +166,10 @@ export async function getLeads(client: Client, body: JsonBody) {
         estado,
       };
     })(),
+    // Columnas nuevas de leads_bottom que no tienen un slot fijo arriba
+    // (BOLETA_FINAL, TIPO_ALUMNO, DOLOR_NECESIDAD, montos, aprobación, etc.)
+    // van al final, para no correr el orden de las columnas de siempre.
+    ...bottomToUpper(r.bottom_data as Record<string, unknown> | null),
   }));
 
   return jsonOk({ data });
