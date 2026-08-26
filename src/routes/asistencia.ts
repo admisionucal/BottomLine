@@ -23,6 +23,21 @@ function normalizarFecha(fechaStr: string): string | null {
   return null;
 }
 
+// Convierte el 'date' de Postgres (string 'YYYY-MM-DD', o Date si algún día
+// cambia el parser de tipos) a 'DD/MM/YYYY', que es lo que espera todo el
+// frontend (calendario, Análisis, ranking, KPI "Asistencia de hoy").
+function formatearFechaDDMMYYYY(fecha: any): string {
+  if (!fecha) return '';
+  if (fecha instanceof Date) {
+    const y = fecha.getUTCFullYear();
+    const m = String(fecha.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(fecha.getUTCDate()).padStart(2, '0');
+    return `${d}/${m}/${y}`;
+  }
+  const m = String(fecha).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(fecha).trim();
+}
+
 export async function marcarAsistencia(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ASESOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -149,7 +164,7 @@ export async function getAsistenciaEmpleados(client: Client, body: JsonBody) {
 function filaAObjeto(r: any) {
   return {
     usuario: r.usuario,
-    fecha: r.fecha,
+    fecha: formatearFechaDDMMYYYY(r.fecha),   // 👈 único cambio real: antes era r.fecha
     nombre: r.nombre,
     campaña: r.campana,
     cargo: r.cargo,
