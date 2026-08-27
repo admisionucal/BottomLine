@@ -43,7 +43,7 @@
         .lead-header-top {
             display: flex;
             align-items: center;
-            gap: 40px;
+            gap: 8px 40px;
             flex-wrap: wrap;
         }
 
@@ -64,8 +64,10 @@
 
         .lead-header .lead-datos-id {
             display: grid;
-            grid-template-columns: repeat(3, max-content);
+            grid-template-columns: max-content minmax(0, 160px) minmax(0, 160px);
             gap: 4px 20px;
+            flex: 1 1 100%;
+            margin-top: 6px;
         }
 
         .lead-header .lead-datos-id > div {
@@ -524,19 +526,8 @@
 
             /* ID / Canal / Asesor */
             .lead-header .lead-datos-id {
-                flex: 1 1 100%;
-                grid-template-columns: repeat(3, max-content);
+                grid-template-columns: max-content minmax(0, 120px) minmax(0, 120px);
                 gap: 4px 14px;
-                word-break: break-word;
-            }
-            .lead-header .lead-datos-id .campo-label,
-            .lead-header .lead-datos-id .campo-valor {
-                display: block;
-                white-space: normal;
-            }
-
-            .lead-header .lead-datos-detalle {
-                grid-template-columns: repeat(2, minmax(160px, 1fr));
             }
         }
     </style>
