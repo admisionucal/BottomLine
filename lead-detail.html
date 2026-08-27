@@ -106,6 +106,10 @@
         .status-large.vll { background: #ffe0b2; color: #bf360c; }
         .status-large.black { background: #212121; color: white; }
 
+        .lead-header-top .status-large {
+            margin-left: auto;
+        }
+
         .tabs {
             display: flex;
             gap: 4px;
@@ -494,6 +498,46 @@
             .grid-2col { grid-template-columns: 1fr; }
             .tabs button { padding: 10px 16px; font-size: 13px; }
         }
+
+        @media (max-width: 900px) {
+            /* Nombre 70% / Status 30% */
+            .lead-header-top {
+                flex-wrap: wrap;
+                gap: 8px 20px;
+            }
+            .lead-header-top h2 {
+                flex: 1 1 70%;
+                max-width: 70%;
+                margin: 0;
+                line-height: 1.15;
+                word-break: break-word;
+            }
+            .lead-header-top .status-large {
+                flex: 0 0 auto;
+                max-width: 30%;
+                margin-left: 0;
+                text-align: center;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            /* ID / Canal / Asesor */
+            .lead-header .lead-datos-id {
+                flex: 1 1 100%;
+                grid-template-columns: repeat(3, max-content);
+                gap: 4px 14px;
+            }
+            .lead-header .lead-datos-id .campo-label,
+            .lead-header .lead-datos-id .campo-valor {
+                display: block;
+                white-space: normal;
+            }
+
+            .lead-header .lead-datos-detalle {
+                grid-template-columns: repeat(2, minmax(160px, 1fr));
+            }
+        }
     </style>
 </head>
 <body>
@@ -572,7 +616,6 @@
                             </div>
                         </div>
                     </div>
-                    <div class="status-large vp" id="statusBadge">Cargando...</div>
                 </div>
 
                 <!-- TABS -->
