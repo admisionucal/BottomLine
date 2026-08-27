@@ -86,7 +86,7 @@
 
         .lead-header .lead-datos-detalle {
             display: grid;
-            grid-template-columns: repeat(3, minmax(220px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px 64px;
             margin-top: 18px;
             width: 100%;
@@ -492,7 +492,6 @@
         @media (max-width: 768px) {
             .container { padding: 12px; }
             .grid-2col { grid-template-columns: 1fr; }
-            .lead-header { flex-direction: column; align-items: flex-start; gap: 12px; }
             .tabs button { padding: 10px 16px; font-size: 13px; }
         }
     </style>
@@ -517,6 +516,7 @@
                     <div class="info">
                         <div class="lead-header-top">
                             <h2 id="leadNombre">Cargando...</h2>
+                            <div class="status-large vp" id="statusBadge">Cargando...</div>
                             <div class="lead-datos-grid lead-datos-id">
                                 <div>
                                     <span class="campo-label">ID</span>
