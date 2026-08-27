@@ -784,14 +784,21 @@ function filasCatalogoSinRango(catalogo, tipoIngreso) {
 }
 
 function rangosUnicosOrdenados(filasTipo) {
-    const rangosMap = new Map(); // key: MAX
+    // Clave: MIN-MAX combinados. Deduplicar solo por MAX es incorrecto:
+    // colapsa rangos distintos que comparten el mismo MAX (ej. 201-400 y 0-400),
+    // haciendo que uno de los dos "desaparezca" y rompiendo la detección de
+    // superposición (0-400 contiene a 0-200 y 201-400).
+    const rangosMap = new Map(); // key: `${min}-${max}`
     filasTipo.forEach(fila => {
         const min = parseNumero(fila.BOLETA_PROCEDENCIA_MIN);
         const max = parseNumero(fila.BOLETA_PROCEDENCIA_MAX);
         if (isNaN(min) || isNaN(max)) return;
-        if (!rangosMap.has(max)) rangosMap.set(max, { min, max });
+        const key = `${min}-${max}`;
+        if (!rangosMap.has(key)) rangosMap.set(key, { min, max });
     });
-    return Array.from(rangosMap.values()).sort((a, b) => a.max - b.max);
+    // Orden: por MAX y, en caso de empate, por MIN ascendente (el rango más
+    // "angosto"/específico queda antes que el que lo engloba).
+    return Array.from(rangosMap.values()).sort((a, b) => a.max - b.max || a.min - b.min);
 }
 
 function encontrarIndiceRango(rangosOrdenadosPorMax, ref) {
