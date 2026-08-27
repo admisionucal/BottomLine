@@ -566,14 +566,6 @@ function renderVista1() {
     document.getElementById('btnGuardarFicha')?.addEventListener('click', () => guardarFicha(id));
 
     actualizarMonto();
-    // Se guarda en state (no solo como argumento local) para poder
-    // revalidarlo justo al hacer clic en "Solicitar envío de CC" — ver
-    // abrirModalSolicitudCC(), que usa esto como segunda barrera además
-    // de que el botón ni siquiera se pinte cuando esto es false.
-    // Nota: antes esto se saltaba con `boletaVirtualFija !== null` (precio
-    // fijo por modalidad Remoto) sin exigir guardado — se quitó esa
-    // excepción: aunque el precio sea fijo, si no se guarda la ficha no hay
-    // garantía de que siga correspondiendo a la carrera/modalidad vigente.
     state.boletaGuardada = boletaActual !== '';
     renderSolicitudCCBox(state.boletaGuardada);
 }
@@ -620,11 +612,6 @@ function selectConValorHTML(id, opciones, valorActual, disabled) {
     const opts = opciones.map(op =>
         `<option value="${escapeHtml(op.value)}" ${String(op.value) === String(valorActual) ? 'selected' : ''}>${escapeHtml(op.label)}</option>`
     ).join('');
-    // Si nada calza con el valor guardado (p.ej. porque todavía no se ha
-    // guardado nada para este lead), el navegador seleccionaría la PRIMERA
-    // opción del catálogo por defecto — dando la falsa impresión de que ya
-    // hay algo elegido. Se agrega un placeholder deshabilitado y
-    // seleccionado en ese caso para que el <select> se vea genuinamente vacío.
     const placeholder = hayCoincidencia ? '' : '<option value="" selected disabled hidden>-- Selecciona --</option>';
     return `<select id="${id}" class="campo-editable-select" ${disabled ? 'disabled' : ''}>${placeholder}${opts}</select>`;
 }
@@ -796,15 +783,6 @@ function filasCatalogoSinRango(catalogo, tipoIngreso) {
     });
 }
 
-// Arma la lista de rangos únicos de un TIPO_INGRESO, ordenados por
-// BOLETA_PROCEDENCIA_MAX ascendente. Se agrupa SOLO por MAX (no por el par
-// min-max): si en la hoja BOLETAS quedó una fila ancha "catch-all" que
-// traslapa con el desglose fino (ej. 0-1249 conviviendo con 1100-1149,
-// 1150-1199, 1200-1249...), la fila ancha comparte el mismo MAX que una de
-// las finas y por lo tanto queda descartada automáticamente (se conserva la
-// que aparece primero en la hoja). Esto evita tener que editar/depurar la
-// hoja manualmente: basta con que el desglose fino exista antes en el orden
-// de filas para que gane.
 function rangosUnicosOrdenados(filasTipo) {
     const rangosMap = new Map(); // key: MAX
     filasTipo.forEach(fila => {
@@ -816,13 +794,16 @@ function rangosUnicosOrdenados(filasTipo) {
     return Array.from(rangosMap.values()).sort((a, b) => a.max - b.max);
 }
 
-// El rango que le corresponde a `ref` es el de MENOR MAX que aún lo cubre
-// (equivalente a una tabla de tramos/tax-bracket: se busca el primer
-// "hasta X" que alcance). Como los rangos ya vienen ordenados por MAX
-// ascendente, el primer match es siempre el más ajustado — sin necesidad de
-// comparar amplitudes ni de que la hoja esté libre de filas anchas legacy.
 function encontrarIndiceRango(rangosOrdenadosPorMax, ref) {
     return rangosOrdenadosPorMax.findIndex(r => ref >= r.min && ref <= r.max);
+}
+
+function encontrarIndicesRango(rangosOrdenadosPorMax, ref) {
+    const indices = [];
+    rangosOrdenadosPorMax.forEach((r, i) => {
+        if (ref >= r.min && ref <= r.max) indices.push(i);
+    });
+    return indices;
 }
 
 function filasCatalogoFiltradas(catalogo, tipoIngreso, referencia) {
@@ -831,13 +812,28 @@ function filasCatalogoFiltradas(catalogo, tipoIngreso, referencia) {
     if (isNaN(ref)) return [];
 
     const filasTipo = (catalogo || []).filter(fila => normalizarTexto(fila.TIPO_INGRESO || '') === tipoNorm);
+    const rangosOrdenados = rangosUnicosOrdenados(filasTipo);
+
+    const indicesMatch = encontrarIndicesRango(rangosOrdenados, ref);
+    if (indicesMatch.length === 0) return [];
+
+    const esOrdinario = tipoNorm === normalizarTexto('Ordinario');
+    const incremento = esOrdinario ? 200 : 100;
+    const refSubida = ref + incremento;
+
+    const indicesSubida = encontrarIndicesRango(rangosOrdenados, refSubida);
+    const indiceMasAltoSubida = indicesSubida.length
+        ? Math.max(...indicesSubida)
+        : rangosOrdenados.length - 1; // Fallback de seguridad; en la práctica siempre hay un rango que lo cubre.
+
+    const indiceInicial = Math.min(...indicesMatch);
+    const indiceFinal = Math.max(indiceMasAltoSubida, ...indicesMatch);
+
+    const rangosIncluidos = rangosOrdenados.slice(indiceInicial, indiceFinal + 1);
 
     return filasTipo.filter(fila => {
-        const min = parseNumero(fila.BOLETA_PROCEDENCIA_MIN);
         const max = parseNumero(fila.BOLETA_PROCEDENCIA_MAX);
-
-        return !isNaN(min) && !isNaN(max) &&
-            ref >= min && ref <= max;
+        return rangosIncluidos.some(r => r.max === max);
     });
 }
 
@@ -939,12 +935,6 @@ function actualizarMonto() {
 
     state.ultimoCalculo = { descuento, admision, matricula, boletaAPagar, beneficioAdicionalMonto, total };
 
-    // Línea informativa de "6 cuotas": reusa exactamente el mismo cálculo
-    // que va a terminar en el PDF de Condiciones Comerciales (construirDatosCC
-    // en cc-template.js), pasando como overrides los valores que hay AHORA
-    // MISMO en el formulario (aunque todavía no se hayan guardado), para que
-    // el asesor vea el número real antes de solicitar el envío. No afecta
-    // en nada el cálculo del Total de arriba — es solo informativo.
     const datosCC = construirDatosCC(state.lead, state.campana, {
         escalaRegular: boleta || undefined,
         escalaFinal: montoConBeca !== null ? montoConBeca : undefined,
@@ -1051,13 +1041,6 @@ function idBaseArchivoCC(campo) {
     return 'ccArchivo' + campo.charAt(0).toUpperCase() + campo.slice(1);
 }
 
-// Las fotos de celular suelen traer una etiqueta EXIF de rotación (según cómo
-// se sostuvo el teléfono al tomarla). Apps Script IGNORA esa etiqueta al
-// insertar la imagen en el PDF, así que dos fotos "derechas" en la galería
-// pueden terminar una horizontal y otra vertical en el documento. Se corrige
-// acá, en el navegador, dibujando la imagen en un canvas con la orientación
-// ya aplicada — así el archivo que se sube ya viene "derecho" sin depender
-// de metadata que el backend no puede leer.
 async function normalizarOrientacionImagen(file) {
     if (!file.type || !file.type.startsWith('image/')) return file; // PDFs: sin cambios
     try {
@@ -1147,17 +1130,13 @@ function abrirModalSolicitudCC() {
     ['dni', 'certificado', 'boletaProcedencia'].forEach(renderListaArchivosCC);
 
     // Boleta de Procedencia: solo aplica a Traslado (con o sin convalidación).
-    // Si el lead no es traslado, se oculta el campo y se limpia cualquier
-    // archivo que hubiera quedado seleccionado de una apertura anterior.
     const tipoIngreso = String(obtenerCampo(state.lead, COLUMNAS.MODALIDAD_INGRESO) || '').toLowerCase();
     const esTraslado = tipoIngreso.indexOf('con conva') !== -1 || tipoIngreso.indexOf('sin conva') !== -1;
     const bloqueBoletaProc = document.getElementById('ccBloqueBoletaProcedencia');
     if (bloqueBoletaProc) bloqueBoletaProc.style.display = esTraslado ? '' : 'none';
     if (!esTraslado) ccArchivos.boletaProcedencia = [];
 
-    // DNI: si el lead no lo tiene registrado, se pide acá mismo — es el dato
-    // que arma el nombre de la carpeta del alumno en Drive (ver solicitarCC
-    // en el backend); sin él la carpeta se crea como "SIN-DNI".
+    // DNI: si el lead no lo tiene registrado, se pide acá mismo
     const dniActual = String(obtenerCampo(state.lead, COLUMNAS.DNI) || '').trim();
     const bloqueDniFaltante = document.getElementById('ccBloqueDniFaltante');
     const dniInput = document.getElementById('ccDniInput');
@@ -1194,9 +1173,6 @@ function leerArchivoBase64(file) {
     });
 }
 
-// Devuelve la lista de archivos de un campo ya leídos en base64. La
-// conversión a PDF (y, para DNI con 2 archivos, la unión en una sola hoja
-// en horizontal) la hace el backend en solicitarCC.
 async function armarArchivosCC(campo) {
     const files = ccArchivos[campo];
     if (!files || files.length === 0) return [];
@@ -1213,9 +1189,6 @@ async function enviarSolicitudCC() {
     const user = getCurrentUser();
     const id = obtenerCampo(state.lead, COLUMNAS.ID_PROMETEO);
     const dniInput = document.getElementById('ccDniInput');
-    // Si el lead no tenía DNI registrado, se usa el que se acaba de ingresar
-    // en el aviso del modal (ccBloqueDniFaltante) — es el dato que arma el
-    // nombre de la carpeta del alumno en Drive.
     const dni = String(obtenerCampo(state.lead, COLUMNAS.DNI) || '').trim() || (dniInput?.value || '').trim();
     const nombreCompleto = obtenerCampo(state.lead, COLUMNAS.NOMBRES) || '';
 
@@ -1416,8 +1389,6 @@ function renderVista2() {
         { id: 'inputOtrasOpciones', label: '¿Cuáles son sus otras opciones?', value: lead[COLUMNAS.OTRAS_OPCIONES] || '' }
     ];
 
-    // Comentarios pasa a ocupar el ancho completo (igual que Acciones Definidas);
-    // el espacio normal que dejaba libre lo toma el bloque de Dolor/Necesidad.
     const camposFinales = [
         { id: 'inputComentariosPerfil', label: 'Comentarios', value: lead[COLUMNAS.COMENTARIOS_PERFIL] || '' }
     ];
@@ -1483,9 +1454,7 @@ function dolorNecesidadHTML(lead, bloqueado) {
         `<option value="${escapeHtml(d.nombre)}" ${String(d.nombre) === String(valorActual) ? 'selected' : ''}>${escapeHtml(d.nombre)}</option>`
     ).join('');
 
-    // Si el valor guardado ya no calza con ningún ítem del catálogo (o todavía
-    // no hay nada guardado), se agrega un placeholder para no inducir a error,
-    // igual que se hace en selectConValorHTML.
+    // Si el valor guardado ya no calza con ningún ítem del catálogo (o todavía no hay nada guardado)
     let placeholder = '';
     if (valorActual && !coincide) {
         placeholder = `<option value="${escapeHtml(valorActual)}" selected>${escapeHtml(valorActual)}</option>`;
@@ -1537,9 +1506,7 @@ function onCambioDolorNecesidad() {
 async function guardarPerfilamiento(idPrometeo) {
     const getVal = id => { const el = document.getElementById(id); return el ? el.value : ''; };
 
-    // Dolor / Necesidad: si está en modo "agregar nueva", valida nombre (máx. 5
-    // palabras) y descripción antes de armar el payload; si no, usa el valor
-    // ya elegido del catálogo tal cual.
+    // Dolor / Necesidad: si está en modo "agregar nueva", valida nombre (máx. 5 palabras) y descripción
     const selectDolor = document.getElementById('selectDolorNecesidad');
     let dolorNecesidadValor = '';
     let dolorDescripcionNueva = '';
@@ -1577,8 +1544,6 @@ async function guardarPerfilamiento(idPrometeo) {
         [COLUMNAS.DOLOR_NECESIDAD]: dolorNecesidadValor,
         [COLUMNAS.FECHA_ULT_MODIFICACION]: new Date().toISOString()
     };
-    // Campo transitorio: solo viaja al backend para crear el ítem nuevo en el
-    // catálogo DOLOR; no se guarda como columna en bottom{campaña}.
     if (dolorDescripcionNueva) data['DOLOR_DESCRIPCION_NUEVA'] = dolorDescripcionNueva;
 
     const acciones = document.getElementById('inputAccionesDefinidas');
@@ -1678,8 +1643,6 @@ function renderItemsHistorial(items, asesorEmail) {
         return '<p style="color:#888; font-size:14px;">Sin interacciones registradas.</p>';
     }
 
-    // Más reciente primero. El backend agrega cada entrada al final del array
-    // (orden cronológico ascendente), así que acá se invierte para mostrar.
     const itemsOrdenados = items
         .slice()
         .sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
