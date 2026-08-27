@@ -811,28 +811,47 @@ function filasCatalogoFiltradas(catalogo, tipoIngreso, referencia) {
     const ref = parseNumero(referencia);
     if (isNaN(ref)) return [];
 
-    const filasTipo = (catalogo || []).filter(fila => normalizarTexto(fila.TIPO_INGRESO || '') === tipoNorm);
+    const filasTipo = (catalogo || []).filter(
+        fila => normalizarTexto(fila.TIPO_INGRESO || '') === tipoNorm
+    );
+
     const rangosOrdenados = rangosUnicosOrdenados(filasTipo);
 
+    // El monto original puede pertenecer a varios rangos
     const indicesMatch = encontrarIndicesRango(rangosOrdenados, ref);
+
     if (indicesMatch.length === 0) return [];
 
+    const indiceRangoMaximo = Math.max(...indicesMatch);
+    const maximoRangoOriginal = rangosOrdenados[indiceRangoMaximo].max;
+
+    // Ordinario sube 200; los demás suben 100
     const esOrdinario = tipoNorm === normalizarTexto('Ordinario');
     const incremento = esOrdinario ? 200 : 100;
-    const refSubida = ref + incremento;
 
-    const indicesSubida = encontrarIndicesRango(rangosOrdenados, refSubida);
+    const montoBusqueda = maximoRangoOriginal + incremento;
+    const indicesSubida = encontrarIndicesRango(
+        rangosOrdenados,
+        montoBusqueda
+    );
+
     const indiceMasAltoSubida = indicesSubida.length
         ? Math.max(...indicesSubida)
-        : rangosOrdenados.length - 1; // Fallback de seguridad; en la práctica siempre hay un rango que lo cubre.
-
+        : rangosOrdenados.length - 1;
     const indiceInicial = Math.min(...indicesMatch);
-    const indiceFinal = Math.max(indiceMasAltoSubida, ...indicesMatch);
+    const indiceFinal = Math.max(
+        indiceMasAltoSubida,
+        indiceRangoMaximo
+    );
 
-    const rangosIncluidos = rangosOrdenados.slice(indiceInicial, indiceFinal + 1);
+    const rangosIncluidos = rangosOrdenados.slice(
+        indiceInicial,
+        indiceFinal + 1
+    );
 
     return filasTipo.filter(fila => {
         const max = parseNumero(fila.BOLETA_PROCEDENCIA_MAX);
+
         return rangosIncluidos.some(r => r.max === max);
     });
 }
