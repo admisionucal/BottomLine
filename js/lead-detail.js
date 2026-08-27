@@ -35,8 +35,25 @@ const state = {
     catalogoInstitucionesProcedencia: [],
     catalogoCarrerasProcedencia: [],
     catalogoDoloresNecesidades: [],
+    catalogoPorQueEligioCarrera: [],
+    catalogoQueBuscaUniversidad: [],
+    catalogoQuienFinancia: [],
+    catalogoQueLeFalta: [],
+    catalogoOtrasOpciones: [],
     solicitudCC: null
 };
+
+// ===== CAMPOS DE PERFILAMIENTO =====
+const VALOR_OTRAS_OPCIONES_INSTITUCION = 'Evaluando otras instituciones';
+
+const CAMPOS_SELECT_PERFILAMIENTO = [
+    { columna: COLUMNAS.POR_QUE_ELIGIO_CARRERA, label: '¿Por qué eligió la carrera?', selectId: 'selectPorQueEligio', cacheKey: CACHE_KEYS.CATALOGO_POR_QUE_ELIGIO_CARRERA, dataKey: 'porQueEligioCarrera', stateKey: 'catalogoPorQueEligioCarrera', permiteAgregarNuevo: false },
+    { columna: COLUMNAS.QUE_BUSCA_UNIVERSIDAD, label: '¿Qué busca en una universidad?', selectId: 'selectQueBusca', cacheKey: CACHE_KEYS.CATALOGO_QUE_BUSCA_UNIVERSIDAD, dataKey: 'queBuscaUniversidad', stateKey: 'catalogoQueBuscaUniversidad', permiteAgregarNuevo: false },
+    { columna: COLUMNAS.QUIEN_FINANCIARA, label: '¿Quién financiará la carrera?', selectId: 'selectQuienFinancia', cacheKey: CACHE_KEYS.CATALOGO_QUIEN_FINANCIARA, dataKey: 'quienFinanciaCarrera', stateKey: 'catalogoQuienFinancia', permiteAgregarNuevo: false },
+    { columna: COLUMNAS.QUE_LE_FALTA, label: '¿Qué le falta para tomar una decisión?', selectId: 'selectQueLeFalta', cacheKey: CACHE_KEYS.CATALOGO_QUE_LE_FALTA, dataKey: 'queFaltaParaDecision', stateKey: 'catalogoQueLeFalta', permiteAgregarNuevo: false, permiteMultiple: true },
+    { columna: COLUMNAS.OTRAS_OPCIONES, label: '¿Cuáles son sus otras opciones?', selectId: 'selectOtrasOpciones', cacheKey: CACHE_KEYS.CATALOGO_OTRAS_OPCIONES, dataKey: 'queOtrasOpciones', stateKey: 'catalogoOtrasOpciones', permiteAgregarNuevo: false },
+    { columna: COLUMNAS.DOLOR_NECESIDAD, label: 'Dolor / Necesidad', selectId: 'selectDolorNecesidad', cacheKey: CACHE_KEYS.CATALOGO_DOLOR_NECESIDAD, dataKey: 'doloresNecesidades', stateKey: 'catalogoDoloresNecesidades', permiteAgregarNuevo: true },
+];
 
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', async () => {
@@ -64,7 +81,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.catalogoBeneficios = cacheGet(CACHE_KEYS.BENEFICIOS) || [];
     state.catalogoInstitucionesProcedencia = cacheGet(CACHE_KEYS.INSTITUCIONES_PROCEDENCIA) || [];
     state.catalogoCarrerasProcedencia = cacheGet(CACHE_KEYS.CARRERAS_PROCEDENCIA) || [];
-    state.catalogoDoloresNecesidades = cacheGet(CACHE_KEYS.DOLORES_NECESIDADES) || [];
+    CAMPOS_SELECT_PERFILAMIENTO.forEach(cfg => {
+        state[cfg.stateKey] = cacheGet(cfg.cacheKey) || [];
+    });
 
     // Configurar tabs
     document.querySelectorAll('.tabs button[data-tab]').forEach(btn => {
@@ -132,7 +151,9 @@ async function cargarCatalogos() {
             cacheSet(CACHE_KEYS.BENEFICIOS, result.data?.beneficios || []);
             cacheSet(CACHE_KEYS.INSTITUCIONES_PROCEDENCIA, result.data?.institucionesProcedencia || []);
             cacheSet(CACHE_KEYS.CARRERAS_PROCEDENCIA, result.data?.carrerasProcedencia || []);
-            cacheSet(CACHE_KEYS.DOLORES_NECESIDADES, result.data?.doloresNecesidades || []);
+            CAMPOS_SELECT_PERFILAMIENTO.forEach(cfg => {
+                cacheSet(cfg.cacheKey, result.data?.[cfg.dataKey] || []);
+            });
         }
     } catch (e) {
         console.error('Error cargando catálogos:', e);
@@ -168,18 +189,18 @@ async function actualizarCatalogoProcedencia() {
     }
 }
 
-// Se llama tras crear un nuevo valor de Dolor/Necesidad, para que el <select>
-// lo muestre de inmediato sin esperar a un refresco completo de página.
-async function actualizarCatalogoDolor() {
+async function actualizarCatalogosPerfilamiento() {
     try {
         const result = await callAPI('getCatalogos');
         if (result.success) {
-            const dolores = result.data?.doloresNecesidades || [];
-            cacheSet(CACHE_KEYS.DOLORES_NECESIDADES, dolores);
-            state.catalogoDoloresNecesidades = dolores;
+            CAMPOS_SELECT_PERFILAMIENTO.forEach(cfg => {
+                const datos = result.data?.[cfg.dataKey] || [];
+                cacheSet(cfg.cacheKey, datos);
+                state[cfg.stateKey] = datos;
+            });
         }
     } catch (e) {
-        console.error('Error actualizando catálogo de Dolor/Necesidad:', e);
+        console.error('Error actualizando catálogos de perfilamiento:', e);
     }
 }
 
@@ -1414,14 +1435,6 @@ function renderVista2() {
 
     const bloqueado = !esAdmin && state.solicitudPendiente && state.solicitudPendiente.STATUS === 'PENDIENTE';
 
-    const campos = [
-        { id: 'inputPorQueEligio', label: '¿Por qué eligió la carrera?', value: lead[COLUMNAS.POR_QUE_ELIGIO_CARRERA] || '' },
-        { id: 'inputQueBusca', label: '¿Qué busca en una universidad?', value: lead[COLUMNAS.QUE_BUSCA_UNIVERSIDAD] || '' },
-        { id: 'inputQuienFinancia', label: '¿Quién financiará la carrera?', value: lead[COLUMNAS.QUIEN_FINANCIARA] || '' },
-        { id: 'inputQueLeFalta', label: '¿Qué le falta para tomar una decisión?', value: lead[COLUMNAS.QUE_LE_FALTA] || '' },
-        { id: 'inputOtrasOpciones', label: '¿Cuáles son sus otras opciones?', value: lead[COLUMNAS.OTRAS_OPCIONES] || '' }
-    ];
-
     const camposFinales = [
         { id: 'inputComentariosPerfil', label: 'Comentarios', value: lead[COLUMNAS.COMENTARIOS_PERFIL] || '' }
     ];
@@ -1443,16 +1456,12 @@ function renderVista2() {
             <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:16px;">
     `;
 
-    campos.forEach(c => {
-        html += `
-            <div>
-                <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">${c.label}</label>
-                <textarea id="${c.id}" class="campo-editable-input" style="width:100%; min-height:60px; padding:10px 12px; border:1px solid var(--color-border); border-radius:6px; font-size:14px; font-family:inherit; resize:vertical;" ${bloqueado ? 'disabled' : ''}>${escapeHtml(c.value)}</textarea>
-            </div>
-        `;
+    CAMPOS_SELECT_PERFILAMIENTO.forEach(cfg => {
+        html += selectorPerfilamientoHTML(cfg, lead, bloqueado);
+        if (cfg.columna === COLUMNAS.OTRAS_OPCIONES) {
+            html += otrasOpcionesInstitucionHTML(lead, bloqueado);
+        }
     });
-
-    html += dolorNecesidadHTML(lead, bloqueado);
 
     camposFinales.forEach(c => {
         html += `
@@ -1475,109 +1484,220 @@ function renderVista2() {
     container.innerHTML = html;
 
     document.getElementById('btnGuardarPerfil')?.addEventListener('click', () => guardarPerfilamiento(id));
-    document.getElementById('selectDolorNecesidad')?.addEventListener('change', onCambioDolorNecesidad);
+    CAMPOS_SELECT_PERFILAMIENTO.forEach(cfg => {
+        if (cfg.permiteMultiple) return;
+        document.getElementById(cfg.selectId)?.addEventListener('change', () => onCambioSelectorPerfilamiento(cfg));
+    });
+
+    // Institución de "Otras opciones": mostrar/ocultar + combo dependiente
+    const selectOtrasOpciones = document.getElementById('selectOtrasOpciones');
+    const wrapOpcionInstitucion = document.getElementById('otrasOpcionesInstitucionWrap');
+    if (selectOtrasOpciones && wrapOpcionInstitucion) {
+        selectOtrasOpciones.addEventListener('change', () => {
+            wrapOpcionInstitucion.style.display = (selectOtrasOpciones.value === VALOR_OTRAS_OPCIONES_INSTITUCION) ? 'grid' : 'none';
+        });
+    }
+
+    const tipoActualOpcionInst = lead[COLUMNAS.OPCION_INSTITUCION] || '';
+    initComboBuscable('selectOpcionInstitucionNombre', opcionesInstitucionPorTipo(tipoActualOpcionInst));
+
+    const selectOpcionInstTipo = document.getElementById('selectOpcionInstitucionTipo');
+    const inputOpcionInstNombre = document.getElementById('selectOpcionInstitucionNombre');
+    if (selectOpcionInstTipo && inputOpcionInstNombre) {
+        selectOpcionInstTipo.addEventListener('change', () => {
+            const tipoSel = selectOpcionInstTipo.value;
+            const nuevasOpciones = opcionesInstitucionPorTipo(tipoSel);
+
+            if (inputOpcionInstNombre._actualizarOpcionesCombo) inputOpcionInstNombre._actualizarOpcionesCombo(nuevasOpciones);
+
+            const valorActualNorm = String(inputOpcionInstNombre.value || '').trim().toUpperCase();
+            const sigueValido = nuevasOpciones.some(op => String(op).trim().toUpperCase() === valorActualNorm);
+            if (!sigueValido) inputOpcionInstNombre.value = '';
+
+            inputOpcionInstNombre.disabled = !tipoSel || bloqueado;
+            inputOpcionInstNombre.placeholder = tipoSel ? 'Escribe para buscar...' : 'Selecciona primero el tipo';
+        });
+    }
 }
 
-function dolorNecesidadHTML(lead, bloqueado) {
-    const valorActual = lead[COLUMNAS.DOLOR_NECESIDAD] || '';
-    const catalogo = state.catalogoDoloresNecesidades || [];
+function selectorPerfilamientoHTML(cfg, lead, bloqueado) {
+    if (cfg.permiteMultiple) return checklistPerfilamientoHTML(cfg, lead, bloqueado);
+
+    const valorActual = lead[cfg.columna] || '';
+    const catalogo = state[cfg.stateKey] || [];
     const coincide = catalogo.some(d => String(d.nombre) === String(valorActual));
 
     const opciones = catalogo.map(d =>
         `<option value="${escapeHtml(d.nombre)}" ${String(d.nombre) === String(valorActual) ? 'selected' : ''}>${escapeHtml(d.nombre)}</option>`
     ).join('');
 
-    // Si el valor guardado ya no calza con ningún ítem del catálogo (o todavía no hay nada guardado)
-    let placeholder = '';
+    const opcionVacia = `<option value="" ${!valorActual ? 'selected' : ''}>-- Sin seleccionar --</option>`;
+
+    let opcionExtra = '';
     if (valorActual && !coincide) {
-        placeholder = `<option value="${escapeHtml(valorActual)}" selected>${escapeHtml(valorActual)}</option>`;
-    } else if (!valorActual) {
-        placeholder = '<option value="" selected disabled hidden>-- Seleccionar --</option>';
+        // Cubre leads antiguos con texto libre que ya no calza con el catálogo:
+        // se conserva como opción seleccionada, pero se puede limpiar o reemplazar.
+        opcionExtra = `<option value="${escapeHtml(valorActual)}" selected>${escapeHtml(valorActual)}</option>`;
     }
+
+    const nuevaOpcion = cfg.permiteAgregarNuevo ? '<option value="__nuevo__">+ Agregar nueva...</option>' : '';
 
     const itemActual = catalogo.find(d => String(d.nombre) === String(valorActual));
     const descripcionActual = itemActual ? (itemActual.descripcion || '') : '';
 
+    let html = `
+        <div>
+            <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">${cfg.label}</label>
+            <select id="${cfg.selectId}" class="campo-editable-select" ${bloqueado ? 'disabled' : ''}>
+                ${opcionVacia}${opcionExtra}${opciones}${nuevaOpcion}
+            </select>
+            <div id="${cfg.selectId}Descripcion" style="margin-top:6px; font-size:12px; color:#777; ${descripcionActual ? '' : 'display:none;'}">${escapeHtml(descripcionActual)}</div>
+    `;
+
+    if (cfg.permiteAgregarNuevo) {
+        html += `
+            <div id="${cfg.selectId}NuevoWrap" style="margin-top:8px; display:none;">
+                <input type="text" id="${cfg.selectId}NuevoNombre" class="campo-editable-input"
+                       placeholder="Nombre (máx. 5 palabras)" style="width:100%; margin-bottom:6px;" ${bloqueado ? 'disabled' : ''}>
+                <textarea id="${cfg.selectId}NuevaDescripcion" class="campo-editable-input" placeholder="Descripción"
+                          style="width:100%; min-height:50px; padding:8px 10px; border:1px solid var(--color-border); border-radius:6px; font-size:13px; font-family:inherit; resize:vertical;" ${bloqueado ? 'disabled' : ''}></textarea>
+                <span id="${cfg.selectId}NuevoError" style="color:#c62828; font-size:12px; display:none;"></span>
+            </div>
+        `;
+    }
+
+    html += `</div>`;
+    return html;
+}
+
+// "¿Qué le falta para tomar una decisión?" admite varias opciones; se
+// guarda como texto separado por comas en la misma columna.
+function checklistPerfilamientoHTML(cfg, lead, bloqueado) {
+    const catalogo = state[cfg.stateKey] || [];
+    const seleccionados = String(lead[cfg.columna] || '').split(',').map(v => v.trim()).filter(Boolean);
+
+    // Cubre valores de leads antiguos que ya no están en el catálogo
+    const extras = seleccionados.filter(v => !catalogo.some(d => String(d.nombre) === v));
+    const opciones = [...catalogo.map(d => d.nombre), ...extras];
+
+    const checkboxes = opciones.map(nombre => `
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400; padding:3px 0; color:#333;">
+            <input type="checkbox" class="checklist-${cfg.selectId}" value="${escapeHtml(nombre)}" ${seleccionados.includes(nombre) ? 'checked' : ''} ${bloqueado ? 'disabled' : ''}>
+            ${escapeHtml(nombre)}
+        </label>
+    `).join('');
+
     return `
         <div>
-            <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Dolor / Necesidad</label>
-            <select id="selectDolorNecesidad" class="campo-editable-select" ${bloqueado ? 'disabled' : ''}>
-                ${placeholder}${opciones}<option value="__nuevo__">+ Agregar nueva...</option>
-            </select>
-            <div id="dolorDescripcionDisplay" style="margin-top:6px; font-size:12px; color:#777; ${descripcionActual ? '' : 'display:none;'}">${escapeHtml(descripcionActual)}</div>
-            <div id="dolorNuevoWrap" style="margin-top:8px; display:none;">
-                <input type="text" id="inputDolorNuevoNombre" class="campo-editable-input"
-                       placeholder="Nombre (máx. 5 palabras)" style="width:100%; margin-bottom:6px;" ${bloqueado ? 'disabled' : ''}>
-                <textarea id="inputDolorNuevaDescripcion" class="campo-editable-input" placeholder="Descripción"
-                          style="width:100%; min-height:50px; padding:8px 10px; border:1px solid var(--color-border); border-radius:6px; font-size:13px; font-family:inherit; resize:vertical;" ${bloqueado ? 'disabled' : ''}></textarea>
-                <span id="dolorNuevoError" style="color:#c62828; font-size:12px; display:none;"></span>
+            <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">${cfg.label}</label>
+            <div id="${cfg.selectId}" style="border:1px solid var(--color-border); border-radius:6px; padding:8px 10px; max-height:160px; overflow-y:auto;">
+                ${checkboxes || '<span style="color:#999; font-size:12px;">Sin opciones</span>'}
             </div>
         </div>
     `;
 }
 
-function onCambioDolorNecesidad() {
-    const select = document.getElementById('selectDolorNecesidad');
-    const wrapNuevo = document.getElementById('dolorNuevoWrap');
-    const display = document.getElementById('dolorDescripcionDisplay');
-    if (!select || !wrapNuevo || !display) return;
+// Institución de "Otras opciones": Tipo + Institución dependientes,
+// visibles solo cuando OTRAS_OPCIONES = VALOR_OTRAS_OPCIONES_INSTITUCION.
+// Reutiliza el mismo catálogo de instituciones (state.catalogoInstitucionesProcedencia)
+// y el mismo patrón que Institución de Procedencia (traslados).
+function otrasOpcionesInstitucionHTML(lead, bloqueado) {
+    const mostrar = (lead[COLUMNAS.OTRAS_OPCIONES] || '') === VALOR_OTRAS_OPCIONES_INSTITUCION;
+    const tipoActual = lead[COLUMNAS.OPCION_INSTITUCION] || '';
+    const nombreActual = lead[COLUMNAS.OPCION_NOMBRE_INSTITUCION] || '';
 
-    const errorEl = document.getElementById('dolorNuevoError');
-    if (errorEl) errorEl.style.display = 'none';
+    return `
+        <div id="otrasOpcionesInstitucionWrap" style="display:${mostrar ? 'grid' : 'none'}; grid-template-columns: repeat(2, 1fr); gap:16px; grid-column: 1 / -1;">
+            <div>
+                <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Tipo de Institución</label>
+                ${selectSimpleHTML('selectOpcionInstitucionTipo', TIPOS_INSTITUCION_PROCEDENCIA, tipoActual, bloqueado)}
+            </div>
+            <div>
+                <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Institución</label>
+                ${inputBuscableHTML(
+                    'selectOpcionInstitucionNombre',
+                    opcionesInstitucionPorTipo(tipoActual),
+                    nombreActual,
+                    bloqueado || !tipoActual,
+                    tipoActual ? 'Escribe para buscar...' : 'Selecciona primero el tipo'
+                )}
+            </div>
+        </div>
+    `;
+}
 
-    if (select.value === '__nuevo__') {
-        wrapNuevo.style.display = 'block';
-        display.style.display = 'none';
-    } else {
-        wrapNuevo.style.display = 'none';
-        const item = (state.catalogoDoloresNecesidades || []).find(d => String(d.nombre) === select.value);
-        display.textContent = item ? (item.descripcion || '') : '';
-        display.style.display = (item && item.descripcion) ? 'block' : 'none';
+function onCambioSelectorPerfilamiento(cfg) {
+    const select = document.getElementById(cfg.selectId);
+    const display = document.getElementById(cfg.selectId + 'Descripcion');
+    if (!select || !display) return;
+
+    if (cfg.permiteAgregarNuevo) {
+        const wrapNuevo = document.getElementById(cfg.selectId + 'NuevoWrap');
+        const errorEl = document.getElementById(cfg.selectId + 'NuevoError');
+        if (errorEl) errorEl.style.display = 'none';
+
+        if (select.value === '__nuevo__') {
+            if (wrapNuevo) wrapNuevo.style.display = 'block';
+            display.style.display = 'none';
+            return;
+        }
+        if (wrapNuevo) wrapNuevo.style.display = 'none';
     }
+
+    const item = (state[cfg.stateKey] || []).find(d => String(d.nombre) === select.value);
+    display.textContent = item ? (item.descripcion || '') : '';
+    display.style.display = (item && item.descripcion) ? 'block' : 'none';
 }
 
 async function guardarPerfilamiento(idPrometeo) {
     const getVal = id => { const el = document.getElementById(id); return el ? el.value : ''; };
-
-    // Dolor / Necesidad: si está en modo "agregar nueva", valida nombre (máx. 5 palabras) y descripción
-    const selectDolor = document.getElementById('selectDolorNecesidad');
-    let dolorNecesidadValor = '';
+    const data = {};
     let dolorDescripcionNueva = '';
 
-    if (selectDolor) {
-        if (selectDolor.value === '__nuevo__') {
-            dolorNecesidadValor = getVal('inputDolorNuevoNombre').trim();
-            dolorDescripcionNueva = getVal('inputDolorNuevaDescripcion').trim();
-            const errorEl = document.getElementById('dolorNuevoError');
+    for (const cfg of CAMPOS_SELECT_PERFILAMIENTO) {
+        if (cfg.permiteMultiple) {
+            const marcados = Array.from(document.querySelectorAll(`.checklist-${cfg.selectId}:checked`)).map(el => el.value);
+            data[cfg.columna] = marcados.join(', ');
+            continue;
+        }
 
-            const mostrarErrorDolor = (msg) => {
-                if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'inline'; }
-            };
+        const select = document.getElementById(cfg.selectId);
+        if (!select) continue;
 
-            if (!dolorNecesidadValor || !dolorDescripcionNueva) {
-                mostrarErrorDolor('Completa el nombre y la descripción del nuevo Dolor/Necesidad.');
+        if (cfg.permiteAgregarNuevo && select.value === '__nuevo__') {
+            const nombre = getVal(cfg.selectId + 'NuevoNombre').trim();
+            const descripcion = getVal(cfg.selectId + 'NuevaDescripcion').trim();
+            const errorEl = document.getElementById(cfg.selectId + 'NuevoError');
+            const mostrarError = (msg) => { if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'inline'; } };
+
+            if (!nombre || !descripcion) {
+                mostrarError('Completa el nombre y la descripción del nuevo Dolor/Necesidad.');
                 return;
             }
-            if (dolorNecesidadValor.split(/\s+/).filter(Boolean).length > 5) {
-                mostrarErrorDolor('El nombre debe tener máximo 5 palabras.');
+            if (nombre.split(/\s+/).filter(Boolean).length > 5) {
+                mostrarError('El nombre debe tener máximo 5 palabras.');
                 return;
             }
+            data[cfg.columna] = nombre;
+            dolorDescripcionNueva = descripcion;
         } else {
-            dolorNecesidadValor = selectDolor.value;
+            data[cfg.columna] = select.value;
         }
     }
 
-    const data = {
-        [COLUMNAS.POR_QUE_ELIGIO_CARRERA]: getVal('inputPorQueEligio'),
-        [COLUMNAS.QUE_BUSCA_UNIVERSIDAD]: getVal('inputQueBusca'),
-        [COLUMNAS.QUIEN_FINANCIARA]: getVal('inputQuienFinancia'),
-        [COLUMNAS.QUE_LE_FALTA]: getVal('inputQueLeFalta'),
-        [COLUMNAS.OTRAS_OPCIONES]: getVal('inputOtrasOpciones'),
-        [COLUMNAS.COMENTARIOS_PERFIL]: getVal('inputComentariosPerfil'),
-        [COLUMNAS.DOLOR_NECESIDAD]: dolorNecesidadValor,
-        [COLUMNAS.FECHA_ULT_MODIFICACION]: new Date().toISOString()
-    };
     if (dolorDescripcionNueva) data['DOLOR_DESCRIPCION_NUEVA'] = dolorDescripcionNueva;
+
+    if (data[COLUMNAS.OTRAS_OPCIONES] === VALOR_OTRAS_OPCIONES_INSTITUCION) {
+        data[COLUMNAS.OPCION_INSTITUCION] = getVal('selectOpcionInstitucionTipo');
+        data[COLUMNAS.OPCION_NOMBRE_INSTITUCION] = getVal('selectOpcionInstitucionNombre').trim();
+    } else {
+        // El asesor cambió de opción: se limpian para no dejar datos huérfanos
+        data[COLUMNAS.OPCION_INSTITUCION] = '';
+        data[COLUMNAS.OPCION_NOMBRE_INSTITUCION] = '';
+    }
+
+    data[COLUMNAS.COMENTARIOS_PERFIL] = getVal('inputComentariosPerfil');
+    data[COLUMNAS.FECHA_ULT_MODIFICACION] = new Date().toISOString();
 
     const acciones = document.getElementById('inputAccionesDefinidas');
     if (acciones) data[COLUMNAS.ACCIONES_DEFINIDAS] = acciones.value;
@@ -1590,14 +1710,11 @@ async function guardarPerfilamiento(idPrometeo) {
     mostrarOverlay(true);
     try {
         const result = await callAPI('saveBottom', {
-            idPrometeo: idPrometeo,
-            campana: state.campana,
-            data: data,
-            asesorEmail: asesorPropietario
+            idPrometeo, campana: state.campana, data, asesorEmail: asesorPropietario
         });
 
         if (result.success) {
-            if (dolorDescripcionNueva) await actualizarCatalogoDolor();
+            if (dolorDescripcionNueva) await actualizarCatalogosPerfilamiento();
             Object.assign(state.lead, data);
             sincronizarCache();
             document.getElementById('perfilGuardadoMsg').innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">check_circle</span> Guardado correctamente';

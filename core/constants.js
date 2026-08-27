@@ -57,6 +57,8 @@ export const COLUMNAS = {
     QUIEN_FINANCIARA: 'QUIEN_FINANCIARA',
     QUE_LE_FALTA: 'QUE_LE_FALTA',
     OTRAS_OPCIONES: 'OTRAS_OPCIONES',
+    OPCION_INSTITUCION: 'OPCION_INSTITUCION',
+    OPCION_NOMBRE_INSTITUCION: 'OPCION_NOMBRE_INSTITUCION',
     COMENTARIOS_PERFIL: 'COMENTARIOS_PERFIL',
     ACCIONES_DEFINIDAS: 'ACCIONES_DEFINIDAS',
 
@@ -173,5 +175,10 @@ export const CACHE_KEYS = {
     BENEFICIOS: 'bl_beneficios',
     INSTITUCIONES_PROCEDENCIA: 'bl_instituciones_procedencia',
     CARRERAS_PROCEDENCIA: 'bl_carreras_procedencia',
-    DOLORES_NECESIDADES: 'bl_dolores_necesidades',
+    CATALOGO_DOLOR_NECESIDAD: 'bl_dolores_necesidades',
+    CATALOGO_POR_QUE_ELIGIO_CARRERA: 'bl_catalogo_por_que_eligio_carrera',
+    CATALOGO_QUE_BUSCA_UNIVERSIDAD: 'bl_catalogo_que_busca_universidad',
+    CATALOGO_QUIEN_FINANCIARA: 'bl_catalogo_quien_financiara',
+    CATALOGO_QUE_LE_FALTA: 'bl_catalogo_que_le_falta',
+    CATALOGO_OTRAS_OPCIONES: 'bl_catalogo_otras_opciones',
 };

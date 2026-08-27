@@ -10,7 +10,7 @@ const CAMPOS_BOTTOM_EDITABLES = [
   'numero_cuotas', 'metodo_pago',
   'por_que_eligio_carrera', 'que_busca_universidad', 'quien_financiara',
   'acciones_definidas', 'que_le_falta', 'otras_opciones', 'comentarios_perfil',
-  'dolor_necesidad',
+  'dolor_necesidad', 'opcion_institucion', 'opcion_nombre_institucion',
   // Montos y aprobación (columnas nuevas de bottom{campaña})
   'descuento_matricula', 'matricula_final',
   'descuento_admision', 'admision_final', 'rinde_examen_suficiencia',
@@ -22,7 +22,7 @@ const CAMPOS_BOTTOM_EDITABLES = [
 const CAMPOS_PERFIL = [
   'por_que_eligio_carrera', 'que_busca_universidad', 'quien_financiara',
   'acciones_definidas', 'que_le_falta', 'otras_opciones', 'comentarios_perfil',
-  'dolor_necesidad',
+  'dolor_necesidad', 'opcion_institucion', 'opcion_nombre_institucion',
 ] as const;
 
 function esRolSupervisorOAdmision(rol: string) {
@@ -48,7 +48,6 @@ export async function saveBottom(client: Client, body: JsonBody) {
 
   const data = body.data || {};
 
-  // Igual que validarTipoInstitucionProcedencia() real.
   if (data.TIPO_INSTITUCION_PROCEDENCIA !== undefined && String(data.TIPO_INSTITUCION_PROCEDENCIA).trim() !== '') {
     const valor = String(data.TIPO_INSTITUCION_PROCEDENCIA).trim().toUpperCase();
     if (valor !== 'UNIVERSIDAD' && valor !== 'INSTITUTO') {
@@ -57,7 +56,6 @@ export async function saveBottom(client: Client, body: JsonBody) {
     data.TIPO_INSTITUCION_PROCEDENCIA = valor;
   }
 
-  // Igual que upsertInstitucionProcedencia()/upsertCarreraProcedencia().
   if (data.INSTITUCION_PROCEDENCIA !== undefined && String(data.INSTITUCION_PROCEDENCIA).trim() !== '') {
     const nombreNorm = normalizarCatalogo(String(data.INSTITUCION_PROCEDENCIA));
     await client.query(
@@ -76,13 +74,25 @@ export async function saveBottom(client: Client, body: JsonBody) {
     data.CARRERA_PROCEDENCIA = nombreNorm;
   }
 
-  // Igual que upsertDolorNecesidad(): si ya existe en el catálogo, se reusa
-  // tal cual; si es nuevo, exige descripción y máximo 5 palabras.
+  // Institución de "Otras opciones" del Perfilamiento (independiente de
+  // TIPO_INSTITUCION_PROCEDENCIA/INSTITUCION_PROCEDENCIA de traslados,
+  // pero comparten el mismo catálogo).
+  if (data.OPCION_NOMBRE_INSTITUCION !== undefined && String(data.OPCION_NOMBRE_INSTITUCION).trim() !== '') {
+    const nombreNorm = normalizarCatalogo(String(data.OPCION_NOMBRE_INSTITUCION));
+    await client.query(
+      `insert into catalogo_instituciones_procedencia (nombre, tipo) values ($1, $2)
+       on conflict (nombre) do nothing`,
+      [nombreNorm, data.OPCION_INSTITUCION || '']
+    );
+    data.OPCION_NOMBRE_INSTITUCION = nombreNorm;
+  }
+
   if (data.DOLOR_NECESIDAD !== undefined && String(data.DOLOR_NECESIDAD).trim() !== '') {
     const nombreNorm = normalizarCatalogo(String(data.DOLOR_NECESIDAD));
-    const existente = await client.query(`select nombre from catalogo_dolor_necesidad where nombre = $1`, [
-      nombreNorm,
-    ]);
+    const existente = await client.query(
+      `select nombre from catalogo_perfilamiento where tipo = 'dolor_necesidad' and nombre = $1`,
+      [nombreNorm]
+    );
     if (existente.rows.length === 0) {
       const cantidadPalabras = nombreNorm.split(/\s+/).filter(Boolean).length;
       if (cantidadPalabras > 5) {
@@ -92,10 +102,10 @@ export async function saveBottom(client: Client, body: JsonBody) {
       if (!descripcionNueva) {
         return jsonError('Debes indicar una descripción para el nuevo Dolor/Necesidad.');
       }
-      await client.query(`insert into catalogo_dolor_necesidad (nombre, descripcion) values ($1, $2)`, [
-        nombreNorm,
-        descripcionNueva,
-      ]);
+      await client.query(
+        `insert into catalogo_perfilamiento (tipo, nombre, descripcion) values ('dolor_necesidad', $1, $2)`,
+        [nombreNorm, descripcionNueva]
+      );
     }
     data.DOLOR_NECESIDAD = nombreNorm;
   }
