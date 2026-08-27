@@ -831,29 +831,13 @@ function filasCatalogoFiltradas(catalogo, tipoIngreso, referencia) {
     if (isNaN(ref)) return [];
 
     const filasTipo = (catalogo || []).filter(fila => normalizarTexto(fila.TIPO_INGRESO || '') === tipoNorm);
-    const rangosOrdenados = rangosUnicosOrdenados(filasTipo);
-
-    const indiceMatch = encontrarIndiceRango(rangosOrdenados, ref);
-    if (indiceMatch === -1) return [];
-
-    // Cualquier rango cuyo [MIN, MAX] contenga realmente la referencia debe
-    // incluirse siempre (ej. un catch-all 0-900 que convive con un tramo fino
-    // 0-500: ambos contienen 400 y ambos deben aparecer). Antes esto dependía
-    // de que el rango cayera dentro de una ventana fija de 3 posiciones en la
-    // lista ordenada por MAX, lo cual fallaba en cuanto había tramos finos de
-    // por medio que empujaban al catch-all fuera de esa ventana.
-    const rangosQueContienenRef = rangosOrdenados.filter(r => ref >= r.min && ref <= r.max);
-
-    // Se conserva además el comportamiento existente de mostrar hasta 2
-    // tramos superiores como opciones cercanas de escalamiento, aunque esos
-    // tramos no contengan la referencia.
-    const rangosEscalamiento = rangosOrdenados.slice(indiceMatch, indiceMatch + 3);
-
-    const maxesPermitidos = new Set([...rangosQueContienenRef, ...rangosEscalamiento].map(r => r.max));
 
     return filasTipo.filter(fila => {
+        const min = parseNumero(fila.BOLETA_PROCEDENCIA_MIN);
         const max = parseNumero(fila.BOLETA_PROCEDENCIA_MAX);
-        return maxesPermitidos.has(max);
+
+        return !isNaN(min) && !isNaN(max) &&
+            ref >= min && ref <= max;
     });
 }
 
