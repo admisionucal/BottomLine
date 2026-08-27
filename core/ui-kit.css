@@ -755,14 +755,38 @@ table tbody tr:hover { background: #fafbff; }
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
-.dup-icon {
-    display: none;
+/* Popup de duplicados sugeridos */
+.dup-table th { text-align: center; }
+.dup-select-cell { text-align: center; }
+
+.dup-sel-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-left: 6px;
-    color: var(--color-danger);
-    cursor: pointer;
-    vertical-align: middle;
+    color: #ccc;
+    transition: color 0.15s ease, opacity 0.15s ease;
 }
-.dup-icon .material-symbols-outlined { font-size: 16px; }
-.dup-icon:hover { color: #b71c1c; }
+.dup-sel-btn .material-symbols-outlined { font-size: 20px; }
+.dup-sel-btn:hover { opacity: 0.75; }
+.dup-sel-principal.is-active { color: #2e7d32; }
+.dup-sel-secundario.is-active { color: var(--color-danger); }
+
+.dup-modal-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 14px;
+}
+
+.badge-estado {
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.badge-estado.activo { background: #c8e6c9; color: #1b5e20; }
+.badge-estado.huerfano { background: #ffe0b2; color: #bf360c; }

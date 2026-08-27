@@ -1107,26 +1107,36 @@ function abrirPopupDuplicados(sol, dups) {
     ];
     const filas = candidatos.map((c, i) => `
         <tr>
-            <td><input type="radio" name="dupPrincipal" value="${i}" ${c.activo ? 'checked' : ''}></td>
-            <td><input type="checkbox" class="dupSecundarioChk" value="${i}" ${!c.activo ? 'checked' : ''}></td>
+            <td class="dup-select-cell">
+                <button type="button" class="dup-sel-btn dup-sel-principal ${c.activo ? 'is-active' : ''}" data-idx="${i}" title="Marcar como principal">
+                    <span class="material-symbols-outlined">check_circle</span>
+                </button>
+                <button type="button" class="dup-sel-btn dup-sel-secundario ${!c.activo ? 'is-active' : ''}" data-idx="${i}" title="Marcar para fusionar">
+                    <span class="material-symbols-outlined">cancel</span>
+                </button>
+            </td>
             <td><strong>${escapeHtml(c.id)}</strong></td>
             <td>${escapeHtml(c.campana)}</td>
             <td>${escapeHtml(c.nombre)}</td>
+            <td><span class="badge-estado ${c.activo ? 'activo' : 'huerfano'}">${c.activo ? 'Activo (base)' : 'Huérfano'}</span></td>
         </tr>`).join('');
 
     document.body.insertAdjacentHTML('beforeend', `
         <div class="cal-modal-overlay cal-modal-overlay-top" id="dupModal">
             <div class="cal-modal" onclick="event.stopPropagation()" style="max-width:700px;">
                 <div class="cal-modal-header">
-                    <strong>Posibles duplicados de ${escapeHtml(sol.ID_PROMETEO)}</strong>
+                    <strong>Unificar posibles duplicados de ${escapeHtml(sol.ID_PROMETEO)}</strong>
                     <button class="cal-modal-close" id="dupModalCloseBtn"><span class="material-symbols-outlined">close</span></button>
                 </div>
                 <div class="cal-modal-body">
-                    <p style="font-size:12px;color:#888;">Elige el <b>Principal</b> (queda activo) y marca los que se fusionan.</p>
-                    <table><thead><tr><th>Principal</th><th>Fusionar</th><th>ID</th><th>Campaña</th><th>Nombre</th></tr></thead>
-                    <tbody>${filas}</tbody></table>
+                    <table class="dup-table">
+                        <thead><tr><th></th><th>ID</th><th>Campaña</th><th>Nombre</th><th>Estado</th></tr></thead>
+                        <tbody>${filas}</tbody>
+                    </table>
                     <div id="dupModalError"></div>
-                    <button class="btn-unificar-final" id="dupModalConfirmarBtn" style="margin-top:14px;">Unificar seleccionados</button>
+                    <div class="dup-modal-actions">
+                        <button class="btn-unificar-final" id="dupModalConfirmarBtn">Unificar seleccionados</button>
+                    </div>
                 </div>
             </div>
         </div>`);
@@ -1134,15 +1144,32 @@ function abrirPopupDuplicados(sol, dups) {
     const overlay = document.getElementById('dupModal');
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
     document.getElementById('dupModalCloseBtn').addEventListener('click', () => overlay.remove());
+
+    overlay.querySelectorAll('.dup-sel-principal').forEach(btn => {
+        btn.addEventListener('click', () => {
+            overlay.querySelectorAll('.dup-sel-principal').forEach(b => b.classList.remove('is-active'));
+            btn.classList.add('is-active');
+            overlay.querySelector(`.dup-sel-secundario[data-idx="${btn.dataset.idx}"]`)?.classList.remove('is-active');
+        });
+    });
+    overlay.querySelectorAll('.dup-sel-secundario').forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.classList.toggle('is-active');
+            if (btn.classList.contains('is-active')) {
+                overlay.querySelector(`.dup-sel-principal[data-idx="${btn.dataset.idx}"]`)?.classList.remove('is-active');
+            }
+        });
+    });
+
     document.getElementById('dupModalConfirmarBtn').addEventListener('click', () => confirmarUnificacionDesdePopup(candidatos));
 }
 
 async function confirmarUnificacionDesdePopup(candidatos) {
     const overlay = document.getElementById('dupModal');
     const errorDiv = document.getElementById('dupModalError');
-    const idxPrincipal = Number(overlay.querySelector('input[name="dupPrincipal"]:checked')?.value);
-    const secundarios = Array.from(overlay.querySelectorAll('.dupSecundarioChk:checked'))
-        .map(c => Number(c.value)).filter(i => i !== idxPrincipal);
+    const idxPrincipal = Number(overlay.querySelector('.dup-sel-principal.is-active')?.dataset.idx);
+    const secundarios = Array.from(overlay.querySelectorAll('.dup-sel-secundario.is-active'))
+        .map(b => Number(b.dataset.idx));
 
     if (isNaN(idxPrincipal)) { errorDiv.innerHTML = '<div class="error-validacion">Selecciona un Principal.</div>'; return; }
     if (secundarios.length === 0) { errorDiv.innerHTML = '<div class="error-validacion">Selecciona al menos uno para fusionar.</div>'; return; }
