@@ -817,42 +817,49 @@ function filasCatalogoFiltradas(catalogo, tipoIngreso, referencia) {
 
     const rangosOrdenados = rangosUnicosOrdenados(filasTipo);
 
-    // El monto original puede pertenecer a varios rangos
+    // Todos los rangos donde cae el monto original
     const indicesMatch = encontrarIndicesRango(rangosOrdenados, ref);
 
     if (indicesMatch.length === 0) return [];
 
-    const indiceRangoMaximo = Math.max(...indicesMatch);
-    const maximoRangoOriginal = rangosOrdenados[indiceRangoMaximo].max;
+    const maximoRangoOriginal = Math.max(
+        ...indicesMatch.map(i => rangosOrdenados[i].max)
+    );
 
-    // Ordinario sube 200; los demás suben 100
+    // Ordinario +200, los demás +100
     const esOrdinario = tipoNorm === normalizarTexto('Ordinario');
     const incremento = esOrdinario ? 200 : 100;
 
     const montoBusqueda = maximoRangoOriginal + incremento;
+
+    // Todos los rangos donde cae el nuevo monto
     const indicesSubida = encontrarIndicesRango(
         rangosOrdenados,
         montoBusqueda
     );
 
-    const indiceMasAltoSubida = indicesSubida.length
-        ? Math.max(...indicesSubida)
-        : rangosOrdenados.length - 1;
-    const indiceInicial = Math.min(...indicesMatch);
-    const indiceFinal = Math.max(
-        indiceMasAltoSubida,
-        indiceRangoMaximo
+    const minRangoOriginal = Math.min(
+        ...indicesMatch.map(i => rangosOrdenados[i].min)
     );
 
-    const rangosIncluidos = rangosOrdenados.slice(
-        indiceInicial,
-        indiceFinal + 1
-    );
+    const maxRangoFinal = indicesSubida.length
+        ? Math.max(...indicesSubida.map(i => rangosOrdenados[i].max))
+        : maximoRangoOriginal + incremento;
+
+    const rangosIncluidos = rangosOrdenados.filter(rango => {
+        return rango.max >= minRangoOriginal &&
+               rango.min <= maxRangoFinal;
+    });
 
     return filasTipo.filter(fila => {
+        const min = parseNumero(fila.BOLETA_PROCEDENCIA_MIN);
         const max = parseNumero(fila.BOLETA_PROCEDENCIA_MAX);
 
-        return rangosIncluidos.some(r => r.max === max);
+        if (isNaN(min) || isNaN(max)) return false;
+
+        return rangosIncluidos.some(r =>
+            r.min === min && r.max === max
+        );
     });
 }
 
