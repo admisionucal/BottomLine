@@ -3,16 +3,15 @@
 // ================================================================
 
 import { API_URL, esRolSupervisorOAdmision, COLUMNAS, CACHE_KEYS, BCC_DEFAULT_CC, SELECT_OPTIONS } from '../core/constants.js';
-
 import {
     getCurrentUser, getUserCampanas, getSessionToken,
     cacheGet, cacheSet, cacheRemove,
     escapeHtml, formatearFecha, getEspecializacionETU
 } from '../core/utils.js';
-
 import { Sidebar, renderTable, Toast, createMultiSelect } from '../core/components.js';
-
 import { construirDatosCC, renderPlantillaCC, renderPlantillaCCPreview, detectarTipoReferido, precargarLogoCC } from './cc-template.js';
+import { buscarDuplicados } from './duplicados-sugeridos.js';
+import { unificarLeads } from './unificar-core.js';
 
 // PDFs servidos como assets estáticos del proyecto (carpeta assets/), con
 // el nombre real del archivo tal como se guarda cada semestre — incluye el
@@ -274,7 +273,10 @@ function renderTablaCC() {
     const rows = pageItems.map(sol => {
         const estado = ESTADO_INFO[sol.STATUS] || ESTADO_INFO.PENDIENTE;
         return [
-            `<a href="#" class="id-link" onclick="window.irADetalleCC && window.irADetalleCC('${escapeHtml(sol.ID_SOLICITUD)}'); return false;"><strong>${escapeHtml(sol.ID_PROMETEO || '')}</strong></a>`,
+            `<a href="#" class="id-link" onclick="window.irADetalleCC && window.irADetalleCC('${escapeHtml(sol.ID_SOLICITUD)}'); return false;"><strong>${escapeHtml(sol.ID_PROMETEO || '')}</strong></a>
+            <span class="dup-icon" id="dupIcon_${escapeHtml(sol.ID_SOLICITUD)}" title="Posibles duplicados">
+                <span class="material-symbols-outlined">warning</span>
+            </span>`,
             escapeHtml(sol.NOMBRE_LEAD || 'Sin nombre'),
             escapeHtml(sol.CARRERA_LEAD || '-'),
             escapeHtml(sol.ASESOR_NOMBRE || sol.ASESOR_EMAIL || '-'),
@@ -285,6 +287,7 @@ function renderTablaCC() {
     });
 
     renderTable('tablaCCWrap', headers, rows);
+    revisarDuplicadosVisibles(pageItems);
     renderPaginacionCC(totalPages);
 
     // window.irADetalleCC se registra una sola vez más abajo (fuera de este
@@ -1077,5 +1080,95 @@ async function callAPI(action, data = {}) {
         return JSON.parse(raw);
     } catch (error) {
         return { success: false, error: error.message };
+    }
+}
+
+async function revisarDuplicadosVisibles(items) {
+    await Promise.all(items.map(async sol => {
+        const dups = await buscarDuplicados({ idPrometeo: sol.ID_PROMETEO, celular: sol.CELULAR_LEAD });
+        if (dups.length === 0) return;
+        const icon = document.getElementById(`dupIcon_${sol.ID_SOLICITUD}`);
+        if (!icon) return;
+        icon.style.display = 'inline-flex';
+        icon.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            abrirPopupDuplicados(sol, dups);
+        });
+    }));
+}
+
+function abrirPopupDuplicados(sol, dups) {
+    const candidatos = [
+        { id: sol.ID_PROMETEO, campana: sol.CAMPANA, nombre: sol.NOMBRE_LEAD, activo: true },
+        ...dups.map(d => ({
+            id: d[COLUMNAS.ID_PROMETEO], campana: d.CAMPANA || '',
+            nombre: d[COLUMNAS.NOMBRES] || 'Sin Nombre', activo: !!d.activo
+        }))
+    ];
+    const filas = candidatos.map((c, i) => `
+        <tr>
+            <td><input type="radio" name="dupPrincipal" value="${i}" ${c.activo ? 'checked' : ''}></td>
+            <td><input type="checkbox" class="dupSecundarioChk" value="${i}" ${!c.activo ? 'checked' : ''}></td>
+            <td><strong>${escapeHtml(c.id)}</strong></td>
+            <td>${escapeHtml(c.campana)}</td>
+            <td>${escapeHtml(c.nombre)}</td>
+        </tr>`).join('');
+
+    document.body.insertAdjacentHTML('beforeend', `
+        <div class="cal-modal-overlay cal-modal-overlay-top" id="dupModal">
+            <div class="cal-modal" onclick="event.stopPropagation()" style="max-width:700px;">
+                <div class="cal-modal-header">
+                    <strong>Posibles duplicados de ${escapeHtml(sol.ID_PROMETEO)}</strong>
+                    <button class="cal-modal-close" id="dupModalCloseBtn"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="cal-modal-body">
+                    <p style="font-size:12px;color:#888;">Elige el <b>Principal</b> (queda activo) y marca los que se fusionan.</p>
+                    <table><thead><tr><th>Principal</th><th>Fusionar</th><th>ID</th><th>Campaña</th><th>Nombre</th></tr></thead>
+                    <tbody>${filas}</tbody></table>
+                    <div id="dupModalError"></div>
+                    <button class="btn-unificar-final" id="dupModalConfirmarBtn" style="margin-top:14px;">Unificar seleccionados</button>
+                </div>
+            </div>
+        </div>`);
+
+    const overlay = document.getElementById('dupModal');
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.getElementById('dupModalCloseBtn').addEventListener('click', () => overlay.remove());
+    document.getElementById('dupModalConfirmarBtn').addEventListener('click', () => confirmarUnificacionDesdePopup(candidatos));
+}
+
+async function confirmarUnificacionDesdePopup(candidatos) {
+    const overlay = document.getElementById('dupModal');
+    const errorDiv = document.getElementById('dupModalError');
+    const idxPrincipal = Number(overlay.querySelector('input[name="dupPrincipal"]:checked')?.value);
+    const secundarios = Array.from(overlay.querySelectorAll('.dupSecundarioChk:checked'))
+        .map(c => Number(c.value)).filter(i => i !== idxPrincipal);
+
+    if (isNaN(idxPrincipal)) { errorDiv.innerHTML = '<div class="error-validacion">Selecciona un Principal.</div>'; return; }
+    if (secundarios.length === 0) { errorDiv.innerHTML = '<div class="error-validacion">Selecciona al menos uno para fusionar.</div>'; return; }
+
+    const principal = candidatos[idxPrincipal];
+    const listaSecundarios = secundarios.map(i => candidatos[i]);
+    if (!confirm(`¿Unificar?\n\nPrincipal: ${principal.id} (${principal.campana})\nSe fusionará: ${listaSecundarios.map(s => s.id).join(', ')}`)) return;
+
+    const btn = document.getElementById('dupModalConfirmarBtn');
+    btn.disabled = true;
+    const result = await unificarLeads({
+        idPrincipal: principal.id,
+        campanaPrincipal: principal.campana,
+        idsSecundarios: listaSecundarios.map(s => ({ id: s.id, campana: s.campana })),
+        datosPredominantes: { historial: 'ambos' },
+        adminEmail: getCurrentUser().email
+    });
+
+    if (result.success) {
+        new Toast().show('Unificación completada', 'ok');
+        overlay.remove();
+        cargarSolicitudesCC(true);
+    } else if (!result.cancelado) {
+        errorDiv.innerHTML = `<div class="error-validacion">${escapeHtml(result.error || 'Error al unificar')}</div>`;
+        btn.disabled = false;
+    } else {
+        btn.disabled = false;
     }
 }

@@ -170,6 +170,21 @@ html, body {
     opacity: 0;
     transition: opacity 0.15s ease;
 }
+.sidebar-footer-initials {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.sidebar:not(.expanded) .sidebar-footer-initials { display: flex; }
+.sidebar.expanded .sidebar-footer-initials { display: none; }
 .sidebar.expanded .sidebar-footer-info { opacity: 1; }
 .sidebar-footer-name {
     font-size: 13px;
@@ -740,3 +755,14 @@ table tbody tr:hover { background: #fafbff; }
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
+.dup-icon {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    color: var(--color-danger);
+    cursor: pointer;
+    vertical-align: middle;
+}
+.dup-icon .material-symbols-outlined { font-size: 16px; }
+.dup-icon:hover { color: #b71c1c; }

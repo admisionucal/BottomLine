@@ -3,16 +3,13 @@
 // ================================================================
 
 import {
-    API_URL, COLUMNAS, CACHE_KEYS, esRolSupervisorOAdmision
+    COLUMNAS, esRolSupervisorOAdmision
 } from '../core/constants.js';
-
 import {
-    getCurrentUser, getUserCampanas, getSessionToken,
-    cacheGet, cacheSet,
-    escapeHtml
+    getCurrentUser, getUserCampanas, escapeHtml
 } from '../core/utils.js';
-
 import { Sidebar, Toast } from '../core/components.js';
+import { buscarLeads, unificarLeads } from './unificar-core.js';
 
 // ===== ESTADO =====
 const state = {
@@ -119,20 +116,9 @@ async function buscar() {
             state.campana = campana; // campaña por defecto de esta búsqueda
         }
 
-        const result = await callAPI('searchLeads', payload);
+        const data = await buscarLeads(payload);
+        state.resultados = data.map(r => ({ ...r, CAMPANA: r.CAMPANA || campana }));
 
-        if (!result || !result.success) {
-            empty.textContent = 'Error: ' + (result?.error || 'No se pudo completar la búsqueda');
-            return;
-        }
-
-        // Cada resultado ya trae su propia CAMPANA (viene del backend).
-        // Si por algún motivo no viniera (compatibilidad con una versión
-        // vieja del backend), se le asigna la campaña seleccionada en el filtro.
-        state.resultados = (result.data || []).map(r => ({
-            ...r,
-            CAMPANA: r.CAMPANA || campana
-        }));
         renderResultados();
     } catch (e) {
         empty.textContent = 'Error de conexión: ' + e.message;
@@ -287,25 +273,17 @@ async function unificar() {
     }
 
     try {
-        const payload = {
+        const result = await unificarLeads({
             idPrincipal: activo.id,
             campanaPrincipal: activo.campana,
             idsSecundarios: huerfanos.map(h => ({ id: h.id, campana: h.campana })),
-            datosPredominantes: datosPredominantes,
+            datosPredominantes,
             adminEmail: user.email
-        };
+        });
 
-        let result = await callAPI('unifyIds', payload);
-
-        // El backend puede pedir confirmación extra si algún secundario
-        // tiene pagos registrados en leads_pagos.
-        if (result && result.requiereConfirmacion) {
-            const seguir = confirm(result.error + '\n\n¿Deseas continuar de todas formas?');
-            if (!seguir) {
-                alert('Unificación cancelada.');
-                return;
-            }
-            result = await callAPI('unifyIds', { ...payload, confirmado: true });
+        // Si el usuario canceló ahí, no mostramos error.
+        if (result.cancelado) {
+            return;
         }
 
         if (result.success) {
@@ -326,21 +304,5 @@ async function unificar() {
             btn.disabled = false;
             btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">link</span> Unificar seleccionados';
         }
-    }
-}
-
-// ===== API =====
-async function callAPI(action, data = {}) {
-    const payload = { action, sessionToken: getSessionToken(), ...data };
-    try {
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify(payload)
-        });
-        const raw = await response.text();
-        return JSON.parse(raw);
-    } catch (error) {
-        return { success: false, error: error.message };
     }
 }

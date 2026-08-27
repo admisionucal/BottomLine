@@ -18,6 +18,8 @@ import {
 } from '../core/utils.js';
 
 import { Sidebar, Toast, Modal, createMultiSelect, sortTable, toggleMultiSelect, renderTable } from '../core/components.js';
+import { buscarDuplicados } from './duplicados-sugeridos.js';
+import { unificarLeads } from './unificar-core.js';
 
 // ===== ESTADO =====
 let state = {
@@ -557,7 +559,10 @@ function renderTabla() {
 
         const row = [
             bottomLabel,
-            `<a href="#" class="id-link" onclick="window.verDetalle('${escapeHtml(id)}')"><strong>${escapeHtml(id)}</strong></a>`
+            `<a href="#" class="id-link" onclick="window.verDetalle('${escapeHtml(id)}')"><strong>${escapeHtml(id)}</strong></a>
+            <span class="dup-icon" id="dupIcon_${escapeHtml(id)}" title="Posibles duplicados">
+                <span class="material-symbols-outlined">warning</span>
+            </span>`
         ];
         if (esAdmin) row.push(escapeHtml(asesor));
         row.push(escapeHtml(nombre), escapeHtml(carrera), escapeHtml(beneficio), escapeHtml(beneficioAdicional));
@@ -565,6 +570,7 @@ function renderTabla() {
     });
 
     renderTable('tableContainer', headers, rows);
+    revisarDuplicadosVisibles(pageLeads);
 
     // Sobrescribir evento de clic en ID para usar nuestra función
     container.querySelectorAll('.id-link').forEach(el => {
@@ -587,6 +593,103 @@ function verDetalle(id) {
 }
 
 window.verDetalle = verDetalle;
+
+async function revisarDuplicadosVisibles(leads) {
+    await Promise.all(leads.map(async lead => {
+        const id = lead[COLUMNAS.ID_PROMETEO];
+        if (!id) return;
+        const dups = await buscarDuplicados({
+            idPrometeo: id,
+            dni: lead[COLUMNAS.DNI],
+            celular: lead[COLUMNAS.TELEFONO_2]
+        });
+        if (dups.length === 0) return;
+        const icon = document.getElementById(`dupIcon_${id}`);
+        if (!icon) return;
+        icon.style.display = 'inline-flex';
+        icon.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            abrirPopupDuplicadosDashboard(lead, dups);
+        });
+    }));
+}
+
+function abrirPopupDuplicadosDashboard(lead, dups) {
+    const campanaActual = document.getElementById('selectCampana')?.value || state.campana;
+    const candidatos = [
+        { id: lead[COLUMNAS.ID_PROMETEO], campana: campanaActual, nombre: lead[COLUMNAS.NOMBRES], activo: true },
+        ...dups.map(d => ({
+            id: d[COLUMNAS.ID_PROMETEO], campana: d.CAMPANA || '',
+            nombre: d[COLUMNAS.NOMBRES] || 'Sin Nombre', activo: !!d.activo
+        }))
+    ];
+    const filas = candidatos.map((c, i) => `
+        <tr>
+            <td><input type="radio" name="dupPrincipal" value="${i}" ${c.activo ? 'checked' : ''}></td>
+            <td><input type="checkbox" class="dupSecundarioChk" value="${i}" ${!c.activo ? 'checked' : ''}></td>
+            <td><strong>${escapeHtml(c.id)}</strong></td>
+            <td>${escapeHtml(c.campana)}</td>
+            <td>${escapeHtml(c.nombre)}</td>
+        </tr>`).join('');
+
+    document.body.insertAdjacentHTML('beforeend', `
+        <div class="cal-modal-overlay cal-modal-overlay-top" id="dupModal">
+            <div class="cal-modal" onclick="event.stopPropagation()" style="max-width:700px;">
+                <div class="cal-modal-header">
+                    <strong>Posibles duplicados de ${escapeHtml(lead[COLUMNAS.ID_PROMETEO])}</strong>
+                    <button class="cal-modal-close" id="dupModalCloseBtn"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="cal-modal-body">
+                    <p style="font-size:12px;color:#888;">Elige el <b>Principal</b> (queda activo) y marca los que se fusionan.</p>
+                    <table><thead><tr><th>Principal</th><th>Fusionar</th><th>ID</th><th>Campaña</th><th>Nombre</th></tr></thead>
+                    <tbody>${filas}</tbody></table>
+                    <div id="dupModalError"></div>
+                    <button class="btn-unificar-final" id="dupModalConfirmarBtn" style="margin-top:14px;">Unificar seleccionados</button>
+                </div>
+            </div>
+        </div>`);
+
+    const overlay = document.getElementById('dupModal');
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.getElementById('dupModalCloseBtn').addEventListener('click', () => overlay.remove());
+    document.getElementById('dupModalConfirmarBtn').addEventListener('click', () => confirmarUnificacionDashboard(candidatos));
+}
+
+async function confirmarUnificacionDashboard(candidatos) {
+    const overlay = document.getElementById('dupModal');
+    const errorDiv = document.getElementById('dupModalError');
+    const idxPrincipal = Number(overlay.querySelector('input[name="dupPrincipal"]:checked')?.value);
+    const secundarios = Array.from(overlay.querySelectorAll('.dupSecundarioChk:checked'))
+        .map(c => Number(c.value)).filter(i => i !== idxPrincipal);
+
+    if (isNaN(idxPrincipal)) { errorDiv.innerHTML = '<div class="error-validacion">Selecciona un Principal.</div>'; return; }
+    if (secundarios.length === 0) { errorDiv.innerHTML = '<div class="error-validacion">Selecciona al menos uno para fusionar.</div>'; return; }
+
+    const principal = candidatos[idxPrincipal];
+    const listaSecundarios = secundarios.map(i => candidatos[i]);
+    if (!confirm(`¿Unificar?\n\nPrincipal: ${principal.id} (${principal.campana})\nSe fusionará: ${listaSecundarios.map(s => s.id).join(', ')}`)) return;
+
+    const btn = document.getElementById('dupModalConfirmarBtn');
+    btn.disabled = true;
+    const result = await unificarLeads({
+        idPrincipal: principal.id,
+        campanaPrincipal: principal.campana,
+        idsSecundarios: listaSecundarios.map(s => ({ id: s.id, campana: s.campana })),
+        datosPredominantes: { historial: 'ambos' },
+        adminEmail: getCurrentUser().email
+    });
+
+    if (result.success) {
+        new Toast().show('Unificación completada', 'ok');
+        overlay.remove();
+        loadLeads(true);
+    } else if (!result.cancelado) {
+        errorDiv.innerHTML = `<div class="error-validacion">${escapeHtml(result.error || 'Error al unificar')}</div>`;
+        btn.disabled = false;
+    } else {
+        btn.disabled = false;
+    }
+}
 
 function renderPaginacion(totalPages) {
     const container = document.getElementById('paginationPages');

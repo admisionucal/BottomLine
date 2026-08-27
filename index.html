@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comercial Pregrado - Login</title>
+    <title>RUMBO Guía. Acompaña. Convierte. - Login</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
@@ -34,10 +34,20 @@
 
         .title-desktop {
             font-family: 'Hanken Grotesk', sans-serif;
-            font-size: 56px;
+            font-size: 52px;
             color: var(--color-primary);
             font-weight: 700;
-            line-height: 1.1;
+            line-height: 1.05;
+        }
+
+        .title-sub {
+            display: block;
+            font-family: var(--font-family);
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--color-accent);
+            margin-top: 10px;
+            letter-spacing: 0.02em;
         }
 
         .panel-right {
@@ -198,10 +208,15 @@
 
             .header-mobile .title-mobile {
                 font-family: 'Hanken Grotesk', sans-serif;
-                font-size: 40px;
+                font-size: 36px;
                 color: var(--color-primary);
                 font-weight: 700;
-                line-height: 1.2;
+                line-height: 1.05;
+            }
+            
+            .header-mobile .title-mobile .title-sub {
+                font-size: 14px;
+                margin-top: 6px;
             }
 
             .header-mobile .logo-mobile {
@@ -238,13 +253,13 @@
     <div class="login-wrapper">
         <!-- Cabecera móvil -->
         <header class="header-mobile">
-            <div class="title-mobile">Comercial<br>Pregrado</div>
+            <div class="title-mobile">RUMBO<span class="title-sub">Guía. Acompaña. Convierte.</span></div>
             <img src="assets/logo.png" alt="Logo" class="logo-mobile" onerror="this.style.display='none'">
         </header>
 
         <!-- Panel izquierdo (escritorio) -->
         <div class="panel-left">
-            <h1 class="title-desktop">Comercial<br>Pregrado</h1>
+            <h1 class="title-desktop">RUMBO<span class="title-sub">Guía. Acompaña. Convierte.</span></h1>
         </div>
 
         <!-- Panel derecho (formulario) -->

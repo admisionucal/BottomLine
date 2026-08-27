@@ -8,6 +8,17 @@ import { escapeHtml, getCurrentUser, normalizarUrlFoto } from './utils.js';
 // ================================================================
 // SIDEBAR
 // ================================================================
+function obtenerIniciales(nombre) {
+// Iniciales para mostrar en el footer del sidebar cuando está colapsado
+    return String(nombre || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(p => p[0].toUpperCase())
+        .join('');
+}
+
 export class Sidebar {
     // options.active: 'usuario' | 'asistencia' | 'bottomline' — qué grupo debe
     // aparecer abierto/resaltado al construirse (según la página/vista real).
@@ -40,8 +51,7 @@ export class Sidebar {
                     <span class="material-symbols-outlined">menu</span>
                 </button>
                 <div class="sidebar-brand">
-                    <img src="assets/logo.png" alt="Logo" class="sidebar-brand-logo" onerror="this.style.display='none'">
-                    <span class="sidebar-brand-text">Comercial <span>Pregrado</span></span>
+                    <span class="sidebar-brand-text">RUMBO <span>GAC</span></span>
                 </div>
             </div>
             <nav class="sidebar-nav">
@@ -143,6 +153,7 @@ export class Sidebar {
         footer.innerHTML = `
             <div class="sidebar-footer-user">
                 <img class="sidebar-footer-avatar" src="${escapeHtml(normalizarUrlFoto(user.foto)) || 'assets/logo.png'}" alt="" onerror="this.src='assets/logo.png'">
+                <span class="sidebar-footer-initials">${escapeHtml(obtenerIniciales(user.nombre))}</span>
                 <div class="sidebar-footer-info">
                     <span class="sidebar-footer-name">${escapeHtml(user.nombre)}</span>
                     <span class="sidebar-footer-rol">${escapeHtml(user.rol)}</span>
