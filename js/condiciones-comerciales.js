@@ -1085,7 +1085,7 @@ async function callAPI(action, data = {}) {
 
 async function revisarDuplicadosVisibles(items) {
     await Promise.all(items.map(async sol => {
-        const dups = await buscarDuplicados({ idPrometeo: sol.ID_PROMETEO, celular: sol.CELULAR_LEAD });
+        const dups = await buscarDuplicados({ idPrometeo: sol.ID_PROMETEO, celular: sol.CELULAR_LEAD, nombre: sol.NOMBRE_LEAD });
         if (dups.length === 0) return;
         const icon = document.getElementById(`dupIcon_${sol.ID_SOLICITUD}`);
         if (!icon) return;
@@ -1099,10 +1099,11 @@ async function revisarDuplicadosVisibles(items) {
 
 function abrirPopupDuplicados(sol, dups) {
     const candidatos = [
-        { id: sol.ID_PROMETEO, campana: sol.CAMPANA, nombre: sol.NOMBRE_LEAD, activo: true },
+        { id: sol.ID_PROMETEO, campana: sol.CAMPANA, nombre: sol.NOMBRE_LEAD, activo: true, motivos: [] },
         ...dups.map(d => ({
             id: d[COLUMNAS.ID_PROMETEO], campana: d.CAMPANA || '',
-            nombre: d[COLUMNAS.NOMBRES] || 'Sin Nombre', activo: !!d.activo
+            nombre: d[COLUMNAS.NOMBRES] || 'Sin Nombre', activo: !!d.activo,
+            motivos: d._motivos || []
         }))
     ];
     const filas = candidatos.map((c, i) => `
@@ -1119,6 +1120,7 @@ function abrirPopupDuplicados(sol, dups) {
             <td>${escapeHtml(c.campana)}</td>
             <td>${escapeHtml(c.nombre)}</td>
             <td><span class="badge-estado ${c.activo ? 'activo' : 'huerfano'}">${c.activo ? 'Activo (base)' : 'Huérfano'}</span></td>
+            <td>${c.motivos.length ? escapeHtml(c.motivos.join(', ')) : '<span style="color:#bbb;">—</span>'}</td>
         </tr>`).join('');
 
     document.body.insertAdjacentHTML('beforeend', `
@@ -1130,12 +1132,14 @@ function abrirPopupDuplicados(sol, dups) {
                 </div>
                 <div class="cal-modal-body">
                     <table class="dup-table">
-                        <thead><tr><th></th><th>ID</th><th>Campaña</th><th>Nombre</th><th>Estado</th></tr></thead>
+                        <thead><tr><th></th><th>ID</th><th>Campaña</th><th>Nombre</th><th>Estado</th><th>Motivo</th></tr></thead>
                         <tbody>${filas}</tbody>
                     </table>
                     <div id="dupModalError"></div>
                     <div class="dup-modal-actions">
-                        <button class="btn-unificar-final" id="dupModalConfirmarBtn">Unificar seleccionados</button>
+                        <button class="btn-filtros" id="dupModalConfirmarBtn">
+                            <span class="material-symbols-outlined" style="font-size:16px;">link</span> Unificar seleccionados
+                        </button>
                     </div>
                 </div>
             </div>

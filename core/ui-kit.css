@@ -756,7 +756,22 @@ table tbody tr:hover { background: #fafbff; }
 }
 
 /* Popup de duplicados sugeridos */
+.dup-icon {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    color: var(--color-danger);
+    cursor: pointer;
+    vertical-align: middle;
+}
+.dup-icon .material-symbols-outlined { font-size: 16px; }
+.dup-icon:hover { color: #b71c1c; }
+
 .dup-table th { text-align: center; }
+.dup-table th:nth-child(1), .dup-table td:nth-child(1) { width: 60px; }
+.dup-table th:nth-child(2), .dup-table td:nth-child(2) { width: 90px; white-space: nowrap; }
+.dup-table th:nth-child(3), .dup-table td:nth-child(3) { width: 90px; white-space: nowrap; }
 .dup-select-cell { text-align: center; }
 
 .dup-sel-btn {
