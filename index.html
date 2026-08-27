@@ -17,10 +17,18 @@
             min-height: 100vh;
             display: flex;
             background-color: #ffffff;
-            background-image: url('assets/logo.png');
-            background-repeat: no-repeat;
-            background-position: 35% center;
-            background-size: contain;
+        }
+
+        .login-bg-logo {
+            position: absolute;
+            top: 50%;
+            left: 45%;
+            transform: translate(-50%, -50%);
+            max-width: 80%;
+            max-height: 80vh;
+            object-fit: contain;
+            z-index: 1;
+            pointer-events: none;
         }
 
         .panel-left {
@@ -34,19 +42,19 @@
 
         .title-desktop {
             font-family: 'Hanken Grotesk', sans-serif;
-            font-size: 52px;
+            font-size: 90px;
             color: var(--color-primary);
             font-weight: 700;
-            line-height: 1.05;
+            line-height: 1;
         }
 
         .title-sub {
             display: block;
             font-family: var(--font-family);
-            font-size: 18px;
+            font-size: 24px;
             font-weight: 500;
             color: var(--color-accent);
-            margin-top: 10px;
+            margin-top: 5px;
             letter-spacing: 0.02em;
         }
 
@@ -196,6 +204,10 @@
                 padding-top: 0;
             }
 
+            .login-bg-logo {
+                display: none;
+            }
+
             .header-mobile {
                 display: flex;
                 justify-content: space-between;
@@ -208,20 +220,20 @@
 
             .header-mobile .title-mobile {
                 font-family: 'Hanken Grotesk', sans-serif;
-                font-size: 36px;
+                font-size: 63px;
                 color: var(--color-primary);
                 font-weight: 700;
-                line-height: 1.05;
+                line-height: 1;
             }
             
             .header-mobile .title-mobile .title-sub {
-                font-size: 14px;
-                margin-top: 6px;
+                font-size: 18px;
+                margin-top: -2px;
             }
 
             .header-mobile .logo-mobile {
-                max-width: 250px;
-                max-height: 250px;
+                max-width: 190px;
+                max-height: 190px;
                 object-fit: contain;
             }
 
@@ -251,6 +263,8 @@
 </head>
 <body>
     <div class="login-wrapper">
+        <img src="assets/logo.png" alt="" class="login-bg-logo" onerror="this.style.display='none'">
+        
         <!-- Cabecera móvil -->
         <header class="header-mobile">
             <div class="title-mobile">RUMBO<span class="title-sub">Guía. Acompaña. Convierte.</span></div>

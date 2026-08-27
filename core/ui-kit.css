@@ -99,7 +99,7 @@ html, body {
     font-family: var(--font-family-heading);
     color: var(--color-primary);
     font-weight: 700;
-    font-size: 13px;
+    font-size: 20px;
     line-height: 1.15;
     white-space: nowrap;
 }
@@ -220,11 +220,15 @@ html, body {
 }
 .sidebar-footer-logout:hover { background: var(--color-danger-bg); color: #b71c1c; }
 .sidebar-footer-logout-label {
+    display: none;
     opacity: 0;
     white-space: nowrap;
     transition: opacity 0.15s ease;
 }
-.sidebar.expanded .sidebar-footer-logout-label { opacity: 1; }
+.sidebar.expanded .sidebar-footer-logout-label {
+    display: inline;
+    opacity: 1;
+}
 
 .sidebar-overlay { display: none; }
 @media (max-width: 768px) {
