@@ -20,6 +20,7 @@ const MAPEO_LEADS: Record<string, string> = {
   'ASESOR ULT TIP DF SN CONTC': 'asesor',
   'STATUS DE GESTION': 'status_gestion',
   'FECHA COMPROMISO DE PAGO': 'fecha_compromiso_pago',
+  'FECHA VISITA GUIADA': 'fecha_visita_guiada',
   '# DE VPs DIF TI INTE': 'vps_dif_ti_inte',
 };
 

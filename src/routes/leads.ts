@@ -65,6 +65,7 @@ export async function getLeads(client: Client, body: JsonBody) {
       case when ${esAdmin} and p.status_pago_final in ('PAGO COMPLETO', 'PAGO FRACCIONADO')
            then p.status_pago_final else l.status_gestion end as status_gestion,
       l.fecha_compromiso_pago,
+      l.fecha_visita_guiada,
       (l.actualizado_hoy_en is not null) as actualizado_hoy,
       ${selectPagos}
       coalesce(b.beneficio, 'NO') as beneficio,
@@ -121,6 +122,7 @@ export async function getLeads(client: Client, body: JsonBody) {
     'ASESOR ULT TIP DF SN CONTC': r.asesor_nombre,
     'STATUS DE GESTION': r.status_gestion,
     'FECHA COMPROMISO DE PAGO': r.fecha_compromiso_pago,
+    'FECHA VISITA GUIADA': r.fecha_visita_guiada,
     ACTUALIZADO_HOY: r.actualizado_hoy,
     'FECHA DE PAGO COMPLETO': r.fecha_pago_completo,
     'FECHA DE PROMESA DE PAGO': r.fecha_promesa_pago,

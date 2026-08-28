@@ -37,7 +37,7 @@ let state = {
     calCampanas: [],
     calLeadsPorCampana: {},
     mapaCalendario: {},
-    categoriasVisibles: { viva: true, muerta: false, pagoCompleto: false, pagoFraccionado: false },
+    categoriasVisibles: { viva: true, muerta: false, pagoCompleto: false, pagoFraccionado: false, visitaGuiada: true },
     calendarioMes: new Date(),
     vistaCalendario: 'mes',
     diaSeleccionado: null,
@@ -50,8 +50,21 @@ const CATEGORIAS_CALENDARIO = {
     viva: { label: 'PP Viva', color: '#0040A1', status: STATUS.PP_VIVA, campoFecha: COLUMNAS.FECHA_COMPROMISO_PAGO },
     muerta: { label: 'PP Muerta', color: '#5e35b1', status: STATUS.PP_MUERTA, campoFecha: COLUMNAS.FECHA_COMPROMISO_PAGO },
     pagoCompleto: { label: 'Pago Completo', color: '#2e7d32', status: STATUS.PAGO_COMPLETO, campoFecha: COLUMNAS.FECHA_PAGO_COMPLETO },
-    pagoFraccionado: { label: 'Pago Fraccionado', color: '#f9a825', status: STATUS.PAGO_FRACCIONADO, campoFecha: COLUMNAS.FECHA_PROMESA_PAGO }
+    pagoFraccionado: { label: 'Pago Fraccionado', color: '#f9a825', status: STATUS.PAGO_FRACCIONADO, campoFecha: COLUMNAS.FECHA_PROMESA_PAGO },
+    visitaGuiada: { label: 'Visita Guiada', color: '#00897b', campoFecha: COLUMNAS.FECHA_VISITA_GUIADA }
 };
+
+// Categorías visibles/editables según rol. El asesor solo ve PP Viva + Visita
+// Guiada; las otras 3 son admin-only (igual que antes, pero ahora también
+// filtrado en la leyenda, no solo en el mapa).
+const CATEGORIAS_POR_ROL = {
+    admin: ['viva', 'muerta', 'pagoCompleto', 'pagoFraccionado', 'visitaGuiada'],
+    asesor: ['viva', 'visitaGuiada']
+};
+
+function categoriasVisiblesParaRol(esAdmin) {
+    return esAdmin ? CATEGORIAS_POR_ROL.admin : CATEGORIAS_POR_ROL.asesor;
+}
 
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', async () => {
@@ -800,15 +813,22 @@ function actualizarCalendario() {
 
 function construirMapaAsesor() {
     const mapa = {};
+    const agregar = (clave, catKey, lead, campana) => {
+        if (!mapa[clave]) mapa[clave] = { viva: [], visitaGuiada: [] };
+        mapa[clave][catKey].push({ lead, campana });
+    };
+
     Object.keys(state.calLeadsPorCampana).forEach(campana => {
         (state.calLeadsPorCampana[campana] || []).forEach(lead => {
             const status = lead[COLUMNAS.STATUS_GESTION] || '';
-            if (status !== STATUS.PP_VIVA) return;
-            const fecha = parsearFechaFlexible(lead[COLUMNAS.FECHA_COMPROMISO_PAGO]);
-            if (!fecha) return;
-            const clave = fechaAClaveISO(fecha);
-            if (!mapa[clave]) mapa[clave] = [];
-            mapa[clave].push({ lead, campana });
+            if (status === STATUS.PP_VIVA) {
+                const fecha = parsearFechaFlexible(lead[COLUMNAS.FECHA_COMPROMISO_PAGO]);
+                if (fecha) agregar(fechaAClaveISO(fecha), 'viva', lead, campana);
+            }
+
+            // Visita Guiada: independiente del status, aplica a VP o PP.
+            const fechaVisita = parsearFechaFlexible(lead[COLUMNAS.FECHA_VISITA_GUIADA]);
+            if (fechaVisita) agregar(fechaAClaveISO(fechaVisita), 'visitaGuiada', lead, campana);
         });
     });
     return mapa;
@@ -816,23 +836,32 @@ function construirMapaAsesor() {
 
 function construirMapaAdmin() {
     const mapa = {};
-    const categorias = {
+    const categoriasEstado = {
         viva: { status: STATUS.PP_VIVA, campo: COLUMNAS.FECHA_COMPROMISO_PAGO },
         muerta: { status: STATUS.PP_MUERTA, campo: COLUMNAS.FECHA_COMPROMISO_PAGO },
         pagoCompleto: { status: STATUS.PAGO_COMPLETO, campo: COLUMNAS.FECHA_PAGO_COMPLETO },
         pagoFraccionado: { status: STATUS.PAGO_FRACCIONADO, campo: COLUMNAS.FECHA_PROMESA_PAGO }
     };
 
+    const agregar = (clave, catKey, lead, campana) => {
+        if (!mapa[clave]) mapa[clave] = { viva: [], muerta: [], pagoCompleto: [], pagoFraccionado: [], visitaGuiada: [] };
+        mapa[clave][catKey].push({ lead, campana });
+    };
+
     Object.keys(state.calLeadsPorCampana).forEach(campana => {
         (state.calLeadsPorCampana[campana] || []).forEach(lead => {
             const status = lead[COLUMNAS.STATUS_GESTION] || '';
-            const catKey = Object.keys(categorias).find(k => categorias[k].status === status);
-            if (!catKey) return;
-            const fecha = parsearFechaFlexible(lead[categorias[catKey].campo]);
-            if (!fecha) return;
-            const clave = fechaAClaveISO(fecha);
-            if (!mapa[clave]) mapa[clave] = { viva: [], muerta: [], pagoCompleto: [], pagoFraccionado: [] };
-            mapa[clave][catKey].push({ lead, campana });
+
+            // Categorías por status: siguen siendo excluyentes entre sí, como antes.
+            const catKey = Object.keys(categoriasEstado).find(k => categoriasEstado[k].status === status);
+            if (catKey) {
+                const fecha = parsearFechaFlexible(lead[categoriasEstado[catKey].campo]);
+                if (fecha) agregar(fechaAClaveISO(fecha), catKey, lead, campana);
+            }
+
+            // Visita Guiada: independiente del status, para cualquier lead (VP o PP).
+            const fechaVisita = parsearFechaFlexible(lead[COLUMNAS.FECHA_VISITA_GUIADA]);
+            if (fechaVisita) agregar(fechaAClaveISO(fechaVisita), 'visitaGuiada', lead, campana);
         });
     });
     return mapa;
@@ -855,9 +884,6 @@ function actualizarBadgeCalendario() {
 function itemsVisiblesDelDia(clave) {
     const datos = state.mapaCalendario[clave];
     if (!datos) return [];
-    if (Array.isArray(datos)) {
-        return datos.map(({ lead, campana }) => ({ lead, categoria: 'viva', campana }));
-    }
     let items = [];
     Object.keys(state.categoriasVisibles).forEach(key => {
         if (state.categoriasVisibles[key] && datos[key]) {
@@ -884,8 +910,12 @@ function renderLeyendaCalendario() {
     const cont = document.getElementById('calLeyenda');
     if (!cont) return;
 
+    const user = getCurrentUser();
+    const esAdmin = user && esRolSupervisorOAdmision(user.rol);
+    const claves = categoriasVisiblesParaRol(esAdmin);
+
     let html = '<div class="cal-leyenda-items">';
-    Object.keys(CATEGORIAS_CALENDARIO).forEach(key => {
+    claves.forEach(key => {
         const cat = CATEGORIAS_CALENDARIO[key];
         const checked = state.categoriasVisibles[key] ? 'checked' : '';
         const [linea1, ...resto] = cat.label.split(' ');
@@ -1118,7 +1148,7 @@ function abrirDetalleDia(claveDia) {
         const cat = CATEGORIAS_CALENDARIO[categoria];
         filas += `
             <tr>
-                ${esAdmin ? `<td><span class="cal-dot" style="background:${colorParaItem(categoria, campana)};"></span> ${escapeHtml(cat.label)}</td>` : ''}
+                <td><span class="cal-dot" style="background:${colorParaItem(categoria, campana)};"></span> ${escapeHtml(cat.label)}</td>
                 ${mostrarCampana ? `<td>${escapeHtml(campana)}</td>` : ''}
                 <td><a href="#" class="id-link" onclick="verDetalleDesdeCalendario('${escapeHtml(id)}'); return false;">${escapeHtml(id)}</a></td>
                 <td>${escapeHtml(carrera)}</td>
@@ -1129,7 +1159,7 @@ function abrirDetalleDia(claveDia) {
             </tr>`;
     });
 
-    const colspan = (esAdmin ? 7 : 5) + (mostrarCampana ? 1 : 0);
+    const colspan = (esAdmin ? 7 : 6) + (mostrarCampana ? 1 : 0);
 
     const modalHtml = `
         <div class="cal-modal-overlay cal-modal-overlay-top" id="calModalOverlay" onclick="cerrarDetalleDia(event)">
@@ -1145,7 +1175,7 @@ function abrirDetalleDia(claveDia) {
                 <div class="cal-modal-body">
                     <table>
                         <thead><tr>
-                            ${esAdmin ? '<th>CATEGORÍA</th>' : ''}${mostrarCampana ? '<th>CAMPAÑA</th>' : ''}<th>ID</th><th>CARRERA</th><th>MODALIDAD INGRESO</th><th>MODALIDAD</th><th>BOLETA FINAL</th>${esAdmin ? '<th>ASESOR</th>' : ''}
+                            <th>CATEGORÍA</th>${mostrarCampana ? '<th>CAMPAÑA</th>' : ''}<th>ID</th><th>CARRERA</th><th>MODALIDAD INGRESO</th><th>MODALIDAD</th><th>BOLETA FINAL</th>${esAdmin ? '<th>ASESOR</th>' : ''}
                         </tr></thead>
                         <tbody>${filas || `<tr><td colspan="${colspan}" style="text-align:center;color:#888;padding:20px;">Sin registros</td></tr>`}</tbody>
                     </table>
@@ -1173,7 +1203,7 @@ function construirFilasExportCalendario(items, esAdmin, incluirFecha) {
     return items.map(({ lead, categoria, campana, fecha }) => {
         const fila = {};
         if (incluirFecha && fecha) fila['FECHA'] = fecha.split('-').reverse().join('/');
-        if (esAdmin) fila['CATEGORÍA'] = CATEGORIAS_CALENDARIO[categoria].label;
+        fila['CATEGORÍA'] = CATEGORIAS_CALENDARIO[categoria].label;
         if (mostrarCampana) fila['CAMPAÑA'] = campana || '';
         fila['ID PROMETEO'] = lead[COLUMNAS.ID_PROMETEO] || '';
         fila['CARRERA'] = lead['CARRERA'] || lead['PROGRAMA'] || '';

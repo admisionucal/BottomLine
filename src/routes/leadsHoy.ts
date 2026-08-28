@@ -124,9 +124,13 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
         if (esValorMerge(valor)) columnas[colPg] = valor;
       }
 
-      // FECHA COMPROMISO DE PAGO: caso especial, solo si "confiable".
+      // FECHA COMPROMISO DE PAGO Y DE VISITA: caso especial, solo si "confiable".
       if (confiable && esValorMerge(leadRaw['FECHA COMPROMISO DE PAGO'])) {
         columnas.fecha_compromiso_pago = leadRaw['FECHA COMPROMISO DE PAGO'];
+      }
+
+      if (confiable && esValorMerge(leadRaw['FECHA VISITA GUIADA'])) {
+        columnas.fecha_visita_guiada = leadRaw['FECHA VISITA GUIADA'];
       }
 
       const cols = Object.keys(columnas);

@@ -103,9 +103,9 @@ export class Sidebar {
                         <button type="button" class="nav-subitem ${esSub('navUnificarIds')}" id="navUnificarIds" title="Unificar IDs" style="display:none;" onclick="window.mostrarUnificar && mostrarUnificar(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">merge</span> Unificar IDs
                         </button>
-                        <button type="button" class="nav-subitem" id="calendarioTrigger" title="Calendario de PPs" onclick="window.mostrarCalendario && mostrarCalendario(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
+                        <button type="button" class="nav-subitem" id="calendarioTrigger" title="Calendario" onclick="window.mostrarCalendario && mostrarCalendario(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">calendar_month</span>
-                            <span style="flex:1;">Calendario de PPs</span>
+                            <span style="flex:1;">Calendario</span>
                             <span class="cal-trigger-badge" id="calTriggerBadge">0</span>
                         </button>
                     </div>
