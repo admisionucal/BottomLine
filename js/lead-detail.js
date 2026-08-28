@@ -1498,7 +1498,7 @@ function renderVista2() {
     const wrapOpcionInstitucion = document.getElementById('otrasOpcionesInstitucionWrap');
     if (selectOtrasOpciones && wrapOpcionInstitucion) {
         selectOtrasOpciones.addEventListener('change', () => {
-            wrapOpcionInstitucion.style.display = (selectOtrasOpciones.value === VALOR_OTRAS_OPCIONES_INSTITUCION) ? 'flex' : 'none';
+            wrapOpcionInstitucion.style.display = (selectOtrasOpciones.value === VALOR_OTRAS_OPCIONES_INSTITUCION) ? 'grid' : 'none';
         });
     }
 
@@ -1602,9 +1602,9 @@ function checklistPerfilamientoHTML(cfg, lead, bloqueado) {
             <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">${cfg.label}</label>
             <div style="position:relative;">
                 <div id="${cfg.selectId}Display" class="campo-editable-select"
-                     style="display:flex; justify-content:space-between; align-items:center; gap:8px; cursor:${bloqueado ? 'default' : 'pointer'};">
-                    <span id="${cfg.selectId}DisplayText" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${textoResumen}</span>
-                    <span class="material-symbols-outlined" style="font-size:18px; color:#777; flex-shrink:0;">expand_more</span>
+                     style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; cursor:${bloqueado ? 'default' : 'pointer'}; height:auto; min-height:38px; padding:8px 10px;">
+                    <span id="${cfg.selectId}DisplayText" style="white-space:normal; overflow-wrap:break-word; line-height:1.4;">${textoResumen}</span>
+                    <span class="material-symbols-outlined" style="font-size:18px; color:#777; flex-shrink:0; margin-top:1px;">expand_more</span>
                 </div>
                 <div id="${cfg.selectId}" style="display:none; position:absolute; z-index:20; top:calc(100% + 4px); left:0; right:0;
                      background:white; border:1px solid var(--color-border); border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,0.12);
@@ -1626,7 +1626,7 @@ function otrasOpcionesInstitucionHTML(lead, bloqueado) {
     const nombreActual = lead[COLUMNAS.OPCION_NOMBRE_INSTITUCION] || '';
 
     return `
-        <div id="otrasOpcionesInstitucionWrap" style="display:${mostrar ? 'flex' : 'none'}; flex-direction:column; gap:12px; margin-top:12px;">
+        <div id="otrasOpcionesInstitucionWrap" style="display:${mostrar ? 'grid' : 'none'}; grid-template-columns: repeat(2, 1fr); gap:12px; margin-top:12px;">
             <div>
                 <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Tipo de Institución</label>
                 ${selectSimpleHTML('selectOpcionInstitucionTipo', TIPOS_INSTITUCION_PROCEDENCIA, tipoActual, bloqueado)}
