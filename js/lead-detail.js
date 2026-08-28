@@ -1457,9 +1457,10 @@ function renderVista2() {
     `;
 
     CAMPOS_SELECT_PERFILAMIENTO.forEach(cfg => {
-        html += selectorPerfilamientoHTML(cfg, lead, bloqueado);
         if (cfg.columna === COLUMNAS.OTRAS_OPCIONES) {
-            html += otrasOpcionesInstitucionHTML(lead, bloqueado);
+            html += `<div>${selectorPerfilamientoHTML(cfg, lead, bloqueado)}${otrasOpcionesInstitucionHTML(lead, bloqueado)}</div>`;
+        } else {
+            html += selectorPerfilamientoHTML(cfg, lead, bloqueado);
         }
     });
 
@@ -1485,7 +1486,10 @@ function renderVista2() {
 
     document.getElementById('btnGuardarPerfil')?.addEventListener('click', () => guardarPerfilamiento(id));
     CAMPOS_SELECT_PERFILAMIENTO.forEach(cfg => {
-        if (cfg.permiteMultiple) return;
+        if (cfg.permiteMultiple) {
+            initChecklistPerfilamiento(cfg, bloqueado);
+            return;
+        }
         document.getElementById(cfg.selectId)?.addEventListener('change', () => onCambioSelectorPerfilamiento(cfg));
     });
 
@@ -1494,7 +1498,7 @@ function renderVista2() {
     const wrapOpcionInstitucion = document.getElementById('otrasOpcionesInstitucionWrap');
     if (selectOtrasOpciones && wrapOpcionInstitucion) {
         selectOtrasOpciones.addEventListener('change', () => {
-            wrapOpcionInstitucion.style.display = (selectOtrasOpciones.value === VALOR_OTRAS_OPCIONES_INSTITUCION) ? 'grid' : 'none';
+            wrapOpcionInstitucion.style.display = (selectOtrasOpciones.value === VALOR_OTRAS_OPCIONES_INSTITUCION) ? 'flex' : 'none';
         });
     }
 
@@ -1571,7 +1575,9 @@ function selectorPerfilamientoHTML(cfg, lead, bloqueado) {
 }
 
 // "¿Qué le falta para tomar una decisión?" admite varias opciones; se
-// guarda como texto separado por comas en la misma columna.
+// guarda como texto separado por comas en la misma columna. Se muestra
+// colapsado (solo lo marcado) y se despliega un panel con checkboxes al
+// hacer clic.
 function checklistPerfilamientoHTML(cfg, lead, bloqueado) {
     const catalogo = state[cfg.stateKey] || [];
     const seleccionados = String(lead[cfg.columna] || '').split(',').map(v => v.trim()).filter(Boolean);
@@ -1581,17 +1587,30 @@ function checklistPerfilamientoHTML(cfg, lead, bloqueado) {
     const opciones = [...catalogo.map(d => d.nombre), ...extras];
 
     const checkboxes = opciones.map(nombre => `
-        <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400; padding:3px 0; color:#333;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400; padding:6px 10px; cursor:${bloqueado ? 'default' : 'pointer'};">
             <input type="checkbox" class="checklist-${cfg.selectId}" value="${escapeHtml(nombre)}" ${seleccionados.includes(nombre) ? 'checked' : ''} ${bloqueado ? 'disabled' : ''}>
             ${escapeHtml(nombre)}
         </label>
     `).join('');
 
+    const textoResumen = seleccionados.length
+        ? escapeHtml(seleccionados.join(', '))
+        : '<span style="color:#999;">-- Sin seleccionar --</span>';
+
     return `
         <div>
             <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">${cfg.label}</label>
-            <div id="${cfg.selectId}" style="border:1px solid var(--color-border); border-radius:6px; padding:8px 10px; max-height:160px; overflow-y:auto;">
-                ${checkboxes || '<span style="color:#999; font-size:12px;">Sin opciones</span>'}
+            <div style="position:relative;">
+                <div id="${cfg.selectId}Display" class="campo-editable-select"
+                     style="display:flex; justify-content:space-between; align-items:center; gap:8px; cursor:${bloqueado ? 'default' : 'pointer'};">
+                    <span id="${cfg.selectId}DisplayText" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${textoResumen}</span>
+                    <span class="material-symbols-outlined" style="font-size:18px; color:#777; flex-shrink:0;">expand_more</span>
+                </div>
+                <div id="${cfg.selectId}" style="display:none; position:absolute; z-index:20; top:calc(100% + 4px); left:0; right:0;
+                     background:white; border:1px solid var(--color-border); border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,0.12);
+                     max-height:220px; overflow-y:auto;">
+                    ${checkboxes || '<span style="color:#999; font-size:12px; padding:8px 10px; display:block;">Sin opciones</span>'}
+                </div>
             </div>
         </div>
     `;
@@ -1607,7 +1626,7 @@ function otrasOpcionesInstitucionHTML(lead, bloqueado) {
     const nombreActual = lead[COLUMNAS.OPCION_NOMBRE_INSTITUCION] || '';
 
     return `
-        <div id="otrasOpcionesInstitucionWrap" style="display:${mostrar ? 'grid' : 'none'}; grid-template-columns: repeat(2, 1fr); gap:16px; grid-column: 1 / -1;">
+        <div id="otrasOpcionesInstitucionWrap" style="display:${mostrar ? 'flex' : 'none'}; flex-direction:column; gap:12px; margin-top:12px;">
             <div>
                 <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Tipo de Institución</label>
                 ${selectSimpleHTML('selectOpcionInstitucionTipo', TIPOS_INSTITUCION_PROCEDENCIA, tipoActual, bloqueado)}
@@ -1624,6 +1643,35 @@ function otrasOpcionesInstitucionHTML(lead, bloqueado) {
             </div>
         </div>
     `;
+}
+
+// Abre/cierra el panel del checklist colapsable y refresca el resumen
+// (solo lo marcado) cada vez que cambia una casilla.
+function initChecklistPerfilamiento(cfg, bloqueado) {
+    const display = document.getElementById(cfg.selectId + 'Display');
+    const textEl = document.getElementById(cfg.selectId + 'DisplayText');
+    const panel = document.getElementById(cfg.selectId);
+    if (!display || !textEl || !panel) return;
+
+    const cerrar = () => { panel.style.display = 'none'; };
+    const abrir = () => { panel.style.display = 'block'; };
+
+    if (!bloqueado) {
+        display.addEventListener('click', () => {
+            panel.style.display === 'none' ? abrir() : cerrar();
+        });
+    }
+
+    panel.addEventListener('change', () => {
+        const marcados = Array.from(panel.querySelectorAll(`.checklist-${cfg.selectId}:checked`)).map(el => el.value);
+        textEl.innerHTML = marcados.length
+            ? escapeHtml(marcados.join(', '))
+            : '<span style="color:#999;">-- Sin seleccionar --</span>';
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!display.contains(e.target) && !panel.contains(e.target)) cerrar();
+    });
 }
 
 function onCambioSelectorPerfilamiento(cfg) {
