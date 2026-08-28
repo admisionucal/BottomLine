@@ -49,9 +49,9 @@ const VALOR_OTRAS_OPCIONES_INSTITUCION = 'Evaluando otras instituciones';
 const CAMPOS_SELECT_PERFILAMIENTO = [
     { columna: COLUMNAS.POR_QUE_ELIGIO_CARRERA, label: '¿Por qué eligió la carrera?', selectId: 'selectPorQueEligio', cacheKey: CACHE_KEYS.CATALOGO_POR_QUE_ELIGIO_CARRERA, dataKey: 'porQueEligioCarrera', stateKey: 'catalogoPorQueEligioCarrera', permiteAgregarNuevo: false },
     { columna: COLUMNAS.QUE_BUSCA_UNIVERSIDAD, label: '¿Qué busca en una universidad?', selectId: 'selectQueBusca', cacheKey: CACHE_KEYS.CATALOGO_QUE_BUSCA_UNIVERSIDAD, dataKey: 'queBuscaUniversidad', stateKey: 'catalogoQueBuscaUniversidad', permiteAgregarNuevo: false },
-    { columna: COLUMNAS.QUIEN_FINANCIARA, label: '¿Quién financiará la carrera?', selectId: 'selectQuienFinancia', cacheKey: CACHE_KEYS.CATALOGO_QUIEN_FINANCIARA, dataKey: 'quienFinanciaCarrera', stateKey: 'catalogoQuienFinancia', permiteAgregarNuevo: false },
-    { columna: COLUMNAS.QUE_LE_FALTA, label: '¿Qué le falta para tomar una decisión?', selectId: 'selectQueLeFalta', cacheKey: CACHE_KEYS.CATALOGO_QUE_LE_FALTA, dataKey: 'queFaltaParaDecision', stateKey: 'catalogoQueLeFalta', permiteAgregarNuevo: false, permiteMultiple: true },
     { columna: COLUMNAS.OTRAS_OPCIONES, label: '¿Cuáles son sus otras opciones?', selectId: 'selectOtrasOpciones', cacheKey: CACHE_KEYS.CATALOGO_OTRAS_OPCIONES, dataKey: 'queOtrasOpciones', stateKey: 'catalogoOtrasOpciones', permiteAgregarNuevo: false },
+    { columna: COLUMNAS.QUE_LE_FALTA, label: '¿Qué le falta para tomar una decisión?', selectId: 'selectQueLeFalta', cacheKey: CACHE_KEYS.CATALOGO_QUE_LE_FALTA, dataKey: 'queFaltaParaDecision', stateKey: 'catalogoQueLeFalta', permiteAgregarNuevo: false, permiteMultiple: true },
+    { columna: COLUMNAS.QUIEN_FINANCIARA, label: '¿Quién financiará la carrera?', selectId: 'selectQuienFinancia', cacheKey: CACHE_KEYS.CATALOGO_QUIEN_FINANCIARA, dataKey: 'quienFinanciaCarrera', stateKey: 'catalogoQuienFinancia', permiteAgregarNuevo: false },
     { columna: COLUMNAS.DOLOR_NECESIDAD, label: 'Dolor / Necesidad', selectId: 'selectDolorNecesidad', cacheKey: CACHE_KEYS.CATALOGO_DOLOR_NECESIDAD, dataKey: 'doloresNecesidades', stateKey: 'catalogoDoloresNecesidades', permiteAgregarNuevo: true },
 ];
 
@@ -1889,9 +1889,9 @@ window.abrirSnapshot = function(idx) {
     const labels = {
         POR_QUE_ELIGIO_CARRERA: '¿Por qué eligió la carrera?',
         QUE_BUSCA_UNIVERSIDAD: '¿Qué busca en una universidad?',
-        QUIEN_FINANCIARA: '¿Quién financiará la carrera?',
-        QUE_LE_FALTA: '¿Qué le falta para tomar una decisión?',
         OTRAS_OPCIONES: '¿Cuáles son sus otras opciones?',
+        QUE_LE_FALTA: '¿Qué le falta para tomar una decisión?',
+        QUIEN_FINANCIARA: '¿Quién financiará la carrera?',
         DOLOR_NECESIDAD: 'Dolor / Necesidad',
         COMENTARIOS_PERFIL: 'Comentarios',
         ACCIONES_DEFINIDAS: 'Acciones Definidas'
