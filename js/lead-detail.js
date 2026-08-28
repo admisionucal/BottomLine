@@ -652,12 +652,19 @@ function opcionesCicloPorTipoInstitucion(tipo) {
     return [];
 }
 
-function inputBuscableHTML(id, opciones, valorActual, disabled, placeholder = 'Escribe para buscar...') {
+function inputBuscableHTML(id, opciones, valorActual, disabled, placeholder = 'Escribe para buscar...', multilinea = false) {
+    const campo = multilinea
+        ? `<textarea id="${id}" class="campo-editable-input combo-buscable-input" rows="1"
+                    placeholder="${escapeHtml(placeholder)}" autocomplete="off"
+                    style="resize:none; overflow:hidden; white-space:pre-wrap; word-break:break-word;"
+                    ${disabled ? 'disabled' : ''}>${escapeHtml(valorActual || '')}</textarea>`
+        : `<input type="text" id="${id}" class="campo-editable-input combo-buscable-input"
+                  value="${escapeHtml(valorActual || '')}" placeholder="${escapeHtml(placeholder)}"
+                  autocomplete="off" ${disabled ? 'disabled' : ''}>`;
+
     return `
         <div class="combo-buscable" id="${id}Wrap">
-            <input type="text" id="${id}" class="campo-editable-input combo-buscable-input"
-                   value="${escapeHtml(valorActual || '')}" placeholder="${escapeHtml(placeholder)}"
-                   autocomplete="off" ${disabled ? 'disabled' : ''}>
+            ${campo}
             <span class="material-symbols-outlined combo-buscable-arrow">expand_more</span>
             <div class="combo-buscable-panel" id="${id}Panel"></div>
         </div>
@@ -670,6 +677,12 @@ function initComboBuscable(id, opcionesIniciales) {
     if (!input || !panel) return;
 
     let opciones = opcionesIniciales;
+
+    if (input.tagName === 'TEXTAREA') {
+        const autoGrow = () => { input.style.height = 'auto'; input.style.height = input.scrollHeight + 'px'; };
+        input.addEventListener('input', autoGrow);
+        autoGrow();
+    }
 
     function renderPanel(filtro) {
         const filtroNorm = normalizarTexto(filtro || '');
@@ -699,6 +712,7 @@ function initComboBuscable(id, opcionesIniciales) {
         input.value = opt.dataset.valor;
         panel.classList.remove('open');
         input.dispatchEvent(new Event('change'));
+        if (input.tagName === 'TEXTAREA') { input.style.height = 'auto'; input.style.height = input.scrollHeight + 'px'; }
     });
 
     document.addEventListener('click', (e) => {
@@ -1638,7 +1652,8 @@ function otrasOpcionesInstitucionHTML(lead, bloqueado) {
                     opcionesInstitucionPorTipo(tipoActual),
                     nombreActual,
                     bloqueado || !tipoActual,
-                    tipoActual ? 'Escribe para buscar...' : 'Selecciona primero el tipo'
+                    tipoActual ? 'Escribe para buscar...' : 'Selecciona primero el tipo',
+                    true
                 )}
             </div>
         </div>
@@ -1889,7 +1904,7 @@ window.abrirSnapshot = function(idx) {
     const labels = {
         POR_QUE_ELIGIO_CARRERA: '¿Por qué eligió la carrera?',
         QUE_BUSCA_UNIVERSIDAD: '¿Qué busca en una universidad?',
-        OTRAS_OPCIONES: '¿Cuáles son sus otras opciones?',
+        OTRAS_OPCIONES: '¿Cuáles son sus otras opciones?',        
         QUE_LE_FALTA: '¿Qué le falta para tomar una decisión?',
         QUIEN_FINANCIARA: '¿Quién financiará la carrera?',
         DOLOR_NECESIDAD: 'Dolor / Necesidad',
