@@ -4,7 +4,7 @@
 
 // ----- URL DE LA API (Google Apps Script) -----
 //export const API_URL = 'https://script.google.com/macros/s/AKfycby7szo4sq4-ZG4yngiQmZ7wN9g3tuM5bmh2kNb5GAgAfhAAwGBtat8tsQke_qub6PAAwg/exec';
-export const API_URL = 'https://migracion-postgres-bottomline.admisionucal.workers.dev/api';
+export const API_URL = '/api';
 
 // ----- MAPEO DE COLUMNAS DE GOOGLE SHEETS -----
 // Centraliza todos los nombres de columnas para evitar strings mágicos.
