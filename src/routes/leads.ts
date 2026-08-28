@@ -77,7 +77,6 @@ export async function getLeads(client: Client, body: JsonBody) {
         (case when nullif(trim(b.quien_financiara), '') is not null then 1 else 0 end) +
         (case when nullif(trim(b.que_le_falta), '') is not null then 1 else 0 end) +
         (case when nullif(trim(b.otras_opciones), '') is not null then 1 else 0 end) +
-        (case when nullif(trim(b.comentarios_perfil), '') is not null then 1 else 0 end) +
         (case when nullif(trim(b.dolor_necesidad), '') is not null then 1 else 0 end)
       ) as perfil_asesor_respondidas,
       (nullif(trim(b.acciones_definidas), '') is not null) as perfil_supervisor_completo
@@ -131,8 +130,10 @@ export async function getLeads(client: Client, body: JsonBody) {
     PERFILAMIENTO_COMPLETO: (() => {
       const asesorResp = Number(r.perfil_asesor_respondidas);
       const supCompleto = !!r.perfil_supervisor_completo;
-      const asesorCompleto = asesorResp === 7;
-      const estado = !asesorCompleto ? 'Pendiente Asesor' : !supCompleto ? 'Pendiente Supervisor' : 'Completo';
+      const asesorCompleto = asesorResp === 6;
+      const estado = esAdmin
+        ? (supCompleto ? 'Completo' : asesorCompleto ? 'Pendiente Supervisor' : 'Pendiente Asesor')
+        : (asesorCompleto ? 'Completo' : 'Pendiente Asesor');
       return {
         respondidas: asesorResp + (supCompleto ? 1 : 0),
         total: 7,

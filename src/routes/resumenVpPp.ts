@@ -3,7 +3,7 @@ import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
 
 const ESTADOS_VP_PP = ['VALORES_VALORACIONES_POSITIVAS_VIVA', 'VALORES_PROMESA_DE_PAGO_VIVA'];
-const CAMPOS_ASESOR = ['por_que_eligio_carrera', 'que_busca_universidad', 'quien_financiara', 'que_le_falta', 'otras_opciones'];
+const CAMPOS_ASESOR = ['por_que_eligio_carrera', 'que_busca_universidad', 'quien_financiara', 'que_le_falta', 'otras_opciones', 'dolor_necesidad'];
 
 export async function getResumenVpPp(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ASESOR', 'ADMISION']);
@@ -42,7 +42,7 @@ export async function getResumenVpPp(client: Client, body: JsonBody) {
         case when ${esAdmin} and p.status_pago_final in ('PAGO COMPLETO', 'PAGO FRACCIONADO')
              then p.status_pago_final else l.status_gestion end as status_final,
         b.por_que_eligio_carrera, b.que_busca_universidad, b.quien_financiara,
-        b.que_le_falta, b.otras_opciones, b.acciones_definidas
+        b.que_le_falta, b.otras_opciones, b.dolor_necesidad, b.acciones_definidas
       from leads l
       left join leads_bottom b on b.id_prometeo = l.id_prometeo and b.campana = l.campana
       left join leads_pagos p on p.id_prometeo = l.id_prometeo and p.campana = l.campana
@@ -58,7 +58,8 @@ export async function getResumenVpPp(client: Client, body: JsonBody) {
     for (const r of result.rows) {
       const asesorResp = CAMPOS_ASESOR.filter((c) => r[c] && String(r[c]).trim() !== '').length;
       const supCompleto = !!(r.acciones_definidas && String(r.acciones_definidas).trim() !== '');
-      const completo = asesorResp === CAMPOS_ASESOR.length && supCompleto;
+      const asesorCompleto = asesorResp === CAMPOS_ASESOR.length;
+      const completo = esAdmin ? supCompleto : asesorCompleto;
 
       if (r.status_final === 'VALORES_VALORACIONES_POSITIVAS_VIVA') {
         vpTotal++;

@@ -110,7 +110,7 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
     bottomUpper[k.toUpperCase()] = v;
   }
   Object.assign(leadObj, bottomUpper);
-  leadObj['PERFILAMIENTO_COMPLETO'] = calcularPerfilamientoCompleto(bottomUpper);
+  leadObj['PERFILAMIENTO_COMPLETO'] = calcularPerfilamientoCompleto(bottomUpper, esAdmin);
 
   // Historial de comentarios: un ASESOR solo ve sus propios comentarios/snapshots.
   let historial: any[] = [];
