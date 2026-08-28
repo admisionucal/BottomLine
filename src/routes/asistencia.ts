@@ -144,7 +144,7 @@ export async function getAsistenciaEmpleados(client: Client, body: JsonBody) {
   if (error) return jsonError(error);
 
   const result = await client.query(
-    `select usuario, nombre, nombre_aux, rol, cargo, dni, campana, foto
+    `select usuario, nombre, nombre_aux, rol, cargo, dni, campana, foto, activo
      from usuarios where upper(rol) = 'ASESOR'`
   );
 
@@ -156,9 +156,31 @@ export async function getAsistenciaEmpleados(client: Client, body: JsonBody) {
     dni: u.dni || '',
     campaña: String(u.campana || '').split(',')[0]?.trim() || '',
     foto: u.foto || '',
+    activo: u.activo !== false,
   }));
 
   return jsonOk({ data });
+}
+
+// Mantenimiento: activa/desactiva un colaborador. Reemplaza el toggle
+// que antes solo vivía en localStorage (asis_config_colaboradores).
+export async function actualizarEstadoColaborador(client: Client, body: JsonBody) {
+  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
+  if (!sesion) return jsonError(error!);
+
+  const usuario = String(body.usuario || '').trim();
+  if (!usuario) return jsonError('Usuario requerido.');
+
+  const result = await client.query(
+    `update usuarios set activo = $1, actualizado_en = now()
+     where lower(usuario) = lower($2)
+     returning usuario, activo`,
+    [!!body.activo, usuario]
+  );
+
+  if (result.rowCount === 0) return jsonError('Colaborador no encontrado.');
+
+  return jsonOk({ usuario: result.rows[0].usuario, activo: result.rows[0].activo });
 }
 
 function filaAObjeto(r: any) {

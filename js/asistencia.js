@@ -132,6 +132,7 @@ async function initPanelCalendario() {
     document.getElementById('calVistaMesBtn').addEventListener('click', () => cambiarVistaCalendarioAsis('mes'));
     document.getElementById('calVistaAnoBtn').addEventListener('click', () => cambiarVistaCalendarioAsis('ano'));
     document.getElementById('btnExportarCalendarioAsis').addEventListener('click', () => exportarCalendarioAsisActual());
+    await ensureEmpleadosCache();
     await cargarRegistrosCalendario();
 }
 
@@ -357,8 +358,8 @@ function horaEsperada(usuario, fecha) {
 }
 
 function colaboradorActivo(usuario) {
-    const cfg = state.configColaboradores[usuario];
-    return !cfg || cfg.activo !== false;
+    const u = state.empleadosCache.find(e => e.usuario === usuario);
+    return u ? u.activo !== false : true;
 }
 
 // ===== MARCACIÓN =====
@@ -1354,8 +1355,8 @@ async function renderColabCfgLista() {
     const empleados = state.empleadosCache.filter(u => u.rol !== 'admin');
     if (!empleados.length) { cont.innerHTML = '<p style="color:#888;font-size:13px;">Sin colaboradores registrados.</p>'; return; }
     cont.innerHTML = empleados.map(u => {
-        const cfg = state.configColaboradores[u.usuario] || { activo: true, horarios: {} };
-        const activo = cfg.activo !== false;
+        const activo = u.activo !== false;               // 👈 viene de Postgres, no de localStorage
+        const cfg = state.configColaboradores[u.usuario] || { horarios: {} };
         const inputsDias = DIAS_CFG.map(d => `<input type="time" class="colab-cfg-hora" data-usuario="${escapeHtml(u.usuario)}" data-dow="${d.dow}" value="${cfg.horarios && cfg.horarios[d.dow] ? cfg.horarios[d.dow] : ''}" ${activo ? '' : 'disabled'}>`).join('');
         return `
             <div class="colab-cfg-fila">
@@ -1369,28 +1370,36 @@ async function renderColabCfgLista() {
     }).join('');
 }
 
-function toggleColabActivo(chk) {
+async function toggleColabActivo(chk) {
     const fila = chk.closest('.colab-cfg-fila');
     fila.querySelectorAll('.colab-cfg-hora').forEach(inp => inp.disabled = !chk.checked);
+
+    const usuario = chk.getAttribute('data-usuario-activo');
+    try {
+        const r = await callAPI('actualizarEstadoColaborador', { usuario, activo: chk.checked });
+        if (!r || !r.success) throw new Error(r && r.error);
+        const u = state.empleadosCache.find(e => e.usuario === usuario);
+        if (u) u.activo = chk.checked;
+        showToast(chk.checked ? 'Colaborador activado' : 'Colaborador desactivado', 'ok');
+    } catch (e) {
+        chk.checked = !chk.checked;
+        fila.querySelectorAll('.colab-cfg-hora').forEach(inp => inp.disabled = !chk.checked);
+        showToast('No se pudo actualizar el estado', 'err');
+    }
 }
 
 function guardarConfigColaboradoresUI() {
     const cont = document.getElementById('colabCfgLista');
-    cont.querySelectorAll('[data-usuario-activo]').forEach(chk => {
-        const usuario = chk.getAttribute('data-usuario-activo');
-        if (!state.configColaboradores[usuario]) state.configColaboradores[usuario] = { activo: true, horarios: {} };
-        state.configColaboradores[usuario].activo = chk.checked;
-    });
     cont.querySelectorAll('.colab-cfg-hora').forEach(inp => {
         const usuario = inp.getAttribute('data-usuario');
         const dow = inp.getAttribute('data-dow');
-        if (!state.configColaboradores[usuario]) state.configColaboradores[usuario] = { activo: true, horarios: {} };
+        if (!state.configColaboradores[usuario]) state.configColaboradores[usuario] = { horarios: {} };
         if (!state.configColaboradores[usuario].horarios) state.configColaboradores[usuario].horarios = {};
         if (inp.value) state.configColaboradores[usuario].horarios[dow] = inp.value;
         else delete state.configColaboradores[usuario].horarios[dow];
     });
     guardarConfigColaboradores();
-    showToast('Configuración de colaboradores guardada', 'ok');
+    showToast('Horarios guardados', 'ok');
 }
 
 function guardarCfgHorario() {

@@ -102,7 +102,9 @@ async function cargarResumenAsistenciaAdmin() {
             callAPI('getAsistenciaRegistros', {})
         ]);
 
-        const totalEmpleados = empleadosResult.success ? (empleadosResult.data || []).length : 0;
+        const totalEmpleados = empleadosResult.success
+            ? (empleadosResult.data || []).filter(u => u.activo !== false).length
+            : 0;
         const hoy = hoyDDMMYYYY();
 
         const presentesHoy = new Set(
