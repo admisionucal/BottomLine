@@ -39,7 +39,7 @@ const state = {
         minHorasTrabajo: parseFloat(localStorage.getItem('asis_min_horas')) || 3,
         minMinutosAlmuerzo: parseInt(localStorage.getItem('asis_min_almuerzo')) || 20
     },
-    configColaboradores: {},
+    configAsesores: {},
     categoriasCalendario: {
         viva: { label: 'PP Viva', color: '#0040A1', status: 'VALORES_PROMESA_DE_PAGO_VIVA', campoFecha: 'FECHA COMPROMISO DE PAGO' },
         muerta: { label: 'PP Muerta', color: '#5e35b1', status: 'VALORES_PROMESA_DE_PAGO_MUERTA', campoFecha: 'FECHA COMPROMISO DE PAGO' },
@@ -79,8 +79,8 @@ async function initAsistencia(tab) {
         new Sidebar({ active: 'asistencia' });
     }
 
-    // Cargar configuración de colaboradores
-    cargarConfigColaboradores();
+    // Cargar configuración de Asesores
+    cargarConfigAsesores();
 
     const esAdmin = esRolSupervisorOAdmision(user.rol);
 
@@ -289,7 +289,7 @@ async function initPanelMantenimiento() {
                 <div class="mant-col-izq">
                     <div class="card">
                         <h3><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">schedule</span> Horario estándar</h3>
-                        <p style="font-size:13px;color:#888;margin-bottom:12px;">Usado para calcular tardanzas y puntualidad (horario por defecto si un colaborador no tiene uno personalizado).</p>
+                        <p style="font-size:13px;color:#888;margin-bottom:12px;">Usado para calcular tardanzas y puntualidad (horario por defecto si un Asesor no tiene uno personalizado).</p>
                         <label class="cfg-label">Hora de entrada esperada</label>
                         <input class="cfg-input" type="time" id="cfgEntrada">
                         <label class="cfg-label">Minutos de tolerancia</label>
@@ -310,16 +310,16 @@ async function initPanelMantenimiento() {
                 </div>
                 <div class="card">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-                        <h3 style="margin-bottom:0;"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">group</span> Colaboradores</h3>
+                        <h3 style="margin-bottom:0;"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">group</span> Asesores</h3>
                         <button class="btn-save" id="btnGuardarColabs">Guardar</button>
                     </div>
-                    <p style="font-size:13px;color:#888;margin-bottom:12px;">Activa/desactiva a cada colaborador y define su horario de entrada por día.</p>
+                    <p style="font-size:13px;color:#888;margin-bottom:12px;">Activa/desactiva a cada Asesor y define su horario de entrada por día.</p>
                     <div class="colab-cfg-fila colab-cfg-head">
-                        <div>Colaborador</div><div>Activo</div>
+                        <div>Asesor</div><div>Activo</div>
                         <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div>
                     </div>
                     <div class="colab-cfg-scroll" id="colabCfgLista">
-                        <div class="loading">Cargando colaboradores...</div>
+                        <div class="loading">Cargando Asesores...</div>
                     </div>
                 </div>
             </div>
@@ -334,30 +334,30 @@ async function initPanelMantenimiento() {
 
     document.getElementById('btnGuardarCfg').addEventListener('click', guardarCfgHorario);
     document.getElementById('btnGuardarRestricciones').addEventListener('click', guardarRestricciones);
-    document.getElementById('btnGuardarColabs').addEventListener('click', guardarConfigColaboradoresUI);
+    document.getElementById('btnGuardarColabs').addEventListener('click', guardarConfigAsesoresUI);
 
     await renderColabCfgLista();
 }
 
-// ===== CONFIGURACIÓN COLABORADORES =====
-function cargarConfigColaboradores() {
+// ===== CONFIGURACIÓN AsesorES =====
+function cargarConfigAsesores() {
     try {
-        state.configColaboradores = JSON.parse(localStorage.getItem('asis_config_colaboradores') || '{}');
-    } catch { state.configColaboradores = {}; }
+        state.configAsesores = JSON.parse(localStorage.getItem('asis_config_Asesores') || '{}');
+    } catch { state.configAsesores = {}; }
 }
 
-function guardarConfigColaboradores() {
-    localStorage.setItem('asis_config_colaboradores', JSON.stringify(state.configColaboradores));
+function guardarConfigAsesores() {
+    localStorage.setItem('asis_config_Asesores', JSON.stringify(state.configAsesores));
 }
 
 function horaEsperada(usuario, fecha) {
-    const cfg = state.configColaboradores[usuario];
+    const cfg = state.configAsesores[usuario];
     const dow = fecha.getDay();
     if (cfg && cfg.horarios && cfg.horarios[dow]) return cfg.horarios[dow];
     return state.config.horaEntrada;
 }
 
-function colaboradorActivo(usuario) {
+function AsesorActivo(usuario) {
     const u = state.empleadosCache.find(e => e.usuario === usuario);
     return u ? u.activo !== false : true;
 }
@@ -720,7 +720,7 @@ function renderCalendarioAsisMes() {
     for (let dia = 1; dia <= diasEnMes; dia++) {
         const fechaDia = new Date(state.calAnio, state.calMes, dia);
         const fechaStr = `${String(dia).padStart(2, '0')}/${String(state.calMes + 1).padStart(2, '0')}/${state.calAnio}`;
-        const registros = (state.registrosCalendario[fechaStr] || []).filter(r => r.entrada && colaboradorActivo(r.usuario));
+        const registros = (state.registrosCalendario[fechaStr] || []).filter(r => r.entrada && AsesorActivo(r.usuario));
         const esHoy = fechaDia.getDate() === hoy.getDate() && fechaDia.getMonth() === hoy.getMonth() && fechaDia.getFullYear() === hoy.getFullYear();
         const tieneRegistro = registros.length > 0;
         const esFaltaAsesor = !esAdmin && !tieneRegistro && fechaDia.getDay() !== 0 && fechaDia <= hoy;
@@ -790,7 +790,7 @@ function renderCalendarioAsisAnio() {
         for (let dia = 1; dia <= diasEnMes; dia++) {
             const fechaDia = new Date(year, m, dia);
             const fechaStr = `${String(dia).padStart(2, '0')}/${String(m + 1).padStart(2, '0')}/${year}`;
-            const registros = (state.registrosCalendario[fechaStr] || []).filter(r => r.entrada && colaboradorActivo(r.usuario));
+            const registros = (state.registrosCalendario[fechaStr] || []).filter(r => r.entrada && AsesorActivo(r.usuario));
             const esHoy = fechaDia.getDate() === hoy.getDate() && fechaDia.getMonth() === hoy.getMonth() && fechaDia.getFullYear() === hoy.getFullYear();
             const tieneRegistro = registros.length > 0;
             const esFaltaAsesor = !esAdmin && !tieneRegistro && fechaDia.getDay() !== 0 && fechaDia <= hoy;
@@ -934,7 +934,7 @@ function tiempoAlmuerzoMin(registro) {
 function verDetalleDia(dia, mes, anio) {
     const fechaStr = `${String(dia).padStart(2, '0')}/${String(mes + 1).padStart(2, '0')}/${anio}`;
     state.diaAsisSeleccionado = { dia, mes, anio, fechaStr };
-    const registros = (state.registrosCalendario[fechaStr] || []).filter(r => r.entrada && colaboradorActivo(r.usuario));
+    const registros = (state.registrosCalendario[fechaStr] || []).filter(r => r.entrada && AsesorActivo(r.usuario));
     const nombreDia = new Date(anio, mes, dia).toLocaleDateString('es-ES', { weekday: 'long' });
     const tituloFecha = `${nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1)} ${dia}/${mes + 1}/${anio}`;
     const esAdmin = esRolSupervisorOAdmision(state.user.rol);
@@ -1009,7 +1009,7 @@ function filasExportAsis(registros, esAdmin, incluirFecha) {
     return registros.map(({ registro, fecha }) => {
         const fila = {};
         if (incluirFecha) fila['Fecha'] = fecha;
-        if (esAdmin) fila['Colaborador'] = registro.nombre || '';
+        if (esAdmin) fila['Asesor'] = registro.nombre || '';
         fila['Entrada'] = registro.entrada || '';
         fila['Inicio Almuerzo'] = registro.almuerzo || '';
         fila['Fin Almuerzo'] = registro.regreso || '';
@@ -1029,7 +1029,7 @@ function descargarExcelAsis(filas, nombreArchivo) {
 async function exportarDiaAsisExcel() {
     if (!state.diaAsisSeleccionado) return;
     const esAdmin = esRolSupervisorOAdmision(state.user.rol);
-    const registros = (state.registrosCalendario[state.diaAsisSeleccionado.fechaStr] || []).filter(r => r.entrada && colaboradorActivo(r.usuario));
+    const registros = (state.registrosCalendario[state.diaAsisSeleccionado.fechaStr] || []).filter(r => r.entrada && AsesorActivo(r.usuario));
     if (!registros.length) { showToast('No hay datos para exportar', 'err'); return; }
     try { await ensureXLSX(); } catch (e) { showToast(e.message, 'err'); return; }
     const filas = filasExportAsis(registros.map(registro => ({ registro })), esAdmin, false);
@@ -1043,7 +1043,7 @@ function recolectarRegistrosAsisPorPrefijo(mesNum, anio) {
         const [d, m, y] = fechaStr.split('/');
         if (Number(y) !== anio) return;
         if (mesNum !== null && Number(m) - 1 !== mesNum) return;
-        (state.registrosCalendario[fechaStr] || []).filter(r => r.entrada && colaboradorActivo(r.usuario)).forEach(registro => {
+        (state.registrosCalendario[fechaStr] || []).filter(r => r.entrada && AsesorActivo(r.usuario)).forEach(registro => {
             items.push({ registro, fecha: fechaStr });
         });
     });
@@ -1145,7 +1145,7 @@ async function ensureEmpleadosCache() {
         state.empleadosCache = d.data || [];
         return true;
     } catch (e) {
-        showToast('No se pudo cargar la lista de colaboradores', 'err');
+        showToast('No se pudo cargar la lista de Asesores', 'err');
         return false;
     }
 }
@@ -1351,12 +1351,12 @@ const DIAS_CFG = [{ dow: 1, lbl: 'Lun' }, { dow: 2, lbl: 'Mar' }, { dow: 3, lbl:
 async function renderColabCfgLista() {
     const cont = document.getElementById('colabCfgLista');
     const ok = await ensureEmpleadosCache();
-    if (!ok) { cont.innerHTML = '<p style="color:#d32f2f;font-size:13px;">No se pudo cargar la lista de colaboradores.</p>'; return; }
+    if (!ok) { cont.innerHTML = '<p style="color:#d32f2f;font-size:13px;">No se pudo cargar la lista de Asesores.</p>'; return; }
     const empleados = state.empleadosCache.filter(u => u.rol !== 'admin');
-    if (!empleados.length) { cont.innerHTML = '<p style="color:#888;font-size:13px;">Sin colaboradores registrados.</p>'; return; }
+    if (!empleados.length) { cont.innerHTML = '<p style="color:#888;font-size:13px;">Sin Asesores registrados.</p>'; return; }
     cont.innerHTML = empleados.map(u => {
         const activo = u.activo !== false;               // 👈 viene de Postgres, no de localStorage
-        const cfg = state.configColaboradores[u.usuario] || { horarios: {} };
+        const cfg = state.configAsesores[u.usuario] || { horarios: {} };
         const inputsDias = DIAS_CFG.map(d => `<input type="time" class="colab-cfg-hora" data-usuario="${escapeHtml(u.usuario)}" data-dow="${d.dow}" value="${cfg.horarios && cfg.horarios[d.dow] ? cfg.horarios[d.dow] : ''}" ${activo ? '' : 'disabled'}>`).join('');
         return `
             <div class="colab-cfg-fila">
@@ -1376,11 +1376,11 @@ async function toggleColabActivo(chk) {
 
     const usuario = chk.getAttribute('data-usuario-activo');
     try {
-        const r = await callAPI('actualizarEstadoColaborador', { usuario, activo: chk.checked });
+        const r = await callAPI('actualizarEstadoAsesor', { usuario, activo: chk.checked });
         if (!r || !r.success) throw new Error(r && r.error);
         const u = state.empleadosCache.find(e => e.usuario === usuario);
         if (u) u.activo = chk.checked;
-        showToast(chk.checked ? 'Colaborador activado' : 'Colaborador desactivado', 'ok');
+        showToast(chk.checked ? 'Asesor activado' : 'Asesor desactivado', 'ok');
     } catch (e) {
         chk.checked = !chk.checked;
         fila.querySelectorAll('.colab-cfg-hora').forEach(inp => inp.disabled = !chk.checked);
@@ -1388,17 +1388,17 @@ async function toggleColabActivo(chk) {
     }
 }
 
-function guardarConfigColaboradoresUI() {
+function guardarConfigAsesoresUI() {
     const cont = document.getElementById('colabCfgLista');
     cont.querySelectorAll('.colab-cfg-hora').forEach(inp => {
         const usuario = inp.getAttribute('data-usuario');
         const dow = inp.getAttribute('data-dow');
-        if (!state.configColaboradores[usuario]) state.configColaboradores[usuario] = { horarios: {} };
-        if (!state.configColaboradores[usuario].horarios) state.configColaboradores[usuario].horarios = {};
-        if (inp.value) state.configColaboradores[usuario].horarios[dow] = inp.value;
-        else delete state.configColaboradores[usuario].horarios[dow];
+        if (!state.configAsesores[usuario]) state.configAsesores[usuario] = { horarios: {} };
+        if (!state.configAsesores[usuario].horarios) state.configAsesores[usuario].horarios = {};
+        if (inp.value) state.configAsesores[usuario].horarios[dow] = inp.value;
+        else delete state.configAsesores[usuario].horarios[dow];
     });
-    guardarConfigColaboradores();
+    guardarConfigAsesores();
     showToast('Horarios guardados', 'ok');
 }
 

@@ -114,7 +114,7 @@ async function cargarResumenAsistenciaAdmin() {
         ).size;
 
         valorEl.textContent = totalEmpleados ? `${presentesHoy} / ${totalEmpleados}` : String(presentesHoy);
-        if (subEl) subEl.textContent = 'colaboradores marcaron entrada hoy';
+        if (subEl) subEl.textContent = 'Asesores marcaron entrada hoy';
     } catch (e) {
         valorEl.textContent = '—';
     }

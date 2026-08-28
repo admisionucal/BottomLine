@@ -162,9 +162,9 @@ export async function getAsistenciaEmpleados(client: Client, body: JsonBody) {
   return jsonOk({ data });
 }
 
-// Mantenimiento: activa/desactiva un colaborador. Reemplaza el toggle
-// que antes solo vivía en localStorage (asis_config_colaboradores).
-export async function actualizarEstadoColaborador(client: Client, body: JsonBody) {
+// Mantenimiento: activa/desactiva un Asesor. Reemplaza el toggle
+// que antes solo vivía en localStorage (asis_config_Asesores).
+export async function actualizarEstadoAsesor(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
 
@@ -178,7 +178,7 @@ export async function actualizarEstadoColaborador(client: Client, body: JsonBody
     [!!body.activo, usuario]
   );
 
-  if (result.rowCount === 0) return jsonError('Colaborador no encontrado.');
+  if (result.rowCount === 0) return jsonError('Asesor no encontrado.');
 
   return jsonOk({ usuario: result.rows[0].usuario, activo: result.rows[0].activo });
 }
