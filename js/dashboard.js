@@ -18,7 +18,7 @@ import {
 } from '../core/utils.js';
 
 import { Sidebar, Toast, Modal, createMultiSelect, sortTable, toggleMultiSelect, renderTable } from '../core/components.js';
-import { buscarDuplicados } from './duplicados-sugeridos.js';
+import { buscarDuplicados, limpiarCacheDuplicados } from './duplicados-sugeridos.js';
 import { unificarLeads } from './unificar-core.js';
 
 // ===== ESTADO =====
@@ -725,6 +725,7 @@ async function confirmarUnificacionDashboard(candidatos) {
 
     if (result.success) {
         new Toast().show('Unificación completada', 'ok');
+        limpiarCacheDuplicados();
         overlay.remove();
         loadLeads(true);
     } else if (!result.cancelado) {

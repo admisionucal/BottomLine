@@ -10,7 +10,7 @@ import {
 } from '../core/utils.js';
 import { Sidebar, renderTable, Toast, createMultiSelect } from '../core/components.js';
 import { construirDatosCC, renderPlantillaCC, renderPlantillaCCPreview, detectarTipoReferido, precargarLogoCC } from './cc-template.js';
-import { buscarDuplicados } from './duplicados-sugeridos.js';
+import { buscarDuplicados, limpiarCacheDuplicados } from './duplicados-sugeridos.js';
 import { unificarLeads } from './unificar-core.js';
 
 // PDFs servidos como assets estáticos del proyecto (carpeta assets/), con
@@ -1194,6 +1194,7 @@ async function confirmarUnificacionDesdePopup(candidatos) {
 
     if (result.success) {
         new Toast().show('Unificación completada', 'ok');
+        limpiarCacheDuplicados();
         overlay.remove();
         cargarSolicitudesCC(true);
     } else if (!result.cancelado) {

@@ -90,3 +90,7 @@ export async function buscarDuplicados({ idPrometeo, dni, celular, nombre }) {
 
     return Array.from(mapa.values()).map(v => ({ ...v.data, _motivos: Array.from(v.motivos) }));
 }
+
+export function limpiarCacheDuplicados() {
+    cache.clear();
+}
