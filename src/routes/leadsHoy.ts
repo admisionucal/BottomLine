@@ -4,13 +4,15 @@ import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 // Mapea las claves que manda actualizar_leads_hoy.gs (COLUMNAS_HOY) a columnas reales.
 const MAPEO_HOY: Record<string, string> = {
   'NOMBRES': 'nombres',
-  'TELEFONO 3': 'telefono3', // OJO: TELEFONO 2 NO se mergea en el código real, solo TELEFONO 3.
+  'TELEFONO 3': 'telefono3',
   'EMAIL': 'email',
   'NOMBRE DEL COLEGIO': 'colegio',
   'PROGRAMA': 'programa',
   'MODALIDAD': 'modalidad',
   'MODALIDAD INGRESO': 'modalidad_ingreso',
   'BOLETA DE COLEGIO': 'boleta_colegio',
+  'NUMERO DE DOCUMENTO': 'numero_documento',
+  'CODIGO MODULAR': 'codigo_modular',
 };
 
 const ESTADOS_VIVOS = new Set(['VALORES_VALORACIONES_POSITIVAS_VIVA', 'VALORES_PROMESA_DE_PAGO_VIVA']);
