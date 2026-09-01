@@ -827,9 +827,11 @@ function construirMapaAsesor() {
                 if (fecha) agregar(fechaAClaveISO(fecha), 'viva', lead, campana);
             }
 
-            // Visita Guiada: independiente del status, aplica a VP o PP.
-            const fechaVisita = parsearFechaFlexible(lead[COLUMNAS.FECHA_VISITA_GUIADA]);
-            if (fechaVisita) agregar(fechaAClaveISO(fechaVisita), 'visitaGuiada', lead, campana);
+            // Visita Guiada: solo si el lead sigue como VP Viva.
+            if (status === STATUS.VP_VIVA) {
+                const fechaVisita = parsearFechaFlexible(lead[COLUMNAS.FECHA_VISITA_GUIADA]);
+                if (fechaVisita) agregar(fechaAClaveISO(fechaVisita), 'visitaGuiada', lead, campana);
+            }
         });
     });
     return mapa;
@@ -860,9 +862,11 @@ function construirMapaAdmin() {
                 if (fecha) agregar(fechaAClaveISO(fecha), catKey, lead, campana);
             }
 
-            // Visita Guiada: independiente del status, para cualquier lead (VP o PP).
-            const fechaVisita = parsearFechaFlexible(lead[COLUMNAS.FECHA_VISITA_GUIADA]);
-            if (fechaVisita) agregar(fechaAClaveISO(fechaVisita), 'visitaGuiada', lead, campana);
+            // Visita Guiada: solo si el lead sigue como VP Viva.
+            if (status === STATUS.VP_VIVA) {
+                const fechaVisita = parsearFechaFlexible(lead[COLUMNAS.FECHA_VISITA_GUIADA]);
+                if (fechaVisita) agregar(fechaAClaveISO(fechaVisita), 'visitaGuiada', lead, campana);
+            }
         });
     });
     return mapa;
