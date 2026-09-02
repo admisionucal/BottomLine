@@ -72,25 +72,69 @@ export function horasLabel(h) {
     return `${hrs}h ${String(min).padStart(2, '0')}m`;
 }
 
-/** Parsea una fecha flexible (ISO, DD/MM/YYYY, etc.) a objeto Date */
+/** Parsea una fecha flexible (ISO con o sin hora, DD/MM/YYYY, etc.) a objeto
+ *  Date. Cuando el valor trae hora (p.ej. "2026-08-25 16:48:00") esa hora se
+ *  conserva en el Date resultante — no se trunca a medianoche — para que
+ *  filtros, ordenamientos y cálculos de días puedan usarla si la necesitan. */
 export function parsearFechaFlexible(valor) {
     if (!valor) return null;
     if (valor instanceof Date) return isNaN(valor.getTime()) ? null : valor;
     const str = String(valor).trim();
     if (!str) return null;
 
-    let m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    let m = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
     if (m) {
-        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        const d = new Date(
+            Number(m[1]), Number(m[2]) - 1, Number(m[3]),
+            Number(m[4] || 0), Number(m[5] || 0), Number(m[6] || 0)
+        );
         return isNaN(d.getTime()) ? null : d;
     }
-    m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
     if (m) {
-        const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+        const d = new Date(
+            Number(m[3]), Number(m[2]) - 1, Number(m[1]),
+            Number(m[4] || 0), Number(m[5] || 0), Number(m[6] || 0)
+        );
         return isNaN(d.getTime()) ? null : d;
     }
     const fallback = new Date(str);
     return isNaN(fallback.getTime()) ? null : fallback;
+}
+
+// ================================================================
+// NORMALIZACIÓN DE CATEGORÍAS (para agrupaciones/conteos sin duplicados)
+// ================================================================
+
+/** Limpia espacios extremos, colapsa espacios duplicados y quita caracteres
+ *  invisibles (zero-width, NBSP), preservando mayúsculas/minúsculas
+ *  originales — para usar como texto a mostrar. */
+export function limpiarEspacios(s) {
+    return String(s ?? '')
+        .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/** Clave normalizada (case-insensitive) para agrupar valores que
+ *  representan la misma respuesta pese a diferencias menores de formato
+ *  (espacios, mayúsculas/minúsculas, caracteres invisibles). */
+export function claveCategoria(s) {
+    return limpiarEspacios(s).toLowerCase();
+}
+
+/** Suma `inc` (por defecto 1) a la categoría de `valorCrudo` dentro de
+ *  `mapa`, agrupando por clave normalizada pero conservando como label el
+ *  primer valor "limpio" visto para esa clave — así "Ya decidio, falta
+ *  pagar" y " ya decidio,  falta pagar" caen en la misma fila. Devuelve la
+ *  clave usada, o null si el valor está vacío. */
+export function sumarCategoria(mapa, valorCrudo, inc = 1) {
+    const limpio = limpiarEspacios(valorCrudo);
+    if (!limpio) return null;
+    const clave = limpio.toLowerCase();
+    if (!mapa[clave]) mapa[clave] = { label: limpio, total: 0 };
+    mapa[clave].total += inc;
+    return clave;
 }
 
 /** Convierte Date a "YYYY-MM-DD" */

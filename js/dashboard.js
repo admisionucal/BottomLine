@@ -14,7 +14,8 @@ import {
     escapeHtml, normalizarTexto, parseNumero,
     horaAMinutos, minutosAHora, diffHoras, horasLabel,
     parsearFechaFlexible, fechaAClaveISO, fechaDDMMYYYY, hoyDDMMYYYY,
-    nowPeru, formato12h, parsearHistorial
+    nowPeru, formato12h, parsearHistorial,
+    limpiarEspacios, sumarCategoria
 } from '../core/utils.js';
 
 import { Sidebar, Toast, Modal, createMultiSelect, sortTable, toggleMultiSelect, renderTable } from '../core/components.js';
@@ -1569,32 +1570,41 @@ function todosLosLeadsIndicadores() {
 
 // Mismo estilo/orden que los Filtros del Dashboard (grid de 3 en 3):
 // Programa (≈Carrera), Modalidad de Ingreso, Modalidad, Asesor, Campaña, Canal.
+//
+// Filtros interdependientes: las opciones que se ofrecen en CADA filtro se
+// calculan sobre los leads que ya pasan TODOS LOS DEMÁS filtros (nunca sobre
+// el propio, para no auto-restringirse a lo ya marcado). Así, al elegir un
+// valor en un filtro, el resto de los filtros solo muestra opciones que
+// realmente existen dentro de ese contexto — y createMultiSelect ya poda
+// automáticamente cualquier selección previa que haya dejado de existir.
 function poblarFiltrosIndicadores() {
-    const leads = todosLosLeadsIndicadores();
-    const valoresUnicos = (columna) => [...new Set(
-        leads.map(l => String(l[columna] || '').trim()).filter(Boolean)
+    const valoresUnicos = (columna, excluirClave) => [...new Set(
+        leadsIndicadoresFiltradosExcluyendo(excluirClave)
+            .map(l => String(l[columna] || '').trim()).filter(Boolean)
     )].sort();
 
-    createMultiSelect('indFilterPrograma', valoresUnicos(COLUMNAS.PROGRAMA), state.indicadores.filtros.programa, 'Todos');
-    createMultiSelect('indFilterIngreso', valoresUnicos(COLUMNAS.MODALIDAD_INGRESO), state.indicadores.filtros.ingreso, 'Todos');
-    createMultiSelect('indFilterModalidad', valoresUnicos(COLUMNAS.MODALIDAD), state.indicadores.filtros.modalidad, 'Todas');
+    createMultiSelect('indFilterPrograma', valoresUnicos(COLUMNAS.PROGRAMA, 'programa'), state.indicadores.filtros.programa, 'Todos');
+    createMultiSelect('indFilterIngreso', valoresUnicos(COLUMNAS.MODALIDAD_INGRESO, 'ingreso'), state.indicadores.filtros.ingreso, 'Todos');
+    createMultiSelect('indFilterModalidad', valoresUnicos(COLUMNAS.MODALIDAD, 'modalidad'), state.indicadores.filtros.modalidad, 'Todas');
 
     // Asesor: igual que en el Dashboard — value = Nombre crudo (identifica
     // sin ambigüedad al asesor), label = Nombre corto (ASESOR ULT TIP DF SN
     // CONTC), que es lo único que debe verse en pantalla.
-    const nombresRawAsesor = valoresUnicos(COLUMNAS.ASESOR_NOMBRE_RAW);
+    const leadsParaAsesor = leadsIndicadoresFiltradosExcluyendo('asesor');
+    const nombresRawAsesor = [...new Set(leadsParaAsesor.map(l => String(l[COLUMNAS.ASESOR_NOMBRE_RAW] || '').trim()).filter(Boolean))].sort();
     const labelsAsesor = {};
-    leads.forEach(l => {
+    leadsParaAsesor.forEach(l => {
         const raw = String(l[COLUMNAS.ASESOR_NOMBRE_RAW] || '').trim();
         if (raw && !labelsAsesor[raw]) labelsAsesor[raw] = l[COLUMNAS.ASESOR_ULTIMO_CONTACTO] || raw;
     });
     createMultiSelect('indFilterAsesor', nombresRawAsesor, state.indicadores.filtros.asesor, 'Todos', labelsAsesor);
 
-    // Campaña: siempre con TODAS las campañas efectivas del usuario. No se
-    // permite la opción "Todas" (catch-all) — el usuario debe ver siempre
-    // las campañas activas marcadas explícitamente, con al menos una
-    // seleccionada en todo momento.
-    const camposCampana = valoresUnicos(COLUMNAS.CAMPANA);
+    // Campaña: siempre con TODAS las campañas efectivas del usuario (no se
+    // recorta por los demás filtros, para no perder de vista campañas
+    // completas). No se permite la opción "Todas" (catch-all) — el usuario
+    // debe ver siempre las campañas activas marcadas explícitamente, con al
+    // menos una seleccionada en todo momento.
+    const camposCampana = [...new Set(todosLosLeadsIndicadores().map(l => String(l[COLUMNAS.CAMPANA] || '').trim()).filter(Boolean))].sort();
     createMultiSelect('indFilterCampana', camposCampana, state.indicadores.filtros.campana, 'Todas', null, { permitirTodos: false });
     // Si todavía no había selección (primera carga), createMultiSelect ya
     // marcó todas las opciones por defecto — reflejamos eso en el state
@@ -1603,7 +1613,7 @@ function poblarFiltrosIndicadores() {
         state.indicadores.filtros.campana = camposCampana.slice();
     }
 
-    createMultiSelect('indFilterCanal', valoresUnicos(COLUMNAS.CANAL), state.indicadores.filtros.canal, 'Todos');
+    createMultiSelect('indFilterCanal', valoresUnicos(COLUMNAS.CANAL, 'canal'), state.indicadores.filtros.canal, 'Todos');
 
     if (!state.indicadores.filtrosListenerListo) {
         window.addEventListener('multiselect-change', (e) => {
@@ -1614,7 +1624,19 @@ function poblarFiltrosIndicadores() {
             const filtroKey = map[e.detail.containerId];
             if (!filtroKey) return;
             state.indicadores.filtros[filtroKey] = e.detail.values;
+            // Recalcula las opciones de TODOS los filtros (cascada — cada
+            // uno se recalcula sobre el contexto que dejan los demás) y
+            // luego recalcula todos los indicadores/tablas/gráficos.
+            poblarFiltrosIndicadores();
+            // poblarFiltrosIndicadores reconstruye el HTML de los 6
+            // dropdowns (createMultiSelect), lo que cierra el panel que el
+            // usuario tenía abierto — lo reabrimos para que pueda seguir
+            // marcando varias opciones sin interrupciones.
+            const contActivo = document.getElementById(e.detail.containerId);
+            contActivo?.querySelector('.multiselect-panel')?.classList.add('open');
+            contActivo?.closest('.filter-group')?.classList.add('open');
             renderIndicadores();
+            renderIndCalendarioFiltro();
         });
         state.indicadores.filtrosListenerListo = true;
     }
@@ -1625,22 +1647,31 @@ function poblarFiltrosIndicadores() {
 // de días puntuales, con conteo de leads por día), pero sobre FECHA HORA DE
 // REGISTRO — el único campo de fecha común a todos los leads sin importar
 // en qué sección de Indicadores caigan.
-function leadsIndicadoresFiltrados() {
+// `excluirClave` deja de aplicar ese filtro puntual — se usa para calcular
+// las opciones disponibles de un filtro en función de TODOS LOS DEMÁS
+// (filtros interdependientes/cascada), sin que un filtro se autolimite a lo
+// que ya tiene marcado. Con excluirClave = null se aplican los 6 filtros +
+// el calendario tal como están, que es lo que necesitan las tablas/gráficos.
+function leadsIndicadoresFiltradosExcluyendo(excluirClave) {
     const f = state.indicadores.filtros;
     return todosLosLeadsIndicadores().filter(lead => {
-        if (f.campana.length && !f.campana.includes(lead[COLUMNAS.CAMPANA] || '')) return false;
-        if (f.programa.length && !f.programa.includes(lead[COLUMNAS.PROGRAMA] || '')) return false;
-        if (f.modalidad.length && !f.modalidad.includes(lead[COLUMNAS.MODALIDAD] || '')) return false;
-        if (f.ingreso.length && !f.ingreso.includes(lead[COLUMNAS.MODALIDAD_INGRESO] || '')) return false;
-        if (f.asesor.length && !f.asesor.includes(lead[COLUMNAS.ASESOR_NOMBRE_RAW] || '')) return false;
-        if (f.canal.length && !f.canal.includes(lead[COLUMNAS.CANAL] || '')) return false;
-        if (f.fechaCalendario.length) {
+        if (excluirClave !== 'campana' && f.campana.length && !f.campana.includes(lead[COLUMNAS.CAMPANA] || '')) return false;
+        if (excluirClave !== 'programa' && f.programa.length && !f.programa.includes(lead[COLUMNAS.PROGRAMA] || '')) return false;
+        if (excluirClave !== 'modalidad' && f.modalidad.length && !f.modalidad.includes(lead[COLUMNAS.MODALIDAD] || '')) return false;
+        if (excluirClave !== 'ingreso' && f.ingreso.length && !f.ingreso.includes(lead[COLUMNAS.MODALIDAD_INGRESO] || '')) return false;
+        if (excluirClave !== 'asesor' && f.asesor.length && !f.asesor.includes(lead[COLUMNAS.ASESOR_NOMBRE_RAW] || '')) return false;
+        if (excluirClave !== 'canal' && f.canal.length && !f.canal.includes(lead[COLUMNAS.CANAL] || '')) return false;
+        if (excluirClave !== 'fechaCalendario' && f.fechaCalendario.length) {
             const d = parsearFechaFlexible(lead[COLUMNAS.FECHA_HORA_REGISTRO]);
             if (!d) return false;
             if (!f.fechaCalendario.includes(fechaAClaveISO(d))) return false;
         }
         return true;
     });
+}
+
+function leadsIndicadoresFiltrados() {
+    return leadsIndicadoresFiltradosExcluyendo(null);
 }
 
 // ---- Filtro Calendario (mismo patrón que calVpPp del Dashboard) ----
@@ -1677,7 +1708,7 @@ window.cambiarMesIndCal = cambiarMesIndCal;
 
 function mapaFechasIndCal() {
     const mapa = {};
-    todosLosLeadsIndicadores().forEach(lead => {
+    leadsIndicadoresFiltradosExcluyendo('fechaCalendario').forEach(lead => {
         const d = parsearFechaFlexible(lead[COLUMNAS.FECHA_HORA_REGISTRO]);
         if (!d) return;
         const clave = fechaAClaveISO(d);
@@ -1729,6 +1760,7 @@ function toggleFechaIndCal(clave) {
     const idx = state.indicadores.filtros.fechaCalendario.indexOf(clave);
     if (idx >= 0) state.indicadores.filtros.fechaCalendario.splice(idx, 1);
     else state.indicadores.filtros.fechaCalendario.push(clave);
+    poblarFiltrosIndicadores(); // cascada: el resto de filtros se recalcula
     renderIndicadores();
     renderIndCalendarioFiltro();
 }
@@ -1736,6 +1768,7 @@ window.toggleFechaIndCal = toggleFechaIndCal;
 
 function limpiarFiltroIndCal() {
     state.indicadores.filtros.fechaCalendario = [];
+    poblarFiltrosIndicadores();
     renderIndicadores();
     renderIndCalendarioFiltro();
 }
@@ -2015,26 +2048,35 @@ function render2CondicionesComerciales(leadsFiltrados) {
     leadsFiltrados.forEach(l => { mapaLeads[`${l[COLUMNAS.ID_PROMETEO]}|${l[COLUMNAS.CAMPANA]}`] = l; });
 
     const porCampana = {};
+    const totalesPorStatus = {}; // para decidir dinámicamente qué columnas mostrar
     (state.solicitudesCC || []).forEach(sol => {
         const clave = `${sol.ID_PROMETEO}|${sol.CAMPANA}`;
         if (!idsPermitidos.has(clave)) return; // respeta los filtros generales
         const leadCruzado = mapaLeads[clave];
         const camp = sol.CAMPANA || '-';
+        const statusActual = leadCruzado ? (leadCruzado[COLUMNAS.STATUS_GESTION] || '-') : '-';
         porCampana[camp] = porCampana[camp] || [];
-        porCampana[camp].push({
-            ...sol,
-            _fechaEnvio: sol.FECHA_SOLICITUD,
-            _statusActual: leadCruzado ? (leadCruzado[COLUMNAS.STATUS_GESTION] || '-') : '-'
-        });
+        porCampana[camp].push({ ...sol, _fechaEnvio: sol.FECHA_SOLICITUD, _statusActual: statusActual });
+        totalesPorStatus[statusActual] = (totalesPorStatus[statusActual] || 0) + 1;
     });
+
+    // Columna dinámica: un status solo se muestra (con su "Categoría" y su
+    // "%") si tiene AL MENOS un valor > 0 dentro del conjunto actualmente
+    // filtrado. Se recalcula en cada render, así que aparecen/desaparecen
+    // solas según los filtros activos — Total y Total % siempre visibles.
+    const columnasVisibles = STATUS_CC_COLS.filter(c => (totalesPorStatus[c.status] || 0) > 0);
 
     const set = state.indicadores.expandido['indCC'] = state.indicadores.expandido['indCC'] || new Set();
 
+    // Cada status aporta 2 <td>: cantidad y %. Al final siempre van Total y
+    // Total % (ambos calculados sobre totalCamp, igual que el resto de
+    // columnas — consistente con las demás tablas de Indicadores).
     function celdasStatus(items, totalCamp) {
-        return STATUS_CC_COLS.map(c => {
+        const celdasPorStatus = columnasVisibles.map(c => {
             const n = items.filter(it => it._statusActual === c.status).length;
-            return `<td>${n} <span style="color:#999;">(${pctInd(n, totalCamp)})</span></td>`;
+            return `<td>${n}</td><td>${pctInd(n, totalCamp)}</td>`;
         }).join('');
+        return `${celdasPorStatus}<td>${items.length}</td><td>${pctInd(items.length, totalCamp)}</td>`;
     }
 
     let filas = '';
@@ -2087,15 +2129,20 @@ function render2CondicionesComerciales(leadsFiltrados) {
 
         filas += emitirFilasConCampana(filasDeEstaCamp, camp);
     });
-    if (!filas) filas = `<tr><td colspan="${STATUS_CC_COLS.length + 2}" style="text-align:center;color:#888;">Sin datos</td></tr>`;
+    // 2 columnas fijas (Campaña, Fecha) + 2 por cada status visible + 2 de Total.
+    const totalColumnas = 2 + columnasVisibles.length * 2 + 2;
+    if (!filas) filas = `<tr><td colspan="${totalColumnas}" style="text-align:center;color:#888;">Sin datos</td></tr>`;
 
-    const headerStatus = STATUS_CC_COLS.map(c => `<th>${escapeHtml(c.label)}</th>`).join('');
+    // Cada status visible aporta dos encabezados: su nombre y "%", igual que
+    // pide la estructura de la sección 5 (Campaña | Fecha | Pago Completo |
+    // % | Pago Fraccionado | % | ... | Total | %).
+    const headerStatus = columnasVisibles.map(c => `<th>${escapeHtml(c.label)}</th><th>%</th>`).join('');
 
     return `
         <div class="card ind-card">
             <h3>Condiciones Comerciales</h3>
             <table class="ind-table">
-                <thead><tr><th>Campaña</th><th>Fecha</th>${headerStatus}</tr></thead>
+                <thead><tr><th>Campaña</th><th>Fecha</th>${headerStatus}<th>Total</th><th>%</th></tr></thead>
                 <tbody>${filas}</tbody>
             </table>
         </div>`;
@@ -2104,39 +2151,156 @@ function render2CondicionesComerciales(leadsFiltrados) {
 // ---- Sección: Perfilamiento ----
 // NOTA: dejo fuera COMENTARIOS_PERFIL y ACCIONES_DEFINIDAS porque son texto
 // libre (no categorías con catálogo), así que no calzan en una tabla
-// Pregunta/#Leads/%.
+// Pregunta/#Leads/%. OTRAS_OPCIONES tampoco entra acá: tiene su propia
+// sección especial (tabla + gráfico) más abajo — ver render7OtrasOpciones.
 const PREGUNTAS_PERFIL_IND = [
     { columna: COLUMNAS.DOLOR_NECESIDAD, label: 'Dolor / Necesidad' },
     { columna: COLUMNAS.POR_QUE_ELIGIO_CARRERA, label: '¿Por qué eligió la carrera?' },
     { columna: COLUMNAS.QUE_BUSCA_UNIVERSIDAD, label: '¿Qué busca en una universidad?' },
     { columna: COLUMNAS.QUIEN_FINANCIARA, label: '¿Quién financiará la carrera?' },
     { columna: COLUMNAS.QUE_LE_FALTA, label: '¿Qué le falta para tomar una decisión?' }, // admite varias opciones separadas por coma
-    { columna: COLUMNAS.OTRAS_OPCIONES, label: '¿Cuáles son sus otras opciones?' },
 ];
+
+// Valor de OTRAS_OPCIONES que dispara los campos dependientes
+// OPCION_INSTITUCION (Instituto/Universidad) y OPCION_NOMBRE_INSTITUCION —
+// mismo valor usado en lead-detail.js (VALOR_OTRAS_OPCIONES_INSTITUCION).
+const VALOR_OTRAS_OPCIONES_INSTITUCION_IND = 'Evaluando otras instituciones';
+const TOP_N_INSTITUCIONES = 5;
+
+// Tabla Pregunta/#Leads/% de "¿Cuáles son sus otras opciones?" (mismo
+// formato que el resto de Perfilamiento), reutilizando renderTablaPerfilInd.
+function renderTablaOtrasOpciones(leads) {
+    return renderTablaPerfilInd({ columna: COLUMNAS.OTRAS_OPCIONES, label: '¿Cuáles son sus otras opciones?' }, leads);
+}
+
+// Cruza OPCION_INSTITUCION (tipo: INSTITUTO/UNIVERSIDAD) con
+// OPCION_NOMBRE_INSTITUCION para el gráfico de la sección 7. Solo entran los
+// leads cuya respuesta de OTRAS_OPCIONES es "Evaluando otras instituciones"
+// (los únicos que llenan estos dos campos dependientes).
+function datosInstitutoVsUniversidad(leads) {
+    const relevantes = leads.filter(l => limpiarEspacios(l[COLUMNAS.OTRAS_OPCIONES]) === VALOR_OTRAS_OPCIONES_INSTITUCION_IND);
+
+    const grupos = { instituto: {}, universidad: {} };
+    let totalInstituto = 0, totalUniversidad = 0;
+
+    relevantes.forEach(l => {
+        const tipoCrudo = claveCategoriaLocal(l[COLUMNAS.OPCION_INSTITUCION]);
+        const nombre = l[COLUMNAS.OPCION_NOMBRE_INSTITUCION];
+        if (tipoCrudo.startsWith('instituto')) {
+            totalInstituto++;
+            if (nombre) sumarCategoria(grupos.instituto, nombre);
+        } else if (tipoCrudo.startsWith('universidad')) {
+            totalUniversidad++;
+            if (nombre) sumarCategoria(grupos.universidad, nombre);
+        }
+    });
+
+    const topN = (mapa) => Object.values(mapa).sort((a, b) => b.total - a.total).slice(0, TOP_N_INSTITUCIONES);
+
+    return {
+        totalInstituto, totalUniversidad,
+        topInstituto: topN(grupos.instituto),
+        topUniversidad: topN(grupos.universidad),
+    };
+}
+function claveCategoriaLocal(s) { return limpiarEspacios(s).toLowerCase(); }
+
+// Sección 7: tabla (izquierda) + gráfico Instituto vs. Universidad con su
+// Top 5 (derecha), lado a lado. Va aparte del grid de Perfilamiento (no
+// participa del empaquetado dinámico de la sección 4).
+function render7OtrasOpciones(leads) {
+    const tabla = renderTablaOtrasOpciones(leads);
+    if (!tabla) return ''; // nadie respondió esta pregunta con los filtros actuales
+
+    const canvasId = 'indChartOtrasOpciones';
+    return `
+        <div class="card ind-card ind-otras-opciones-card">
+            <div class="ind-otras-opciones-grid">
+                <div>${tabla}</div>
+                <div>
+                    <h3>Instituto vs. Universidad</h3>
+                    <div class="ind-otras-opciones-chart-wrap">
+                        <canvas id="${canvasId}" height="240"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+}
+
+// Se llama DESPUÉS de insertar el HTML de renderIndicadores en el DOM (el
+// <canvas> tiene que existir ya para poder dibujar el gráfico).
+function dibujarGraficoOtrasOpciones(leads) {
+    const canvas = document.getElementById('indChartOtrasOpciones');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const { totalInstituto, totalUniversidad, topInstituto, topUniversidad } = datosInstitutoVsUniversidad(leads);
+    const existente = Chart.getChart(canvas);
+    if (existente) existente.destroy();
+
+    if (totalInstituto === 0 && totalUniversidad === 0) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = '12px Segoe UI'; ctx.fillStyle = '#888'; ctx.textAlign = 'center';
+        ctx.fillText('Sin datos con los filtros actuales', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    const wrap = canvas.closest('.ind-otras-opciones-chart-wrap');
+    if (wrap && !wrap.querySelector('.ind-otras-opciones-badges')) {
+        wrap.insertAdjacentHTML('beforebegin', `
+            <div class="ind-otras-opciones-badges">
+                <span class="ind-otras-opciones-badge instituto"><span class="dot"></span>Instituto: ${totalInstituto}</span>
+                <span class="ind-otras-opciones-badge universidad"><span class="dot"></span>Universidad: ${totalUniversidad}</span>
+            </div>`);
+    }
+
+    const labels = [...topInstituto.map(x => x.label), ...topUniversidad.map(x => x.label)];
+    const data = [...topInstituto.map(x => x.total), ...topUniversidad.map(x => x.total)];
+    const colores = [
+        ...topInstituto.map(() => '#0040A1CC'),
+        ...topUniversidad.map(() => '#FB923CCC'),
+    ];
+
+    new Chart(canvas, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: '# Leads', data, backgroundColor: colores, borderRadius: 6 }] },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+        }
+    });
+}
 
 function renderTablaPerfilInd(pregunta, leads) {
     const porCampana = {};
     leads.forEach(l => {
-        const valorCrudo = String(l[pregunta.columna] || '').trim();
+        const valorCrudo = limpiarEspacios(l[pregunta.columna]);
         if (!valorCrudo) return; // "solo las que se tienen por lo menos 1"
         const camp = l[COLUMNAS.CAMPANA] || '-';
         porCampana[camp] = porCampana[camp] || { total: 0, porValor: {} };
+        // QUE_LE_FALTA admite varias respuestas separadas por coma (checkbox
+        // múltiple). El resto es una sola respuesta. En ambos casos se
+        // normaliza cada valor antes de agruparlo (sumarCategoria), para
+        // que diferencias de espacios/mayúsculas/caracteres invisibles no
+        // generen categorías duplicadas (p.ej. "Ya decidio, falta pagar").
         const valores = pregunta.columna === COLUMNAS.QUE_LE_FALTA
-            ? valorCrudo.split(',').map(v => v.trim()).filter(Boolean)
+            ? valorCrudo.split(',').map(v => limpiarEspacios(v)).filter(Boolean)
             : [valorCrudo];
         porCampana[camp].total++;
-        valores.forEach(v => { porCampana[camp].porValor[v] = (porCampana[camp].porValor[v] || 0) + 1; });
+        valores.forEach(v => sumarCategoria(porCampana[camp].porValor, v));
     });
 
     let filas = '';
     Object.keys(porCampana).sort().forEach(camp => {
         const info = porCampana[camp];
         // Ordenado de mayor a menor por cantidad de leads.
-        const valoresOrdenados = Object.entries(info.porValor).sort((a, b) => b[1] - a[1]);
-        const filasDeEstaCamp = valoresOrdenados.map(([valor, n]) => {
+        const valoresOrdenados = Object.values(info.porValor).sort((a, b) => b.total - a.total);
+        const filasDeEstaCamp = valoresOrdenados.map(({ label, total: n }) => {
             return `
                 <tr>{{CAMP_TD}}
-                    <td>${escapeHtml(valor)}</td>
+                    <td>${escapeHtml(label)}</td>
                     <td>${n}</td>
                     <td>${pctInd(n, info.total)}</td>
                 </tr>`;
@@ -2161,12 +2325,14 @@ function renderTablaPerfilInd(pregunta, leads) {
         </div>`;
 }
 
-// Dos tablas por fila (grid de 2 columnas) — ver .ind-perfil-grid en
-// ui-kit.css.
+// Distribución dinámica tipo masonry (columnas CSS) — ver .ind-perfil-grid
+// en ui-kit.css. "¿Cuáles son sus otras opciones?" queda afuera de este
+// grid: se arma aparte, como sección de ancho completo (tabla + gráfico).
 function render3Perfilamiento(leads) {
     const tablas = PREGUNTAS_PERFIL_IND.map(p => renderTablaPerfilInd(p, leads)).filter(Boolean);
-    if (tablas.length === 0) return '';
-    return `<div class="ind-perfil-grid">${tablas.join('')}</div>`;
+    const otrasOpciones = render7OtrasOpciones(leads);
+    if (tablas.length === 0 && !otrasOpciones) return '';
+    return `<div class="ind-perfil-grid">${tablas.join('')}${otrasOpciones}</div>`;
 }
 
 // ---- Orquestador ----
@@ -2190,6 +2356,9 @@ function renderIndicadores() {
         <h3 class="ind-section-title">Perfilamiento</h3>
         ${tablasPerfil || '<p style="color:#888;">Sin respuestas de perfilamiento con los filtros actuales.</p>'}
     `;
+
+    // El <canvas> recién quedó en el DOM — recién ahora se puede dibujar.
+    dibujarGraficoOtrasOpciones(leads);
 }
 window.renderIndicadores = renderIndicadores;
 
