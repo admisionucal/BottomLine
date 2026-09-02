@@ -597,6 +597,8 @@ table tbody tr:hover { background: #fafbff; }
 .ind-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .ind-table th { text-align: left; padding: 8px; border-bottom: 2px solid var(--color-border); color: #666; font-weight: 600; }
 .ind-table td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+/* Encabezado de la columna Campaña centrado, igual que la celda de datos */
+.ind-table th:first-child { text-align: center; }
 /* Celda de Campaña: una sola celda (rowspan), centrada vertical y horizontalmente */
 .ind-td-campana { text-align: center; vertical-align: middle; font-weight: 700; color: var(--color-primary); border-right: 1px solid #eee; background: #fafbff; }
 .ind-row-mes { cursor: pointer; font-weight: 600; background: #fafafa; }
@@ -608,10 +610,20 @@ table tbody tr:hover { background: #fafbff; }
 .ind-indent-1 { padding-left: 20px; }
 .ind-indent-2 { padding-left: 40px; color: #666; }
 
+/* Perfilamiento: dos tablas por fila */
+.ind-perfil-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.ind-perfil-grid .ind-card { margin-bottom: 0; }
+
+/* El calendario de Indicadores se abre hacia la izquierda (el botón que lo
+   dispara suele quedar pegado al borde derecho del panel de filtros, así
+   que anclarlo por la izquierda lo saca fuera de pantalla). */
+#indCalPanel { left: auto; right: 0; }
+
 @media (max-width: 900px) {
     .filtros-panel .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #indFiltersContainer.filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ind-row-cards { grid-template-columns: 1fr; }
+    .ind-perfil-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
     .filtros-panel .filters { grid-template-columns: 1fr; }

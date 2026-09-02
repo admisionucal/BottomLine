@@ -48,7 +48,8 @@ let state = {
         filtros: { campana: [], programa: [], modalidad: [], ingreso: [], asesor: [], canal: [], fechaCalendario: [] },
         expandido: {},
         calMes: new Date(),
-        cargado: false
+        cargado: false,
+        leadsPorCampana: {}
     }
 };
 
@@ -1483,11 +1484,21 @@ function emitirFilasConCampana(filasDeEstaCamp, campana) {
     }).join('');
 }
 
+// Formatea un % SIN decimales (pedido explícito: "los porcentajes de todas
+// las tablas no deben tener decimales"). Devuelve algo como "37%".
+function pctInd(n, total) {
+    if (!total) return '0%';
+    return `${Math.round((n / total) * 100)}%`;
+}
+
 async function inicializarIndicadores() {
-    // Reusa la data ya cargada al iniciar sesión (cargarLeadsCalendario) —
-    // si por lo que sea todavía no hay nada, la carga.
-    if (!state.calLeadsPorCampana || Object.keys(state.calLeadsPorCampana).length === 0) {
-        await cargarLeadsCalendario();
+    // A diferencia del calendario del Dashboard (que solo trae las campañas
+    // "efectivas" según su propio selector), Indicadores siempre debe
+    // mostrar TODAS las campañas activas del usuario — por eso usa su
+    // propio loader (cargarLeadsIndicadores), independiente del filtro de
+    // campaña del calendario del Dashboard.
+    if (!state.indicadores.leadsPorCampana || Object.keys(state.indicadores.leadsPorCampana).length === 0) {
+        await cargarLeadsIndicadores();
     }
     // El módulo de Condiciones Comerciales guarda su data en su PROPIO
     // `state` (cada módulo ES tiene el suyo, no se comparten entre sí), así
@@ -1507,14 +1518,53 @@ async function inicializarIndicadores() {
 }
 window.inicializarIndicadores = inicializarIndicadores;
 
-// Aplana state.calLeadsPorCampana en un solo array. Cada lead ya trae
-// COLUMNAS.CAMPANA (agregada a constants.js). Nótese que calLeadsPorCampana
-// se carga para TODAS las campañas efectivas del usuario (independiente de
-// la campaña puntual seleccionada en el selector del Dashboard/Bottom
-// Line), así que el filtro de Campaña de Indicadores queda desacoplado de
-// ese selector.
+// Carga los leads de TODAS las campañas activas del usuario (no depende del
+// filtro de campaña del calendario del Dashboard). Reutiliza la misma
+// caché (CACHE_KEYS.LEADS_RAW) que cargarLeadsCalendario, así que si el
+// Dashboard ya trajo esa data no se vuelve a pedir por red.
+async function cargarLeadsIndicadores(forceRefresh = false) {
+    const user = getCurrentUser();
+    if (!user) return;
+    const campanas = getUserCampanas();
+
+    if (campanas.length === 0) {
+        state.indicadores.leadsPorCampana = {};
+        return;
+    }
+
+    const resultados = await Promise.all(campanas.map(async (campana) => {
+        const cacheKey = CACHE_KEYS.LEADS_RAW(user.email, user.rol, campana);
+        if (!forceRefresh) {
+            const cached = cacheGet(cacheKey);
+            if (cached && cached.data) return { campana, leads: cached.data };
+        }
+        try {
+            const result = await callAPI('getLeads', {
+                email: user.email,
+                rol: user.rol,
+                campana,
+                nombreAsesor: user.nombre_completo || user.nombre_asesor || user.nombre || ''
+            });
+            if (result.success) {
+                const data = result.data || [];
+                cacheSet(cacheKey, { data, timestamp: Date.now() });
+                return { campana, leads: data };
+            }
+        } catch (error) {
+            // Se ignora
+        }
+        return { campana, leads: [] };
+    }));
+
+    state.indicadores.leadsPorCampana = {};
+    resultados.forEach(({ campana, leads }) => { state.indicadores.leadsPorCampana[campana] = leads; });
+}
+
+// Aplana state.indicadores.leadsPorCampana (TODAS las campañas activas del
+// usuario) en un solo array. Cada lead ya trae COLUMNAS.CAMPANA (agregada a
+// constants.js).
 function todosLosLeadsIndicadores() {
-    return Object.values(state.calLeadsPorCampana || {}).flat();
+    return Object.values(state.indicadores.leadsPorCampana || {}).flat();
 }
 
 // Mismo estilo/orden que los Filtros del Dashboard (grid de 3 en 3):
@@ -1540,9 +1590,19 @@ function poblarFiltrosIndicadores() {
     });
     createMultiSelect('indFilterAsesor', nombresRawAsesor, state.indicadores.filtros.asesor, 'Todos', labelsAsesor);
 
-    // Campaña: siempre con TODAS las campañas efectivas del usuario, sin
-    // depender de la campaña puntual seleccionada en el Dashboard.
-    createMultiSelect('indFilterCampana', valoresUnicos(COLUMNAS.CAMPANA), state.indicadores.filtros.campana, 'Todas');
+    // Campaña: siempre con TODAS las campañas efectivas del usuario. No se
+    // permite la opción "Todas" (catch-all) — el usuario debe ver siempre
+    // las campañas activas marcadas explícitamente, con al menos una
+    // seleccionada en todo momento.
+    const camposCampana = valoresUnicos(COLUMNAS.CAMPANA);
+    createMultiSelect('indFilterCampana', camposCampana, state.indicadores.filtros.campana, 'Todas', null, { permitirTodos: false });
+    // Si todavía no había selección (primera carga), createMultiSelect ya
+    // marcó todas las opciones por defecto — reflejamos eso en el state
+    // para que el resto de la lógica (filtro, calendario, etc.) lo sepa.
+    if (state.indicadores.filtros.campana.length === 0 && camposCampana.length > 0) {
+        state.indicadores.filtros.campana = camposCampana.slice();
+    }
+
     createMultiSelect('indFilterCanal', valoresUnicos(COLUMNAS.CANAL), state.indicadores.filtros.canal, 'Todos');
 
     if (!state.indicadores.filtrosListenerListo) {
@@ -1752,19 +1812,18 @@ function render1_1StatusGestion(leads) {
         const statusesOrdenados = ordenarStatusInd(Object.keys(info.porStatus));
         const filasDeEstaCamp = statusesOrdenados.map(status => {
             const n = info.porStatus[status];
-            const pct = ((n / info.total) * 100).toFixed(1);
             return `
                 <tr>{{CAMP_TD}}
                     <td>${escapeHtml(STATUS_LABELS[status] || status)}</td>
                     <td>${n}</td>
-                    <td>${pct}%</td>
+                    <td>${pctInd(n, info.total)}</td>
                 </tr>`;
         });
         filasDeEstaCamp.push(`
             <tr class="ind-row-subtotal">{{CAMP_TD}}
-                <td>Subtotal</td>
+                <td>Total</td>
                 <td>${info.total}</td>
-                <td>100.0%</td>
+                <td>100%</td>
             </tr>`);
         filas += emitirFilasConCampana(filasDeEstaCamp, camp);
     });
@@ -1805,21 +1864,20 @@ function render1_2DiasConversion(leads) {
         const filasDeEstaCamp = statusesOrdenados.map(status => {
             const { suma, n } = info.porStatus[status];
             const promedio = (suma / n).toFixed(1);
-            const pct = ((n / info.total) * 100).toFixed(1);
             return `
                 <tr>{{CAMP_TD}}
                     <td>${escapeHtml(STATUS_LABELS[status] || status)}</td>
                     <td>${promedio}</td>
                     <td>${n}</td>
-                    <td>${pct}%</td>
+                    <td>${pctInd(n, info.total)}</td>
                 </tr>`;
         });
         filasDeEstaCamp.push(`
             <tr class="ind-row-subtotal">{{CAMP_TD}}
-                <td>Subtotal</td>
+                <td>Total</td>
                 <td>—</td>
                 <td>${info.total}</td>
-                <td>100.0%</td>
+                <td>100%</td>
             </tr>`);
         filas += emitirFilasConCampana(filasDeEstaCamp, camp);
     });
@@ -1835,57 +1893,41 @@ function render1_2DiasConversion(leads) {
         </div>`;
 }
 
-// ---- Sección: Ventas (antes que Condiciones Comerciales) ----
-// Una columna por cada status pedido: Pago Completo, PP Viva, PP Muerta,
-// VP Muerta y Perdido. Cada columna trae su propia cantidad y % respecto
-// al total de ESE status en la campaña. Agrupación Mes > Semana > Día.
-const STATUS_VENTAS_COLS = [
-    { status: STATUS.PAGO_COMPLETO, label: 'Pago Completo' },
-    { status: STATUS.PP_VIVA, label: 'PP Viva' },
-    { status: STATUS.PP_MUERTA, label: 'PP Muerta' },
-    { status: STATUS.VP_MUERTA, label: 'VP Muerta' },
-    { status: STATUS.PERDIDO, label: 'Perdido' },
-];
+// ---- Sección: Ventas ----
+// Ventas = pagos reales (Pago Completo + Pago Fraccionado). Columnas
+// pedidas: Campaña, Fecha, # de Pagos, % (sobre el total de pagos de la
+// campaña). Agrupación Mes > Semana > Día, igual que el resto de tablas.
+const STATUS_PAGOS = [STATUS.PAGO_COMPLETO, STATUS.PAGO_FRACCIONADO];
 
-// Fecha relevante por lead: Pago Completo usa su fecha de pago; el resto
-// (embudo VP/PP/Perdido) usa la fecha del status actual.
+// Fecha relevante por lead: Pago Completo usa su fecha de pago, Pago
+// Fraccionado usa su fecha de promesa de pago; si falta, cae a la fecha del
+// status actual.
 function fechaVentaLead(lead) {
     if (lead[COLUMNAS.STATUS_GESTION] === STATUS.PAGO_COMPLETO) {
         return parsearFechaFlexible(lead[COLUMNAS.FECHA_PAGO_COMPLETO]) || parsearFechaFlexible(fechaStatusActual(lead));
     }
+    if (lead[COLUMNAS.STATUS_GESTION] === STATUS.PAGO_FRACCIONADO) {
+        return parsearFechaFlexible(lead[COLUMNAS.FECHA_PROMESA_PAGO]) || parsearFechaFlexible(fechaStatusActual(lead));
+    }
     return parsearFechaFlexible(fechaStatusActual(lead));
 }
 
-function render2_2Ventas(leads) {
-    const statusesVenta = STATUS_VENTAS_COLS.map(c => c.status);
-    const leadsVenta = leads.filter(l => statusesVenta.includes(l[COLUMNAS.STATUS_GESTION]));
+function render2Ventas(leads) {
+    const leadsVenta = leads.filter(l => STATUS_PAGOS.includes(l[COLUMNAS.STATUS_GESTION]));
 
-    // Totales por campaña y status: denominador del % de cada columna.
-    const totalesPorCampana = {};
     const porCampana = {};
     leadsVenta.forEach(l => {
         const camp = l[COLUMNAS.CAMPANA] || '-';
-        const status = l[COLUMNAS.STATUS_GESTION];
-        totalesPorCampana[camp] = totalesPorCampana[camp] || {};
-        totalesPorCampana[camp][status] = (totalesPorCampana[camp][status] || 0) + 1;
         porCampana[camp] = porCampana[camp] || [];
         porCampana[camp].push(l);
     });
 
     const set = state.indicadores.expandido['indVentas'] = state.indicadores.expandido['indVentas'] || new Set();
 
-    function celdasStatus(items, camp) {
-        return STATUS_VENTAS_COLS.map(c => {
-            const n = items.filter(it => it[COLUMNAS.STATUS_GESTION] === c.status).length;
-            const totalStatus = (totalesPorCampana[camp] && totalesPorCampana[camp][c.status]) || 0;
-            const pct = totalStatus ? ((n / totalStatus) * 100).toFixed(1) : '0.0';
-            return `<td>${n} <span style="color:#999;">(${pct}%)</span></td>`;
-        }).join('');
-    }
-
     let filas = '';
     Object.keys(porCampana).sort().forEach(camp => {
         const itemsCamp = porCampana[camp];
+        const totalCamp = itemsCamp.length;
         const arbol = construirArbolFechasInd(itemsCamp, fechaVentaLead);
         const filasDeEstaCamp = [];
 
@@ -1896,7 +1938,8 @@ function render2_2Ventas(leads) {
             filasDeEstaCamp.push(`
                 <tr class="ind-row ind-row-mes" onclick="window.toggleIndRow('indVentas','${claveMesRow}')">{{CAMP_TD}}
                     <td><span class="ind-caret">${abiertoMes ? '▾' : '▸'}</span> ${escapeHtml(mes.label)}</td>
-                    ${celdasStatus(mes.items, camp)}
+                    <td>${mes.items.length}</td>
+                    <td>${pctInd(mes.items.length, totalCamp)}</td>
                 </tr>`);
 
             if (abiertoMes) {
@@ -1907,7 +1950,8 @@ function render2_2Ventas(leads) {
                     filasDeEstaCamp.push(`
                         <tr class="ind-row ind-row-semana" onclick="window.toggleIndRow('indVentas','${claveSemRow}')">{{CAMP_TD}}
                             <td class="ind-indent-1"><span class="ind-caret">${abiertoSem ? '▾' : '▸'}</span> ${escapeHtml(sem.label)}</td>
-                            ${celdasStatus(sem.items, camp)}
+                            <td>${sem.items.length}</td>
+                            <td>${pctInd(sem.items.length, totalCamp)}</td>
                         </tr>`);
 
                     if (abiertoSem) {
@@ -1916,7 +1960,8 @@ function render2_2Ventas(leads) {
                             filasDeEstaCamp.push(`
                                 <tr class="ind-row ind-row-dia">{{CAMP_TD}}
                                     <td class="ind-indent-2">${escapeHtml(dia.label)}</td>
-                                    ${celdasStatus(dia.items, camp)}
+                                    <td>${dia.items.length}</td>
+                                    <td>${pctInd(dia.items.length, totalCamp)}</td>
                                 </tr>`);
                         });
                     }
@@ -1926,29 +1971,45 @@ function render2_2Ventas(leads) {
 
         filasDeEstaCamp.push(`
             <tr class="ind-row-subtotal">{{CAMP_TD}}
-                <td>Subtotal</td>
-                ${celdasStatus(itemsCamp, camp)}
+                <td>Total</td>
+                <td>${totalCamp}</td>
+                <td>100%</td>
             </tr>`);
 
         filas += emitirFilasConCampana(filasDeEstaCamp, camp);
     });
-    if (!filas) filas = `<tr><td colspan="6" style="text-align:center;color:#888;">Sin datos con los filtros actuales</td></tr>`;
-
-    const headerStatus = STATUS_VENTAS_COLS.map(c => `<th>${escapeHtml(c.label)}</th>`).join('');
+    if (!filas) filas = `<tr><td colspan="4" style="text-align:center;color:#888;">Sin datos con los filtros actuales</td></tr>`;
 
     return `
         <div class="card ind-card">
             <h3>Ventas</h3>
             <table class="ind-table">
-                <thead><tr><th>Campaña</th><th>Fecha</th>${headerStatus}</tr></thead>
+                <thead><tr><th>Campaña</th><th>Fecha</th><th># de Pagos</th><th>%</th></tr></thead>
                 <tbody>${filas}</tbody>
             </table>
         </div>`;
 }
 
+// ---- Sección: Condiciones Comerciales ----
 // Cruza cada solicitud CC con el lead correspondiente (mismo ID_PROMETEO +
-// campaña) para sacar su status de venta actual.
-function render2_1CondicionesComerciales(leadsFiltrados) {
+// campaña) para sacar su status de venta actual. Una columna por cada
+// status del embudo comercial; cada columna trae su propia cantidad y %,
+// SIEMPRE calculado sobre el total de solicitudes de la campaña (no sobre
+// el total de esa columna).
+const STATUS_CC_COLS = [
+    { status: STATUS.PAGO_COMPLETO, label: 'Pago Completo' },
+    { status: STATUS.PAGO_FRACCIONADO, label: 'Pago Fraccionado' },
+    { status: STATUS.PP_VIVA, label: 'PP Viva' },
+    { status: STATUS.PP_MUERTA, label: 'PP Muerta' },
+    { status: STATUS.VP_VIVA, label: 'VP Viva' },
+    { status: STATUS.VP_MUERTA, label: 'VP Muerta' },
+    { status: STATUS.SIN_CONTACTO, label: 'Sin Contacto' },
+    { status: STATUS.VOLVER_A_LLAMAR, label: 'Volver a Llamar' },
+    { status: STATUS.PERDIDO, label: 'Perdido' },
+    { status: STATUS.BLACK_LIST, label: 'Blacklist' },
+];
+
+function render2CondicionesComerciales(leadsFiltrados) {
     const idsPermitidos = new Set(leadsFiltrados.map(l => `${l[COLUMNAS.ID_PROMETEO]}|${l[COLUMNAS.CAMPANA]}`));
     const mapaLeads = {};
     leadsFiltrados.forEach(l => { mapaLeads[`${l[COLUMNAS.ID_PROMETEO]}|${l[COLUMNAS.CAMPANA]}`] = l; });
@@ -1963,75 +2024,78 @@ function render2_1CondicionesComerciales(leadsFiltrados) {
         porCampana[camp].push({
             ...sol,
             _fechaEnvio: sol.FECHA_SOLICITUD,
-            _statusActual: leadCruzado ? (leadCruzado[COLUMNAS.STATUS_GESTION] || '-') : '(lead no encontrado)'
+            _statusActual: leadCruzado ? (leadCruzado[COLUMNAS.STATUS_GESTION] || '-') : '-'
         });
     });
 
-    // Solo 2 niveles (Mes > Día) para que la columna de Status Actual no
-    // haga la tabla ilegible.
     const set = state.indicadores.expandido['indCC'] = state.indicadores.expandido['indCC'] || new Set();
+
+    function celdasStatus(items, totalCamp) {
+        return STATUS_CC_COLS.map(c => {
+            const n = items.filter(it => it._statusActual === c.status).length;
+            return `<td>${n} <span style="color:#999;">(${pctInd(n, totalCamp)})</span></td>`;
+        }).join('');
+    }
+
     let filas = '';
     Object.keys(porCampana).sort().forEach(camp => {
         const itemsCamp = porCampana[camp];
-        const total = itemsCamp.length;
+        const totalCamp = itemsCamp.length;
         const arbol = construirArbolFechasInd(itemsCamp, x => parsearFechaFlexible(x._fechaEnvio));
         const filasDeEstaCamp = [];
 
         Object.keys(arbol).sort().forEach(mk => {
             const mes = arbol[mk];
             const claveMesRow = `${camp}|${mk}`;
-            const abierto = set.has(claveMesRow);
-            const pct = total ? ((mes.items.length / total) * 100).toFixed(1) : '0.0';
-            const porStatus = {};
-            mes.items.forEach(it => { porStatus[it._statusActual] = (porStatus[it._statusActual] || 0) + 1; });
-            const statusResumen = Object.entries(porStatus).map(([s, n]) => `${STATUS_LABELS[s] || s} (${n})`).join(', ');
-
+            const abiertoMes = set.has(claveMesRow);
             filasDeEstaCamp.push(`
                 <tr class="ind-row ind-row-mes" onclick="window.toggleIndRow('indCC','${claveMesRow}')">{{CAMP_TD}}
-                    <td><span class="ind-caret">${abierto ? '▾' : '▸'}</span> ${escapeHtml(mes.label)}</td>
-                    <td>${escapeHtml(statusResumen)}</td>
-                    <td>${mes.items.length}</td>
-                    <td>${pct}%</td>
+                    <td><span class="ind-caret">${abiertoMes ? '▾' : '▸'}</span> ${escapeHtml(mes.label)}</td>
+                    ${celdasStatus(mes.items, totalCamp)}
                 </tr>`);
 
-            if (abierto) {
+            if (abiertoMes) {
                 Object.keys(mes.semanas).sort().forEach(sk => {
                     const sem = mes.semanas[sk];
-                    Object.keys(sem.dias).sort().forEach(dk => {
-                        const dia = sem.dias[dk];
-                        const porStatusDia = {};
-                        dia.items.forEach(it => { porStatusDia[it._statusActual] = (porStatusDia[it._statusActual] || 0) + 1; });
-                        const resumenDia = Object.entries(porStatusDia).map(([s, n]) => `${STATUS_LABELS[s] || s} (${n})`).join(', ');
-                        const pctDia = total ? ((dia.items.length / total) * 100).toFixed(1) : '0.0';
-                        filasDeEstaCamp.push(`
-                            <tr class="ind-row ind-row-dia">{{CAMP_TD}}
-                                <td class="ind-indent-2">${escapeHtml(dia.label)}</td>
-                                <td>${escapeHtml(resumenDia)}</td>
-                                <td>${dia.items.length}</td>
-                                <td>${pctDia}%</td>
-                            </tr>`);
-                    });
+                    const claveSemRow = `${claveMesRow}|${sk}`;
+                    const abiertoSem = set.has(claveSemRow);
+                    filasDeEstaCamp.push(`
+                        <tr class="ind-row ind-row-semana" onclick="window.toggleIndRow('indCC','${claveSemRow}')">{{CAMP_TD}}
+                            <td class="ind-indent-1"><span class="ind-caret">${abiertoSem ? '▾' : '▸'}</span> ${escapeHtml(sem.label)}</td>
+                            ${celdasStatus(sem.items, totalCamp)}
+                        </tr>`);
+
+                    if (abiertoSem) {
+                        Object.keys(sem.dias).sort().forEach(dk => {
+                            const dia = sem.dias[dk];
+                            filasDeEstaCamp.push(`
+                                <tr class="ind-row ind-row-dia">{{CAMP_TD}}
+                                    <td class="ind-indent-2">${escapeHtml(dia.label)}</td>
+                                    ${celdasStatus(dia.items, totalCamp)}
+                                </tr>`);
+                        });
+                    }
                 });
             }
         });
 
         filasDeEstaCamp.push(`
             <tr class="ind-row-subtotal">{{CAMP_TD}}
-                <td>Subtotal</td>
-                <td>—</td>
-                <td>${total}</td>
-                <td>100.0%</td>
+                <td>Total</td>
+                ${celdasStatus(itemsCamp, totalCamp)}
             </tr>`);
 
         filas += emitirFilasConCampana(filasDeEstaCamp, camp);
     });
-    if (!filas) filas = `<tr><td colspan="5" style="text-align:center;color:#888;">Sin datos</td></tr>`;
+    if (!filas) filas = `<tr><td colspan="${STATUS_CC_COLS.length + 2}" style="text-align:center;color:#888;">Sin datos</td></tr>`;
+
+    const headerStatus = STATUS_CC_COLS.map(c => `<th>${escapeHtml(c.label)}</th>`).join('');
 
     return `
         <div class="card ind-card">
             <h3>Condiciones Comerciales</h3>
             <table class="ind-table">
-                <thead><tr><th>Campaña</th><th>Fecha de Envío</th><th>Status Actual</th><th># Leads</th><th>%</th></tr></thead>
+                <thead><tr><th>Campaña</th><th>Fecha</th>${headerStatus}</tr></thead>
                 <tbody>${filas}</tbody>
             </table>
         </div>`;
@@ -2070,19 +2134,18 @@ function renderTablaPerfilInd(pregunta, leads) {
         // Ordenado de mayor a menor por cantidad de leads.
         const valoresOrdenados = Object.entries(info.porValor).sort((a, b) => b[1] - a[1]);
         const filasDeEstaCamp = valoresOrdenados.map(([valor, n]) => {
-            const pct = ((n / info.total) * 100).toFixed(1);
             return `
                 <tr>{{CAMP_TD}}
                     <td>${escapeHtml(valor)}</td>
                     <td>${n}</td>
-                    <td>${pct}%</td>
+                    <td>${pctInd(n, info.total)}</td>
                 </tr>`;
         });
         filasDeEstaCamp.push(`
             <tr class="ind-row-subtotal">{{CAMP_TD}}
-                <td>Subtotal</td>
+                <td>Total</td>
                 <td>${info.total}</td>
-                <td>100.0%</td>
+                <td>100%</td>
             </tr>`);
         filas += emitirFilasConCampana(filasDeEstaCamp, camp);
     });
@@ -2098,8 +2161,12 @@ function renderTablaPerfilInd(pregunta, leads) {
         </div>`;
 }
 
+// Dos tablas por fila (grid de 2 columnas) — ver .ind-perfil-grid en
+// ui-kit.css.
 function render3Perfilamiento(leads) {
-    return PREGUNTAS_PERFIL_IND.map(p => renderTablaPerfilInd(p, leads)).filter(Boolean).join('');
+    const tablas = PREGUNTAS_PERFIL_IND.map(p => renderTablaPerfilInd(p, leads)).filter(Boolean);
+    if (tablas.length === 0) return '';
+    return `<div class="ind-perfil-grid">${tablas.join('')}</div>`;
 }
 
 // ---- Orquestador ----
@@ -2117,8 +2184,8 @@ function renderIndicadores() {
         </div>
 
         <h3 class="ind-section-title">Ventas y Condiciones Comerciales</h3>
-        ${render2_2Ventas(leads)}
-        ${render2_1CondicionesComerciales(leads)}
+        ${render2Ventas(leads)}
+        ${render2CondicionesComerciales(leads)}
 
         <h3 class="ind-section-title">Perfilamiento</h3>
         ${tablasPerfil || '<p style="color:#888;">Sin respuestas de perfilamiento con los filtros actuales.</p>'}

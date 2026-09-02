@@ -68,6 +68,7 @@ export async function getLeads(client: Client, body: JsonBody) {
       l.fecha_visita_guiada,
       l.fecha_prim_vp_pp,
       (l.actualizado_hoy_en is not null) as actualizado_hoy,
+      l.extra->>'SUBCANAL 2' as canal,
       ${selectPagos}
       coalesce(b.beneficio, 'NO') as beneficio,
       coalesce(b.beneficio_adicional, 'NO') as beneficio_adicional,
@@ -127,6 +128,7 @@ export async function getLeads(client: Client, body: JsonBody) {
     ACTUALIZADO_HOY: r.actualizado_hoy,
     'FECHA DE PAGO COMPLETO': r.fecha_pago_completo,
     'FECHA DE PROMESA DE PAGO': r.fecha_promesa_pago,
+    'SUBCANAL 2': r.canal,
     BENEFICIO: r.beneficio,
     BENEFICIO_ADICIONAL: r.beneficio_adicional,
     PERFILAMIENTO_COMPLETO: (() => {
@@ -147,4 +149,4 @@ export async function getLeads(client: Client, body: JsonBody) {
   }));
 
   return jsonOk({ data });
-}
+}

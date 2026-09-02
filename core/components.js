@@ -310,12 +310,23 @@ export function renderTable(containerId, headers, rows, options = {}) {
 // ================================================================
 // FILTROS MULTI-SELECT
 // ================================================================
-export function createMultiSelect(containerId, options, selected = [], label = 'Todos', labelsMap = null) {
+export function createMultiSelect(containerId, options, selected = [], label = 'Todos', labelsMap = null, opciones = {}) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
+    // permitirTodos = false: no se ofrece la opción "Todos/Todas" (catch-all).
+    // El usuario tiene que marcar explícitamente al menos una opción, y no
+    // puede dejar el filtro en 0 seleccionados (se re-marca automáticamente
+    // la última opción que intente desmarcar).
+    const permitirTodos = opciones.permitirTodos !== false;
+
     const uniqueOptions = [...new Set(options.filter(v => v && String(v).trim() !== '').map(v => String(v).trim()))].sort();
-    const selection = selected.filter(v => uniqueOptions.includes(v));
+    let selection = selected.filter(v => uniqueOptions.includes(v));
+    if (!permitirTodos && selection.length === 0) {
+        // Sin "Todos" no tiene sentido arrancar sin nada marcado: por
+        // defecto se marca todo lo disponible.
+        selection = uniqueOptions.slice();
+    }
 
     if (uniqueOptions.length === 0) {
         container.innerHTML = `<button type="button" class="multiselect-btn" disabled>Sin datos</button>`;
@@ -334,10 +345,11 @@ export function createMultiSelect(containerId, options, selected = [], label = '
         </button>
         <div class="multiselect-panel">
             <div class="multiselect-options">
+                ${permitirTodos ? `
                 <label class="multiselect-option ms-todos">
                     <input type="checkbox" data-todos="1" ${selection.length === 0 ? 'checked' : ''}>
                     <span>${escapeHtml(label)}</span>
-                </label>
+                </label>` : ''}
                 ${uniqueOptions.map(v => {
                     const checked = selection.includes(v) ? 'checked' : '';
                     const labelText = labelsMap && labelsMap[v] ? labelsMap[v] : v;
@@ -386,7 +398,13 @@ export function createMultiSelect(containerId, options, selected = [], label = '
     // Eventos para checkboxes individuales
     getIndividualChecks().forEach(chk => {
         chk.addEventListener('change', () => {
-            const values = Array.from(getIndividualChecks()).filter(c => c.checked).map(c => c.value);
+            let values = Array.from(getIndividualChecks()).filter(c => c.checked).map(c => c.value);
+            if (!permitirTodos && values.length === 0) {
+                // No se permite quedar en 0: se re-marca la opción que se
+                // acaba de intentar desmarcar.
+                chk.checked = true;
+                values = Array.from(getIndividualChecks()).filter(c => c.checked).map(c => c.value);
+            }
             if (chkTodos) chkTodos.checked = values.length === 0;
             actualizarBoton(values);
             window.dispatchEvent(new CustomEvent('multiselect-change', {
@@ -559,4 +577,4 @@ function iniciarControlInactividad() {
             window.logout();
         }
     }, 60 * 1000);
-}
+}
