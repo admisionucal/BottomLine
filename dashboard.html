@@ -306,22 +306,33 @@
                 <!-- VISTA: INDICADORES -->
                 <div class="view" id="view-indicadores" style="display:none;">
                     <div class="ind-toolbar">
-                        <h2 style="margin:0 0 12px;">Indicadores</h2>
-                        <div class="filters" id="indFiltersContainer">
-                            <div class="filter-group"><label class="filter-label">CAMPAÑA</label><div class="multiselect" id="indFilterCampana"></div></div>
-                            <div class="filter-group"><label class="filter-label">PROGRAMA</label><div class="multiselect" id="indFilterPrograma"></div></div>
-                            <div class="filter-group"><label class="filter-label">MODALIDAD</label><div class="multiselect" id="indFilterModalidad"></div></div>
-                            <div class="filter-group"><label class="filter-label">MODALIDAD INGRESO</label><div class="multiselect" id="indFilterIngreso"></div></div>
-                            <div class="filter-group"><label class="filter-label">ASESOR</label><div class="multiselect" id="indFilterAsesor"></div></div>
-                            <div class="filter-group"><label class="filter-label">CANAL</label><div class="multiselect" id="indFilterCanal"></div></div>
-                            <div class="filter-group">
-                                <label class="filter-label">FECHA</label>
-                                <div style="display:flex;gap:6px;align-items:center;">
-                                    <input type="date" id="indFechaDesde">
-                                    <span style="color:#888;font-size:12px;">a</span>
-                                    <input type="date" id="indFechaHasta">
+                        <div class="ind-header-row">
+                            <h2 style="margin:0;">Indicadores</h2>
+                            <div class="filtros-dropdown" id="indCalDropdown">
+                                <button type="button" class="btn-filtros" id="indCalToggleBtn" onclick="window.toggleIndCalPanel && toggleIndCalPanel()">
+                                    <span class="material-symbols-outlined" style="font-size:16px;">event</span> Calendario
+                                </button>
+                                <div class="cal-vpp-panel" id="indCalPanel">
+                                    <div class="cal-vpp-header">
+                                        <button type="button" onclick="window.cambiarMesIndCal && cambiarMesIndCal(-1)">&lt;</button>
+                                        <span id="indCalMesLabel"></span>
+                                        <button type="button" onclick="window.cambiarMesIndCal && cambiarMesIndCal(1)">&gt;</button>
+                                    </div>
+                                    <div class="cal-vpp-grid" id="indCalGrid"></div>
+                                    <div class="cal-vpp-footer">
+                                        <button type="button" onclick="window.limpiarFiltroIndCal && limpiarFiltroIndCal()">Limpiar</button>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
+                        <!-- Mismo orden/estilo que los Filtros del Dashboard (grid de 3 en 3) -->
+                        <div class="filters" id="indFiltersContainer">
+                            <div class="filter-group"><label class="filter-label">PROGRAMA</label><div class="multiselect" id="indFilterPrograma"></div></div>
+                            <div class="filter-group"><label class="filter-label">MODALIDAD DE INGRESO</label><div class="multiselect" id="indFilterIngreso"></div></div>
+                            <div class="filter-group"><label class="filter-label">MODALIDAD</label><div class="multiselect" id="indFilterModalidad"></div></div>
+                            <div class="filter-group"><label class="filter-label">ASESOR</label><div class="multiselect" id="indFilterAsesor"></div></div>
+                            <div class="filter-group"><label class="filter-label">CAMPAÑA</label><div class="multiselect" id="indFilterCampana"></div></div>
+                            <div class="filter-group"><label class="filter-label">CANAL</label><div class="multiselect" id="indFilterCanal"></div></div>
                         </div>
                     </div>
                     <div id="indContent"><div class="loading">Cargando indicadores…</div></div>
@@ -338,4 +349,4 @@
     <script type="module" src="js/sidebar.js"></script>
     <script type="module" src="js/dashboard.js"></script>   
 </body>
-</html>
+</html>

@@ -16,6 +16,7 @@ export const COLUMNAS = {
     NOMBRE: 'NOMBRE',
     CANAL: 'SUBCANAL 2',
     ASESOR_ULTIMO_CONTACTO: 'ASESOR ULT TIP DF SN CONTC',
+    FECHA_HORA_REGISTRO: 'FECHA HORA DE REGISTRO',
     ASESOR_NOMBRE_RAW: 'ASESOR_NOMBRE_RAW',
     ASESOR_EMAIL: 'ASESOR_EMAIL',
     ASESOR_NOMBRE: 'ASESOR_NOMBRE',
@@ -184,4 +185,4 @@ export const CACHE_KEYS = {
     CATALOGO_QUIEN_FINANCIARA: 'bl_catalogo_quien_financiara',
     CATALOGO_QUE_LE_FALTA: 'bl_catalogo_que_le_falta',
     CATALOGO_OTRAS_OPCIONES: 'bl_catalogo_otras_opciones',
-};
+};
