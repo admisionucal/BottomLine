@@ -98,12 +98,13 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
       // toca el import diario) — no el asesor/status actual, que puede ya
       // estar modificado por una corrida anterior de este mismo scraper.
       const ref = await client.query(
-        `select en_base, asesor_base, status_base from leads where id_prometeo = $1 and campana = $2`,
+        `select en_base, asesor_base, status_base, fecha_prim_vp_pp from leads where id_prometeo = $1 and campana = $2`,
         [idPrometeo, campana]
       );
       const encontradoEnBase = !!ref.rows[0]?.en_base;
       const asesorBase = ref.rows[0]?.asesor_base || '';
       const statusBase = ref.rows[0]?.status_base || '';
+      const fechaPrimVpPpActual = ref.rows[0]?.fecha_prim_vp_pp || '';
 
       const statusHoy = leadRaw['STATUS DE GESTION'];
       const asesorHoy = leadRaw['ASESOR ULT TIP DF SN CONTC'];
@@ -129,6 +130,13 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
       // FECHA COMPROMISO DE PAGO Y DE VISITA: caso especial, solo si "confiable".
       if (confiable && esValorMerge(leadRaw['FECHA COMPROMISO DE PAGO'])) {
         columnas.fecha_compromiso_pago = leadRaw['FECHA COMPROMISO DE PAGO'];
+
+        // FECHA PRIM VP/PP: se llena una sola vez, la primera vez que el lead
+        // tiene un compromiso de pago confiable (VP o PP). Una vez seteada, no
+        // se vuelve a tocar aunque el compromiso de pago cambie después.
+        if (!fechaPrimVpPpActual) {
+          columnas.fecha_prim_vp_pp = leadRaw['FECHA COMPROMISO DE PAGO'];
+        }
       }
 
       if (confiable && esValorMerge(leadRaw['FECHA VISITA GUIADA'])) {
@@ -155,4 +163,4 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
   }
 
   return jsonOk({ actualizados, errores, total: leads.length, primerError });
-}
+}

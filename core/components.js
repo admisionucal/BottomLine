@@ -100,6 +100,10 @@ export class Sidebar {
                         <button type="button" class="nav-subitem ${esSub('navDashboardBL')}" id="navDashboardBL" title="Dashboard" onclick="window.mostrarBottomLine && mostrarBottomLine(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">dashboard</span> Dashboard
                         </button>
+                        <button type="button" class="nav-subitem ${esSub('navIndicadoresBL')}" id="navIndicadoresBL" title="Indicadores" style="display:none;" onclick="window.mostrarIndicadores && mostrarIndicadores(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
+                            <span class="material-symbols-outlined">insights</span>
+                            <span style="flex:1;">Indicadores</span>
+                        </button>
                         <button type="button" class="nav-subitem ${esSub('navUnificarIds')}" id="navUnificarIds" title="Unificar IDs" style="display:none;" onclick="window.mostrarUnificar && mostrarUnificar(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">merge</span> Unificar IDs
                         </button>
@@ -136,7 +140,7 @@ export class Sidebar {
         const user = getCurrentUser();
         if (!user || !esRolSupervisorOAdmision(user.rol)) return;
 
-        ['navUnificarIds', 'navCondicionesCC', 'navAsistenciaAnalisis', 'navAsistenciaMantenimiento']
+        ['navUnificarIds', 'navIndicadoresBL', 'navCondicionesCC', 'navAsistenciaAnalisis', 'navAsistenciaMantenimiento']
             .forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.style.display = '';
@@ -555,4 +559,4 @@ function iniciarControlInactividad() {
             window.logout();
         }
     }, 60 * 1000);
-}
+}

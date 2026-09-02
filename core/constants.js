@@ -11,6 +11,7 @@ export const API_URL = '/api';
 export const COLUMNAS = {
     // Leads / Campañas
     ID_PROMETEO: 'ID PROMETEO',
+    CAMPANA: 'CAMPAÑA',
     NOMBRES: 'NOMBRES',
     NOMBRE: 'NOMBRE',
     CANAL: 'SUBCANAL 2',
@@ -40,6 +41,7 @@ export const COLUMNAS = {
     CODIGO_MODULAR: 'CODIGO MODULAR',
     STATUS_GESTION: 'STATUS DE GESTION',
     FECHA_COMPROMISO_PAGO: 'FECHA COMPROMISO DE PAGO',
+    FECHA_PRIM_VP_PP: 'FECHA PRIM VP/PP',
     FECHA_VISITA_GUIADA: 'FECHA VISITA GUIADA',
     FECHA_PAGO_COMPLETO: 'FECHA DE PAGO COMPLETO',
     FECHA_PROMESA_PAGO: 'FECHA DE PROMESA DE PAGO',
@@ -182,4 +184,4 @@ export const CACHE_KEYS = {
     CATALOGO_QUIEN_FINANCIARA: 'bl_catalogo_quien_financiara',
     CATALOGO_QUE_LE_FALTA: 'bl_catalogo_que_le_falta',
     CATALOGO_OTRAS_OPCIONES: 'bl_catalogo_otras_opciones',
-};
+};

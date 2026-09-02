@@ -66,6 +66,7 @@ export async function getLeads(client: Client, body: JsonBody) {
            then p.status_pago_final else l.status_gestion end as status_gestion,
       l.fecha_compromiso_pago,
       l.fecha_visita_guiada,
+      l.fecha_prim_vp_pp,
       (l.actualizado_hoy_en is not null) as actualizado_hoy,
       ${selectPagos}
       coalesce(b.beneficio, 'NO') as beneficio,
@@ -122,6 +123,7 @@ export async function getLeads(client: Client, body: JsonBody) {
     'STATUS DE GESTION': r.status_gestion,
     'FECHA COMPROMISO DE PAGO': r.fecha_compromiso_pago,
     'FECHA VISITA GUIADA': r.fecha_visita_guiada,
+    'FECHA PRIM VP/PP': r.fecha_prim_vp_pp,
     ACTUALIZADO_HOY: r.actualizado_hoy,
     'FECHA DE PAGO COMPLETO': r.fecha_pago_completo,
     'FECHA DE PROMESA DE PAGO': r.fecha_promesa_pago,
@@ -145,4 +147,4 @@ export async function getLeads(client: Client, body: JsonBody) {
   }));
 
   return jsonOk({ data });
-}
+}

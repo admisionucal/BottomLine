@@ -49,7 +49,7 @@ function marcarSubitemActivo(el) {
 }
 
 function ocultarTodasLasVistas() {
-    ['view-bottomline', 'view-placeholder', 'view-calendario', 'view-asistencia', 'view-usuario', 'view-unificar', 'view-cc']
+    ['view-bottomline', 'view-placeholder', 'view-calendario', 'view-asistencia', 'view-usuario', 'view-unificar', 'view-cc', 'view-indicadores']
         .forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = 'none';
@@ -188,6 +188,31 @@ function mostrarBottomLine() {
     document.querySelectorAll('.nav-subitem').forEach(b => b.classList.remove('active'));
     const navDash = document.getElementById('navDashboardBL');
     if (navDash) navDash.classList.add('active');
+}
+
+// ===== VISTA: INDICADORES =====
+function mostrarIndicadores() {
+    const viewUsuario = document.getElementById('view-usuario');
+    const viewBottomline = document.getElementById('view-bottomline');
+
+    if (!viewUsuario && !viewBottomline) {
+        window.location.href = 'dashboard.html?view=indicadores';
+        return;
+    }
+
+    ocultarTodasLasVistas();
+    const view = document.getElementById('view-indicadores');
+    if (view) view.style.display = 'block';
+
+    document.querySelectorAll('.nav-group-btn').forEach(b => b.classList.remove('active'));
+    const grupo = document.getElementById('navGroupBottomLine');
+    if (grupo) grupo.querySelector('.nav-group-btn').classList.add('active');
+
+    document.querySelectorAll('.nav-subitem').forEach(b => b.classList.remove('active'));
+    const navInd = document.getElementById('navIndicadoresBL');
+    if (navInd) navInd.classList.add('active');
+
+    if (typeof window.inicializarIndicadores === 'function') window.inicializarIndicadores();
 }
 
 // ===== VISTA: ASISTENCIA =====
@@ -541,8 +566,9 @@ window.marcarSubitemActivo = marcarSubitemActivo;
 window.mostrarUsuario = mostrarUsuario;
 window.mostrarAsistencia = mostrarAsistencia;
 window.mostrarBottomLine = mostrarBottomLine;
+window.mostrarIndicadores = mostrarIndicadores;
 window.mostrarCalendario = mostrarCalendario;
 window.mostrarUnificar = mostrarUnificar;
 window.mostrarCC = mostrarCC;
 window.logout = logout;
-window.irAMarcarAsistenciaDesdeUsuario = irAMarcarAsistenciaDesdeUsuario;
+window.irAMarcarAsistenciaDesdeUsuario = irAMarcarAsistenciaDesdeUsuario;

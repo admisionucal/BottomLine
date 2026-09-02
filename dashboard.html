@@ -218,6 +218,22 @@
                                             <span class="material-symbols-outlined" style="font-size:16px;">tune</span> Filtros
                                         </button>
                                     </div>
+                                    <div class="filtros-dropdown" id="calVpPpDropdown">
+                                        <button type="button" class="btn-filtros" id="calVpPpToggleBtn">
+                                            <span class="material-symbols-outlined" style="font-size:16px;">event</span> Fecha VP/PP
+                                        </button>
+                                        <div class="cal-vpp-panel" id="calVpPpPanel">
+                                            <div class="cal-vpp-header">
+                                                <button type="button" onclick="window.cambiarMesCalVpPp && cambiarMesCalVpPp(-1)">&lt;</button>
+                                                <span id="calVpPpMesLabel"></span>
+                                                <button type="button" onclick="window.cambiarMesCalVpPp && cambiarMesCalVpPp(1)">&gt;</button>
+                                            </div>
+                                            <div class="cal-vpp-grid" id="calVpPpGrid"></div>
+                                            <div class="cal-vpp-footer">
+                                                <button type="button" onclick="window.limpiarFiltroCalVpPp && limpiarFiltroCalVpPp()">Limpiar</button>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <span class="badge" id="leadCount">0 leads</span>
                                 </div>
                                 <div class="toolbar-search" id="toolbarSearchWrap">
@@ -286,6 +302,30 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- VISTA: INDICADORES -->
+                <div class="view" id="view-indicadores" style="display:none;">
+                    <div class="ind-toolbar">
+                        <h2 style="margin:0 0 12px;">Indicadores</h2>
+                        <div class="filters" id="indFiltersContainer">
+                            <div class="filter-group"><label class="filter-label">CAMPAÑA</label><div class="multiselect" id="indFilterCampana"></div></div>
+                            <div class="filter-group"><label class="filter-label">PROGRAMA</label><div class="multiselect" id="indFilterPrograma"></div></div>
+                            <div class="filter-group"><label class="filter-label">MODALIDAD</label><div class="multiselect" id="indFilterModalidad"></div></div>
+                            <div class="filter-group"><label class="filter-label">MODALIDAD INGRESO</label><div class="multiselect" id="indFilterIngreso"></div></div>
+                            <div class="filter-group"><label class="filter-label">ASESOR</label><div class="multiselect" id="indFilterAsesor"></div></div>
+                            <div class="filter-group"><label class="filter-label">CANAL</label><div class="multiselect" id="indFilterCanal"></div></div>
+                            <div class="filter-group">
+                                <label class="filter-label">FECHA</label>
+                                <div style="display:flex;gap:6px;align-items:center;">
+                                    <input type="date" id="indFechaDesde">
+                                    <span style="color:#888;font-size:12px;">a</span>
+                                    <input type="date" id="indFechaHasta">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="indContent"><div class="loading">Cargando indicadores…</div></div>
+                </div>
             </div>
         </div>
     </div>
@@ -298,5 +338,4 @@
     <script type="module" src="js/sidebar.js"></script>
     <script type="module" src="js/dashboard.js"></script>   
 </body>
-</html>
-
+</html>

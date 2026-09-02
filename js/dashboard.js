@@ -31,6 +31,7 @@ let state = {
     terminoBusqueda: '',
     filtros: {
         carrera: [], ingreso: [], beneficio: [], modalidad: [], asesor: [], perfil: [], dolorNecesidad: [],
+        fechaPrimVpPp: [],
         status: [STATUS.VP_VIVA, STATUS.PP_VIVA]
     },
     campana: '',
@@ -41,7 +42,13 @@ let state = {
     calendarioMes: new Date(),
     vistaCalendario: 'mes',
     diaSeleccionado: null,
-    ultimaActualizacion: null
+    ultimaActualizacion: null,
+    calVpPpMes: new Date(),
+    indicadores: {
+        filtros: { campana: [], programa: [], modalidad: [], ingreso: [], asesor: [], canal: [], fechaDesde: '', fechaHasta: '' },
+        expandido: {},
+        cargado: false
+    }
 };
 
 // Config de categorías del calendario: color, label, de qué status viene, y qué campo de fecha usar.
@@ -98,11 +105,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnActualizar')?.addEventListener('click', () => loadLeads(true));
     document.getElementById('btnExportar')?.addEventListener('click', exportarExcel);
     document.getElementById('filtrosToggleBtn')?.addEventListener('click', toggleFiltrosPanel);
+    document.getElementById('calVpPpToggleBtn')?.addEventListener('click', toggleCalVpPpPanel);
     setupAutoHideToolbar();
 
     // Mostrar la vista embebida correspondiente
     if (vistaInicial === 'bottomline' && typeof window.mostrarBottomLine === 'function') {
         window.mostrarBottomLine();
+    } else if (vistaInicial === 'indicadores' && typeof window.mostrarIndicadores === 'function') {
+        window.mostrarIndicadores();
     } else if (vistaInicial === 'calendario' && typeof window.mostrarCalendario === 'function') {
         window.mostrarCalendario();
     } else if (vistaInicial === 'unificar' && typeof window.mostrarUnificar === 'function') {
@@ -422,7 +432,7 @@ window.addEventListener('multiselect-change', (e) => {
 function applyFilters() {
     const user = getCurrentUser();
     const esAdmin = esRolSupervisorOAdmision(user.rol);
-    const { carrera, ingreso, beneficio, modalidad, asesor, status, perfil, dolorNecesidad } = state.filtros;
+    const { carrera, ingreso, beneficio, modalidad, asesor, status, perfil, dolorNecesidad, fechaPrimVpPp } = state.filtros;
 
     state.leadsFiltered = state.leadsRaw.filter(lead => {
         // Filtros multi-select
@@ -436,6 +446,7 @@ function applyFilters() {
         if (status.length > 0 && !status.includes(lead[COLUMNAS.STATUS_GESTION] || '')) return false;
         if (perfil.length > 0 && !perfil.includes((lead.PERFILAMIENTO_COMPLETO || {}).estado || '')) return false;
         if (dolorNecesidad.length > 0 && !dolorNecesidad.includes(lead[COLUMNAS.DOLOR_NECESIDAD] || '')) return false;
+        if (fechaPrimVpPp.length > 0 && !fechaPrimVpPp.includes(lead[COLUMNAS.FECHA_PRIM_VP_PP] || '')) return false;
 
         // Búsqueda por texto
         if (state.terminoBusqueda) {
@@ -457,6 +468,7 @@ function applyFilters() {
     guardarEstadoFiltros();
 
     setTimeout(populateFilters, 0);
+    setTimeout(renderCalendarioFiltroVpPp, 0);
 }
 
 function populateFilters() {
@@ -507,7 +519,7 @@ function leadPasaFiltrosSin(lead, filtroExcluido, esAdmin) {
     filtros[filtroExcluido] = [];
     if (!esAdmin) filtros.asesor = [];
 
-    const { carrera, ingreso, beneficio, modalidad, asesor, status, perfil, dolorNecesidad } = filtros;
+    const { carrera, ingreso, beneficio, modalidad, asesor, status, perfil, dolorNecesidad, fechaPrimVpPp } = filtros;
 
     if (carrera.length > 0 && !carrera.includes(lead[COLUMNAS.CARRERA] || lead[COLUMNAS.PROGRAMA] || '')) return false;
     if (ingreso.length > 0 && !ingreso.includes(lead[COLUMNAS.MODALIDAD_INGRESO] || '')) return false;
@@ -517,6 +529,7 @@ function leadPasaFiltrosSin(lead, filtroExcluido, esAdmin) {
     if (status.length > 0 && !status.includes(lead[COLUMNAS.STATUS_GESTION] || '')) return false;
     if (perfil.length > 0 && !perfil.includes((lead.PERFILAMIENTO_COMPLETO || {}).estado || '')) return false;
     if (dolorNecesidad.length > 0 && !dolorNecesidad.includes(lead[COLUMNAS.DOLOR_NECESIDAD] || '')) return false;
+    if (fechaPrimVpPp.length > 0 && !fechaPrimVpPp.includes(lead[COLUMNAS.FECHA_PRIM_VP_PP] || '')) return false;
 
     return true;
 }
@@ -1321,6 +1334,560 @@ function toggleFiltrosPanel() {
     if (btn) btn.classList.toggle('active', abierto);
 }
 
+// ===== CALENDARIO FILTRO: FECHA PRIM VP/PP =====
+function toggleCalVpPpPanel() {
+    const panel = document.getElementById('calVpPpPanel');
+    const btn = document.getElementById('calVpPpToggleBtn');
+    if (!panel) return;
+    const abierto = panel.classList.toggle('open');
+    if (btn) btn.classList.toggle('active', abierto);
+    if (abierto) {
+        renderCalendarioFiltroVpPp();
+        setTimeout(() => document.addEventListener('click', cerrarCalVpPpFuera), 0);
+    }
+}
+window.toggleCalVpPpPanel = toggleCalVpPpPanel;
+
+function cerrarCalVpPpFuera(e) {
+    const panel = document.getElementById('calVpPpPanel');
+    if (!panel || !panel.classList.contains('open')) {
+        document.removeEventListener('click', cerrarCalVpPpFuera);
+        return;
+    }
+    if (e.target.closest('#calVpPpDropdown')) return;
+    panel.classList.remove('open');
+    document.getElementById('calVpPpToggleBtn')?.classList.remove('active');
+    document.removeEventListener('click', cerrarCalVpPpFuera);
+}
+
+function cambiarMesCalVpPp(delta) {
+    state.calVpPpMes.setMonth(state.calVpPpMes.getMonth() + delta);
+    renderCalendarioFiltroVpPp();
+}
+window.cambiarMesCalVpPp = cambiarMesCalVpPp;
+
+// Cuenta leads por fecha (YYYY-MM-DD), excluyendo el propio filtro
+// fechaPrimVpPp — mismo patrón en cascada que getValues() en populateFilters().
+function mapaFechasVpPp() {
+    const user = getCurrentUser();
+    const esAdmin = esRolSupervisorOAdmision(user.rol);
+    const mapa = {};
+    state.leadsRaw
+        .filter(lead => leadPasaFiltrosSin(lead, 'fechaPrimVpPp', esAdmin))
+        .forEach(lead => {
+            const d = parsearFechaFlexible(lead[COLUMNAS.FECHA_PRIM_VP_PP]);
+            if (!d) return;
+            const clave = fechaAClaveISO(d);
+            mapa[clave] = (mapa[clave] || 0) + 1;
+        });
+    return mapa;
+}
+
+function renderCalendarioFiltroVpPp() {
+    const panel = document.getElementById('calVpPpPanel');
+    if (!panel || !panel.classList.contains('open')) return; // no perder tiempo si está cerrado
+
+    const grid = document.getElementById('calVpPpGrid');
+    const label = document.getElementById('calVpPpMesLabel');
+    if (!grid || !label) return;
+
+    const mes = state.calVpPpMes;
+    const labelMes = mes.toLocaleDateString('es-PE', { month: 'long', year: 'numeric' });
+    label.textContent = labelMes.charAt(0).toUpperCase() + labelMes.slice(1);
+
+    const mapa = mapaFechasVpPp();
+    const seleccionadas = state.filtros.fechaPrimVpPp;
+
+    const primerDia = new Date(mes.getFullYear(), mes.getMonth(), 1);
+    const ultimoDia = new Date(mes.getFullYear(), mes.getMonth() + 1, 0);
+    const offset = (primerDia.getDay() + 6) % 7; // semana empieza en lunes
+
+    let html = '';
+    for (let i = 0; i < offset; i++) html += '<div class="cal-vpp-day vacio"></div>';
+    for (let d = 1; d <= ultimoDia.getDate(); d++) {
+        const clave = `${mes.getFullYear()}-${String(mes.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const count = mapa[clave] || 0;
+        const activo = seleccionadas.includes(clave);
+        html += `
+            <div class="cal-vpp-day ${count ? 'tiene-datos' : ''} ${activo ? 'seleccionado' : ''}"
+                 onclick="${count ? `window.toggleFechaVpPp('${clave}')` : ''}">
+                ${d}
+                ${count ? `<span class="cal-vpp-count">${count}</span>` : ''}
+            </div>`;
+    }
+    grid.innerHTML = html;
+
+    const btn = document.getElementById('calVpPpToggleBtn');
+    if (btn) btn.classList.toggle('has-selection', seleccionadas.length > 0);
+}
+window.renderCalendarioFiltroVpPp = renderCalendarioFiltroVpPp;
+
+function toggleFechaVpPp(clave) {
+    const idx = state.filtros.fechaPrimVpPp.indexOf(clave);
+    if (idx >= 0) state.filtros.fechaPrimVpPp.splice(idx, 1);
+    else state.filtros.fechaPrimVpPp.push(clave);
+    applyFilters();
+    renderCalendarioFiltroVpPp();
+}
+window.toggleFechaVpPp = toggleFechaVpPp;
+
+function limpiarFiltroCalVpPp() {
+    state.filtros.fechaPrimVpPp = [];
+    applyFilters();
+    renderCalendarioFiltroVpPp();
+}
+window.limpiarFiltroCalVpPp = limpiarFiltroCalVpPp;
+
+// ================================================================
+// INDICADORES
+// ================================================================
+
+async function inicializarIndicadores() {
+    // Reusa la data ya cargada al iniciar sesión (cargarLeadsCalendario) —
+    // si por lo que sea todavía no hay nada, la carga.
+    if (!state.calLeadsPorCampana || Object.keys(state.calLeadsPorCampana).length === 0) {
+        await cargarLeadsCalendario();
+    }
+    // El módulo de Condiciones Comerciales guarda su data en su PROPIO
+    // `state` (cada módulo ES tiene el suyo, no se comparten entre sí), así
+    // que para cruzar 2.1 con Ventas se llama la misma API acá y se guarda
+    // en el `state.solicitudesCC` de este módulo.
+    if (!state.solicitudesCC) {
+        try {
+            const result = await callAPI('getSolicitudesCC', { campanas: getUserCampanas(), incluirResueltas: true });
+            state.solicitudesCC = result.success ? (result.data || []) : [];
+        } catch (e) {
+            state.solicitudesCC = [];
+        }
+    }
+
+    poblarFiltrosIndicadores();
+    renderIndicadores();
+}
+window.inicializarIndicadores = inicializarIndicadores;
+
+// Aplana state.calLeadsPorCampana en un solo array. Cada lead ya trae
+// COLUMNAS.CAMPANA (agregada a constants.js).
+function todosLosLeadsIndicadores() {
+    return Object.values(state.calLeadsPorCampana || {}).flat();
+}
+
+function poblarFiltrosIndicadores() {
+    const leads = todosLosLeadsIndicadores();
+    const valoresUnicos = (columna) => [...new Set(
+        leads.map(l => String(l[columna] || '').trim()).filter(Boolean)
+    )].sort();
+
+    createMultiSelect('indFilterCampana', valoresUnicos(COLUMNAS.CAMPANA), state.indicadores.filtros.campana, 'Todas');
+    createMultiSelect('indFilterPrograma', valoresUnicos(COLUMNAS.PROGRAMA), state.indicadores.filtros.programa, 'Todos');
+    createMultiSelect('indFilterModalidad', valoresUnicos(COLUMNAS.MODALIDAD), state.indicadores.filtros.modalidad, 'Todas');
+    createMultiSelect('indFilterIngreso', valoresUnicos(COLUMNAS.MODALIDAD_INGRESO), state.indicadores.filtros.ingreso, 'Todos');
+    createMultiSelect('indFilterAsesor', valoresUnicos(COLUMNAS.ASESOR_NOMBRE_RAW), state.indicadores.filtros.asesor, 'Todos');
+    createMultiSelect('indFilterCanal', valoresUnicos(COLUMNAS.CANAL), state.indicadores.filtros.canal, 'Todos');
+
+    const fDesde = document.getElementById('indFechaDesde');
+    const fHasta = document.getElementById('indFechaHasta');
+    if (fDesde) fDesde.value = state.indicadores.filtros.fechaDesde;
+    if (fHasta) fHasta.value = state.indicadores.filtros.fechaHasta;
+
+    if (!state.indicadores.filtrosListenerListo) {
+        window.addEventListener('multiselect-change', (e) => {
+            const map = { indFilterCampana: 'campana', indFilterPrograma: 'programa', indFilterModalidad: 'modalidad', indFilterIngreso: 'ingreso', indFilterAsesor: 'asesor', indFilterCanal: 'canal' };
+            if (!map[e.detail.containerId]) return;
+            state.indicadores.filtros[map[e.detail.containerId]] = e.detail.values;
+            renderIndicadores();
+        });
+        if (fDesde) fDesde.onchange = (e) => { state.indicadores.filtros.fechaDesde = e.target.value; renderIndicadores(); };
+        if (fHasta) fHasta.onchange = (e) => { state.indicadores.filtros.fechaHasta = e.target.value; renderIndicadores(); };
+        state.indicadores.filtrosListenerListo = true;
+    }
+}
+
+// NOTA: "Fecha" en los filtros generales de Indicadores se aplica sobre
+// FECHA HORA DE REGISTRO (cuándo entró el lead) — es el único campo de
+// fecha común a todos los leads sin importar en qué sección caigan.
+function leadsIndicadoresFiltrados() {
+    const f = state.indicadores.filtros;
+    return todosLosLeadsIndicadores().filter(lead => {
+        if (f.campana.length && !f.campana.includes(lead[COLUMNAS.CAMPANA] || '')) return false;
+        if (f.programa.length && !f.programa.includes(lead[COLUMNAS.PROGRAMA] || '')) return false;
+        if (f.modalidad.length && !f.modalidad.includes(lead[COLUMNAS.MODALIDAD] || '')) return false;
+        if (f.ingreso.length && !f.ingreso.includes(lead[COLUMNAS.MODALIDAD_INGRESO] || '')) return false;
+        if (f.asesor.length && !f.asesor.includes(lead[COLUMNAS.ASESOR_NOMBRE_RAW] || '')) return false;
+        if (f.canal.length && !f.canal.includes(lead[COLUMNAS.CANAL] || '')) return false;
+        if (f.fechaDesde || f.fechaHasta) {
+            const d = parsearFechaFlexible(lead[COLUMNAS.FECHA_HORA_REGISTRO]);
+            if (!d) return false;
+            const iso = fechaAClaveISO(d);
+            if (f.fechaDesde && iso < f.fechaDesde) return false;
+            if (f.fechaHasta && iso > f.fechaHasta) return false;
+        }
+        return true;
+    });
+}
+
+// ---- Utilidades de agrupación jerárquica de fechas (Mes → Semana → Día) ----
+function claveMesInd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+function labelMesInd(d) {
+    const s = d.toLocaleDateString('es-PE', { month: 'long', year: 'numeric' });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function claveSemanaISOInd(d) {
+    const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = (dt.getUTCDay() + 6) % 7;
+    dt.setUTCDate(dt.getUTCDate() - dayNum + 3);
+    const firstThursday = new Date(Date.UTC(dt.getUTCFullYear(), 0, 4));
+    const weekNum = 1 + Math.round(((dt - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+    return `${dt.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+}
+function labelSemanaInd(d) {
+    const lunes = new Date(d);
+    lunes.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    const domingo = new Date(lunes);
+    domingo.setDate(lunes.getDate() + 6);
+    const fmt = (x) => x.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' });
+    return `Semana ${fmt(lunes)} – ${fmt(domingo)}`;
+}
+function labelDiaInd(d) { return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+
+// Arma el árbol Mes > Semana > Día para un conjunto de items ya filtrados.
+function construirArbolFechasInd(items, getFecha) {
+    const raiz = {};
+    items.forEach(item => {
+        const d = getFecha(item);
+        if (!d) return;
+        const mk = claveMesInd(d), sk = claveSemanaISOInd(d), dk = fechaAClaveISO(d);
+        raiz[mk] = raiz[mk] || { label: labelMesInd(d), items: [], semanas: {} };
+        raiz[mk].items.push(item);
+        raiz[mk].semanas[sk] = raiz[mk].semanas[sk] || { label: labelSemanaInd(d), items: [], dias: {} };
+        raiz[mk].semanas[sk].items.push(item);
+        raiz[mk].semanas[sk].dias[dk] = raiz[mk].semanas[sk].dias[dk] || { label: labelDiaInd(d), items: [] };
+        raiz[mk].semanas[sk].dias[dk].items.push(item);
+    });
+    return raiz;
+}
+
+function toggleIndRow(tablaId, clave) {
+    const set = state.indicadores.expandido[tablaId] = state.indicadores.expandido[tablaId] || new Set();
+    if (set.has(clave)) set.delete(clave); else set.add(clave);
+    renderIndicadores();
+}
+window.toggleIndRow = toggleIndRow;
+
+// Tabla genérica Campaña / <colFecha> / #Leads / % con jerarquía Mes>Semana>Día.
+// `porCampana` viene pre-armado: { [campana]: { leads: [...], getFecha } }.
+function renderTablaFechaAgrupadaInd(tablaId, titulo, colFecha, porCampana) {
+    const set = state.indicadores.expandido[tablaId] = state.indicadores.expandido[tablaId] || new Set();
+    let filas = '';
+
+    Object.keys(porCampana).sort().forEach(campana => {
+        const leadsCamp = porCampana[campana];
+        const total = leadsCamp.leads.length;
+        if (total === 0) return;
+        const arbol = construirArbolFechasInd(leadsCamp.leads, leadsCamp.getFecha);
+
+        Object.keys(arbol).sort().forEach(mk => {
+            const mes = arbol[mk];
+            const claveMesRow = `${campana}|${mk}`;
+            const abiertoMes = set.has(claveMesRow);
+            const pctMes = ((mes.items.length / total) * 100).toFixed(1);
+            filas += `
+                <tr class="ind-row ind-row-mes" onclick="window.toggleIndRow('${tablaId}','${claveMesRow}')">
+                    <td>${escapeHtml(campana)}</td>
+                    <td><span class="ind-caret">${abiertoMes ? '▾' : '▸'}</span> ${escapeHtml(mes.label)}</td>
+                    <td>${mes.items.length}</td>
+                    <td>${pctMes}%</td>
+                </tr>`;
+
+            if (abiertoMes) {
+                Object.keys(mes.semanas).sort().forEach(sk => {
+                    const sem = mes.semanas[sk];
+                    const claveSemRow = `${claveMesRow}|${sk}`;
+                    const abiertoSem = set.has(claveSemRow);
+                    const pctSem = ((sem.items.length / total) * 100).toFixed(1);
+                    filas += `
+                        <tr class="ind-row ind-row-semana" onclick="window.toggleIndRow('${tablaId}','${claveSemRow}')">
+                            <td></td>
+                            <td class="ind-indent-1"><span class="ind-caret">${abiertoSem ? '▾' : '▸'}</span> ${escapeHtml(sem.label)}</td>
+                            <td>${sem.items.length}</td>
+                            <td>${pctSem}%</td>
+                        </tr>`;
+
+                    if (abiertoSem) {
+                        Object.keys(sem.dias).sort().forEach(dk => {
+                            const dia = sem.dias[dk];
+                            const pctDia = ((dia.items.length / total) * 100).toFixed(1);
+                            filas += `
+                                <tr class="ind-row ind-row-dia">
+                                    <td></td>
+                                    <td class="ind-indent-2">${escapeHtml(dia.label)}</td>
+                                    <td>${dia.items.length}</td>
+                                    <td>${pctDia}%</td>
+                                </tr>`;
+                        });
+                    }
+                });
+            }
+        });
+    });
+
+    if (!filas) filas = `<tr><td colspan="4" style="text-align:center;color:#888;">Sin datos con los filtros actuales</td></tr>`;
+
+    return `
+        <div class="card ind-card">
+            <h3>${escapeHtml(titulo)}</h3>
+            <table class="ind-table">
+                <thead><tr><th>Campaña</th><th>${escapeHtml(colFecha)}</th><th># Leads</th><th>%</th></tr></thead>
+                <tbody>${filas}</tbody>
+            </table>
+        </div>`;
+}
+
+// ---- Sección 1: Status de Gestión ----
+// "Fecha de status actual" = FECHA_ULT_MODIFICACION (columna real de
+// leads_bottom, expuesta en cada lead vía bottomToUpper en getLeads).
+function fechaStatusActual(lead) {
+    return lead[COLUMNAS.FECHA_ULT_MODIFICACION];
+}
+
+function render1_1StatusGestion(leads) {
+    const porCampana = {};
+    leads.forEach(l => {
+        const camp = l[COLUMNAS.CAMPANA] || '-';
+        const status = l[COLUMNAS.STATUS_GESTION] || '-';
+        porCampana[camp] = porCampana[camp] || { total: 0, porStatus: {} };
+        porCampana[camp].total++;
+        porCampana[camp].porStatus[status] = (porCampana[camp].porStatus[status] || 0) + 1;
+    });
+
+    let filas = '';
+    Object.keys(porCampana).sort().forEach(camp => {
+        const info = porCampana[camp];
+        Object.keys(info.porStatus).sort().forEach(status => {
+            const n = info.porStatus[status];
+            const pct = ((n / info.total) * 100).toFixed(1);
+            filas += `<tr><td>${escapeHtml(camp)}</td><td>${escapeHtml(STATUS_LABELS[status] || status)}</td><td>${n}</td><td>${pct}%</td></tr>`;
+        });
+    });
+    if (!filas) filas = `<tr><td colspan="4" style="text-align:center;color:#888;">Sin datos</td></tr>`;
+
+    return `
+        <div class="card ind-card">
+            <h3>1.1 Status de Gestión</h3>
+            <table class="ind-table">
+                <thead><tr><th>Campaña</th><th>Status</th><th># Leads</th><th>%</th></tr></thead>
+                <tbody>${filas}</tbody>
+            </table>
+        </div>`;
+}
+
+function render1_2DiasConversion(leads) {
+    const porCampana = {};
+    leads.forEach(l => {
+        const fPrim = parsearFechaFlexible(l[COLUMNAS.FECHA_PRIM_VP_PP]);
+        const fStatus = parsearFechaFlexible(fechaStatusActual(l));
+        if (!fPrim || !fStatus) return; // solo cuenta si ambas fechas existen
+        const dias = Math.round((fStatus - fPrim) / 86400000);
+        if (dias < 0) return;
+
+        const camp = l[COLUMNAS.CAMPANA] || '-';
+        const status = l[COLUMNAS.STATUS_GESTION] || '-';
+        porCampana[camp] = porCampana[camp] || { total: 0, porStatus: {} };
+        porCampana[camp].total++;
+        porCampana[camp].porStatus[status] = porCampana[camp].porStatus[status] || { suma: 0, n: 0 };
+        porCampana[camp].porStatus[status].suma += dias;
+        porCampana[camp].porStatus[status].n++;
+    });
+
+    let filas = '';
+    Object.keys(porCampana).sort().forEach(camp => {
+        const info = porCampana[camp];
+        Object.keys(info.porStatus).sort().forEach(status => {
+            const { suma, n } = info.porStatus[status];
+            const promedio = (suma / n).toFixed(1);
+            const pct = ((n / info.total) * 100).toFixed(1);
+            filas += `<tr><td>${escapeHtml(camp)}</td><td>${escapeHtml(STATUS_LABELS[status] || status)}</td><td>${promedio}</td><td>${n}</td><td>${pct}%</td></tr>`;
+        });
+    });
+    if (!filas) filas = `<tr><td colspan="5" style="text-align:center;color:#888;">Sin datos</td></tr>`;
+
+    return `
+        <div class="card ind-card">
+            <h3>1.2 Cantidad de días para conversión</h3>
+            <table class="ind-table">
+                <thead><tr><th>Campaña</th><th>Status</th><th>Días (promedio)</th><th># Leads</th><th>%</th></tr></thead>
+                <tbody>${filas}</tbody>
+            </table>
+        </div>`;
+}
+
+// ---- Sección 2: Ventas y Condiciones Comerciales ----
+const STATUS_VENTA = ['PAGO COMPLETO', 'PAGO FRACCIONADO'];
+
+function render2_2Ventas(leads) {
+    const porCampana = {};
+    leads.filter(l => STATUS_VENTA.includes(l[COLUMNAS.STATUS_GESTION])).forEach(l => {
+        const camp = l[COLUMNAS.CAMPANA] || '-';
+        porCampana[camp] = porCampana[camp] || { leads: [], getFecha: (x) => parsearFechaFlexible(x[COLUMNAS.FECHA_PAGO_COMPLETO]) };
+        porCampana[camp].leads.push(l);
+    });
+    return renderTablaFechaAgrupadaInd('ind2_2', '2.2 Ventas', 'Fecha (Pago Completo)', porCampana);
+}
+
+// Cruza cada solicitud CC con el lead correspondiente (mismo ID_PROMETEO +
+// campaña) para sacar su status de venta actual.
+function render2_1CondicionesComerciales(leadsFiltrados) {
+    const idsPermitidos = new Set(leadsFiltrados.map(l => `${l[COLUMNAS.ID_PROMETEO]}|${l[COLUMNAS.CAMPANA]}`));
+    const mapaLeads = {};
+    leadsFiltrados.forEach(l => { mapaLeads[`${l[COLUMNAS.ID_PROMETEO]}|${l[COLUMNAS.CAMPANA]}`] = l; });
+
+    const porCampana = {};
+    (state.solicitudesCC || []).forEach(sol => {
+        const clave = `${sol.ID_PROMETEO}|${sol.CAMPANA}`;
+        if (!idsPermitidos.has(clave)) return; // respeta los filtros generales
+        const leadCruzado = mapaLeads[clave];
+        const camp = sol.CAMPANA || '-';
+        porCampana[camp] = porCampana[camp] || { leads: [], getFecha: (x) => parsearFechaFlexible(x._fechaEnvio) };
+        porCampana[camp].leads.push({
+            ...sol,
+            _fechaEnvio: sol.FECHA_SOLICITUD,
+            _statusActual: leadCruzado ? (leadCruzado[COLUMNAS.STATUS_GESTION] || '-') : '(lead no encontrado)'
+        });
+    });
+
+    // Variante con columna extra Status Actual (no reutilizo la genérica
+    // porque acá se pide una columna más). Solo 2 niveles (Mes > Día) para
+    // que la columna de Status Actual no haga la tabla ilegible.
+    const set = state.indicadores.expandido['ind2_1'] = state.indicadores.expandido['ind2_1'] || new Set();
+    let filas = '';
+    Object.keys(porCampana).sort().forEach(campana => {
+        const total = porCampana[campana].leads.length;
+        const arbol = construirArbolFechasInd(porCampana[campana].leads, porCampana[campana].getFecha);
+        Object.keys(arbol).sort().forEach(mk => {
+            const mes = arbol[mk];
+            const claveMesRow = `${campana}|${mk}`;
+            const abierto = set.has(claveMesRow);
+            const pct = ((mes.items.length / total) * 100).toFixed(1);
+            const porStatus = {};
+            mes.items.forEach(it => { porStatus[it._statusActual] = (porStatus[it._statusActual] || 0) + 1; });
+            const statusResumen = Object.entries(porStatus).map(([s, n]) => `${STATUS_LABELS[s] || s} (${n})`).join(', ');
+
+            filas += `
+                <tr class="ind-row ind-row-mes" onclick="window.toggleIndRow('ind2_1','${claveMesRow}')">
+                    <td>${escapeHtml(campana)}</td>
+                    <td><span class="ind-caret">${abierto ? '▾' : '▸'}</span> ${escapeHtml(mes.label)}</td>
+                    <td>${escapeHtml(statusResumen)}</td>
+                    <td>${mes.items.length}</td>
+                    <td>${pct}%</td>
+                </tr>`;
+
+            if (abierto) {
+                Object.keys(mes.semanas).sort().forEach(sk => {
+                    const sem = mes.semanas[sk];
+                    Object.keys(sem.dias).sort().forEach(dk => {
+                        const dia = sem.dias[dk];
+                        const porStatusDia = {};
+                        dia.items.forEach(it => { porStatusDia[it._statusActual] = (porStatusDia[it._statusActual] || 0) + 1; });
+                        const resumenDia = Object.entries(porStatusDia).map(([s, n]) => `${STATUS_LABELS[s] || s} (${n})`).join(', ');
+                        const pctDia = ((dia.items.length / total) * 100).toFixed(1);
+                        filas += `
+                            <tr class="ind-row ind-row-dia">
+                                <td></td>
+                                <td class="ind-indent-2">${escapeHtml(dia.label)}</td>
+                                <td>${escapeHtml(resumenDia)}</td>
+                                <td>${dia.items.length}</td>
+                                <td>${pctDia}%</td>
+                            </tr>`;
+                    });
+                });
+            }
+        });
+    });
+    if (!filas) filas = `<tr><td colspan="5" style="text-align:center;color:#888;">Sin datos</td></tr>`;
+
+    return `
+        <div class="card ind-card">
+            <h3>2.1 Condiciones Comerciales</h3>
+            <table class="ind-table">
+                <thead><tr><th>Campaña</th><th>Fecha de Envío</th><th>Status Actual</th><th># Leads</th><th>%</th></tr></thead>
+                <tbody>${filas}</tbody>
+            </table>
+        </div>`;
+}
+
+// ---- Sección 3: Perfilamiento ----
+// NOTA: dejo fuera COMENTARIOS_PERFIL y ACCIONES_DEFINIDAS porque son texto
+// libre (no categorías con catálogo), así que no calzan en una tabla
+// Pregunta/#Leads/%.
+const PREGUNTAS_PERFIL_IND = [
+    { columna: COLUMNAS.DOLOR_NECESIDAD, label: 'Dolor / Necesidad' },
+    { columna: COLUMNAS.POR_QUE_ELIGIO_CARRERA, label: '¿Por qué eligió la carrera?' },
+    { columna: COLUMNAS.QUE_BUSCA_UNIVERSIDAD, label: '¿Qué busca en una universidad?' },
+    { columna: COLUMNAS.QUIEN_FINANCIARA, label: '¿Quién financiará la carrera?' },
+    { columna: COLUMNAS.QUE_LE_FALTA, label: '¿Qué le falta para tomar una decisión?' }, // admite varias opciones separadas por coma
+    { columna: COLUMNAS.OTRAS_OPCIONES, label: '¿Cuáles son sus otras opciones?' },
+];
+
+function renderTablaPerfilInd(pregunta, leads) {
+    const porCampana = {};
+    leads.forEach(l => {
+        const valorCrudo = String(l[pregunta.columna] || '').trim();
+        if (!valorCrudo) return; // "solo las que se tienen por lo menos 1"
+        const camp = l[COLUMNAS.CAMPANA] || '-';
+        porCampana[camp] = porCampana[camp] || { total: 0, porValor: {} };
+        const valores = pregunta.columna === COLUMNAS.QUE_LE_FALTA
+            ? valorCrudo.split(',').map(v => v.trim()).filter(Boolean)
+            : [valorCrudo];
+        porCampana[camp].total++;
+        valores.forEach(v => { porCampana[camp].porValor[v] = (porCampana[camp].porValor[v] || 0) + 1; });
+    });
+
+    let filas = '';
+    Object.keys(porCampana).sort().forEach(camp => {
+        const info = porCampana[camp];
+        Object.keys(info.porValor).sort().forEach(valor => {
+            const n = info.porValor[valor];
+            const pct = ((n / info.total) * 100).toFixed(1);
+            filas += `<tr><td>${escapeHtml(camp)}</td><td>${escapeHtml(valor)}</td><td>${n}</td><td>${pct}%</td></tr>`;
+        });
+    });
+    if (!filas) return ''; // la tabla entera desaparece si nadie respondió esta pregunta
+
+    return `
+        <div class="card ind-card">
+            <h3>${escapeHtml(pregunta.label)}</h3>
+            <table class="ind-table">
+                <thead><tr><th>Campaña</th><th>Respuesta</th><th># Leads</th><th>%</th></tr></thead>
+                <tbody>${filas}</tbody>
+            </table>
+        </div>`;
+}
+
+function render3Perfilamiento(leads) {
+    const tablas = PREGUNTAS_PERFIL_IND.map(p => renderTablaPerfilInd(p, leads)).filter(Boolean).join('');
+    return `<h3 class="ind-section-title">3. Perfilamiento</h3>${tablas || '<p style="color:#888;">Sin respuestas de perfilamiento con los filtros actuales.</p>'}`;
+}
+
+// ---- Orquestador ----
+function renderIndicadores() {
+    const cont = document.getElementById('indContent');
+    if (!cont) return;
+    const leads = leadsIndicadoresFiltrados();
+
+    cont.innerHTML = `
+        <h3 class="ind-section-title">1. Status de Gestión</h3>
+        ${render1_1StatusGestion(leads)}
+        ${render1_2DiasConversion(leads)}
+
+        <h3 class="ind-section-title">2. Ventas</h3>
+        ${render2_1CondicionesComerciales(leads)}
+        ${render2_2Ventas(leads)}
+
+        ${render3Perfilamiento(leads)}
+    `;
+}
+window.renderIndicadores = renderIndicadores;
+
 // ===== UTILITIES =====
 function mostrarUltimaActualizacion() {
     const el = document.getElementById('lastUpdate');
@@ -1345,4 +1912,4 @@ async function callAPI(action, data = {}) {
     } catch (error) {
         return { success: false, error: error.message };
     }
-}
+}
