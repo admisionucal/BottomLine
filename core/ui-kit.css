@@ -624,9 +624,7 @@ table tbody tr:hover { background: #fafbff; }
 /* Excepción de la sección 7: "¿Cuáles son sus otras opciones?" no entra al
    flujo de columnas — ocupa todo el ancho, con tabla + gráfico lado a lado. */
 .ind-otras-opciones-card { column-span: all; -webkit-column-span: all; margin: 0 0 16px; }
-.ind-otras-opciones-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-.ind-otras-opciones-badges { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-.ind-otras-opciones-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+.ind-otras-opciones-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }.ind-otras-opciones-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
 .ind-otras-opciones-badge.instituto { background: rgba(0, 64, 161, 0.1); color: #0040A1; }
 .ind-otras-opciones-badge.universidad { background: rgba(251, 146, 60, 0.15); color: #b45309; }
 .ind-otras-opciones-badge .dot { width: 8px; height: 8px; border-radius: 50%; }

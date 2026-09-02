@@ -2208,7 +2208,7 @@ function claveCategoriaLocal(s) { return limpiarEspacios(s).toLowerCase(); }
 // Sección 7: tabla (izquierda) + gráfico Instituto vs. Universidad con su
 // Top 5 (derecha), lado a lado. Va aparte del grid de Perfilamiento (no
 // participa del empaquetado dinámico de la sección 4).
-function filasInstitutoVsUniversidad(topInstituto, topUniversidad) {
+function filasInstitutoVsUniversidad(topInstituto, topUniversidad, totalInstituto, totalUniversidad) {
     const n = Math.max(topInstituto.length, topUniversidad.length);
     let filas = '';
     for (let i = 0; i < n; i++) {
@@ -2222,6 +2222,13 @@ function filasInstitutoVsUniversidad(topInstituto, topUniversidad) {
                 <td>${uni ? uni.total : ''}</td>
             </tr>`;
     }
+    filas += `
+        <tr class="ind-row-subtotal">
+            <td>Total</td>
+            <td>${totalInstituto}</td>
+            <td>Total</td>
+            <td>${totalUniversidad}</td>
+        </tr>`;
     return filas;
 }
 
@@ -2234,13 +2241,9 @@ function render7OtrasOpciones(leads) {
     const contenidoInstUni = (totalInstituto === 0 && totalUniversidad === 0)
         ? `<p style="color:#888;">Sin datos con los filtros actuales</p>`
         : `
-            <div class="ind-otras-opciones-badges">
-                <span class="ind-otras-opciones-badge instituto"><span class="dot"></span>Instituto: ${totalInstituto}</span>
-                <span class="ind-otras-opciones-badge universidad"><span class="dot"></span>Universidad: ${totalUniversidad}</span>
-            </div>
             <table class="ind-table ind-table-instituto-universidad">
                 <thead><tr><th>Instituto</th><th>#</th><th>Universidad</th><th>#</th></tr></thead>
-                <tbody>${filasInstitutoVsUniversidad(topInstituto, topUniversidad)}</tbody>
+                <tbody>${filasInstitutoVsUniversidad(topInstituto, topUniversidad, totalInstituto, totalUniversidad)}</tbody>
             </table>`;
 
     return `
@@ -2262,7 +2265,9 @@ function renderTablaPerfilInd(pregunta, leads) {
         if (!valorCrudo) return; // "solo las que se tienen por lo menos 1"
         const camp = l[COLUMNAS.CAMPANA] || '-';
         porCampana[camp] = porCampana[camp] || { total: 0, porValor: {} };
-        const valores = [valorCrudo];
+        const valores = pregunta.columna === COLUMNAS.QUE_LE_FALTA
+            ? valorCrudo.split(',').map(v => limpiarEspacios(v)).filter(Boolean)
+            : [valorCrudo];
         porCampana[camp].total++;
         valores.forEach(v => sumarCategoria(porCampana[camp].porValor, v));
     });
