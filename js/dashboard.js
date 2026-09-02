@@ -819,6 +819,9 @@ function construirMapaAsesor() {
         mapa[clave][catKey].push({ lead, campana });
     };
 
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
     Object.keys(state.calLeadsPorCampana).forEach(campana => {
         (state.calLeadsPorCampana[campana] || []).forEach(lead => {
             const status = lead[COLUMNAS.STATUS_GESTION] || '';
@@ -827,10 +830,12 @@ function construirMapaAsesor() {
                 if (fecha) agregar(fechaAClaveISO(fecha), 'viva', lead, campana);
             }
 
-            // Visita Guiada: solo si el lead sigue como VP Viva.
+            // Visita Guiada: solo si el lead sigue como VP Viva y la fecha es hoy o futura.
             if (status === STATUS.VP_VIVA) {
                 const fechaVisita = parsearFechaFlexible(lead[COLUMNAS.FECHA_VISITA_GUIADA]);
-                if (fechaVisita) agregar(fechaAClaveISO(fechaVisita), 'visitaGuiada', lead, campana);
+                if (fechaVisita && fechaVisita >= hoy) {
+                    agregar(fechaAClaveISO(fechaVisita), 'visitaGuiada', lead, campana);
+                }
             }
         });
     });
