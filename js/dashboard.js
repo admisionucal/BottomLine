@@ -2208,69 +2208,51 @@ function claveCategoriaLocal(s) { return limpiarEspacios(s).toLowerCase(); }
 // Sección 7: tabla (izquierda) + gráfico Instituto vs. Universidad con su
 // Top 5 (derecha), lado a lado. Va aparte del grid de Perfilamiento (no
 // participa del empaquetado dinámico de la sección 4).
+function filasInstitutoVsUniversidad(topInstituto, topUniversidad) {
+    const n = Math.max(topInstituto.length, topUniversidad.length);
+    let filas = '';
+    for (let i = 0; i < n; i++) {
+        const inst = topInstituto[i];
+        const uni = topUniversidad[i];
+        filas += `
+            <tr>
+                <td>${inst ? escapeHtml(inst.label) : ''}</td>
+                <td>${inst ? inst.total : ''}</td>
+                <td>${uni ? escapeHtml(uni.label) : ''}</td>
+                <td>${uni ? uni.total : ''}</td>
+            </tr>`;
+    }
+    return filas;
+}
+
 function render7OtrasOpciones(leads) {
     const tabla = renderTablaOtrasOpciones(leads);
-    if (!tabla) return ''; // nadie respondió esta pregunta con los filtros actuales
+    if (!tabla) return '';
 
-    const canvasId = 'indChartOtrasOpciones';
+    const { totalInstituto, totalUniversidad, topInstituto, topUniversidad } = datosInstitutoVsUniversidad(leads);
+
+    const contenidoInstUni = (totalInstituto === 0 && totalUniversidad === 0)
+        ? `<p style="color:#888;">Sin datos con los filtros actuales</p>`
+        : `
+            <div class="ind-otras-opciones-badges">
+                <span class="ind-otras-opciones-badge instituto"><span class="dot"></span>Instituto: ${totalInstituto}</span>
+                <span class="ind-otras-opciones-badge universidad"><span class="dot"></span>Universidad: ${totalUniversidad}</span>
+            </div>
+            <table class="ind-table ind-table-instituto-universidad">
+                <thead><tr><th>Instituto</th><th>#</th><th>Universidad</th><th>#</th></tr></thead>
+                <tbody>${filasInstitutoVsUniversidad(topInstituto, topUniversidad)}</tbody>
+            </table>`;
+
     return `
         <div class="card ind-card ind-otras-opciones-card">
             <div class="ind-otras-opciones-grid">
                 <div>${tabla}</div>
                 <div>
                     <h3>Instituto vs. Universidad</h3>
-                    <div class="ind-otras-opciones-chart-wrap">
-                        <canvas id="${canvasId}" height="240"></canvas>
-                    </div>
+                    ${contenidoInstUni}
                 </div>
             </div>
         </div>`;
-}
-
-// Se llama DESPUÉS de insertar el HTML de renderIndicadores en el DOM (el
-// <canvas> tiene que existir ya para poder dibujar el gráfico).
-function dibujarGraficoOtrasOpciones(leads) {
-    const canvas = document.getElementById('indChartOtrasOpciones');
-    if (!canvas || typeof Chart === 'undefined') return;
-
-    const { totalInstituto, totalUniversidad, topInstituto, topUniversidad } = datosInstitutoVsUniversidad(leads);
-    const existente = Chart.getChart(canvas);
-    if (existente) existente.destroy();
-
-    if (totalInstituto === 0 && totalUniversidad === 0) {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.font = '12px Segoe UI'; ctx.fillStyle = '#888'; ctx.textAlign = 'center';
-        ctx.fillText('Sin datos con los filtros actuales', canvas.width / 2, canvas.height / 2);
-        return;
-    }
-
-    const wrap = canvas.closest('.ind-otras-opciones-chart-wrap');
-    if (wrap && !wrap.querySelector('.ind-otras-opciones-badges')) {
-        wrap.insertAdjacentHTML('beforebegin', `
-            <div class="ind-otras-opciones-badges">
-                <span class="ind-otras-opciones-badge instituto"><span class="dot"></span>Instituto: ${totalInstituto}</span>
-                <span class="ind-otras-opciones-badge universidad"><span class="dot"></span>Universidad: ${totalUniversidad}</span>
-            </div>`);
-    }
-
-    const labels = [...topInstituto.map(x => x.label), ...topUniversidad.map(x => x.label)];
-    const data = [...topInstituto.map(x => x.total), ...topUniversidad.map(x => x.total)];
-    const colores = [
-        ...topInstituto.map(() => '#0040A1CC'),
-        ...topUniversidad.map(() => '#FB923CCC'),
-    ];
-
-    new Chart(canvas, {
-        type: 'bar',
-        data: { labels, datasets: [{ label: '# Leads', data, backgroundColor: colores, borderRadius: 6 }] },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
-        }
-    });
 }
 
 function renderTablaPerfilInd(pregunta, leads) {
@@ -2280,14 +2262,7 @@ function renderTablaPerfilInd(pregunta, leads) {
         if (!valorCrudo) return; // "solo las que se tienen por lo menos 1"
         const camp = l[COLUMNAS.CAMPANA] || '-';
         porCampana[camp] = porCampana[camp] || { total: 0, porValor: {} };
-        // QUE_LE_FALTA admite varias respuestas separadas por coma (checkbox
-        // múltiple). El resto es una sola respuesta. En ambos casos se
-        // normaliza cada valor antes de agruparlo (sumarCategoria), para
-        // que diferencias de espacios/mayúsculas/caracteres invisibles no
-        // generen categorías duplicadas (p.ej. "Ya decidio, falta pagar").
-        const valores = pregunta.columna === COLUMNAS.QUE_LE_FALTA
-            ? valorCrudo.split(',').map(v => limpiarEspacios(v)).filter(Boolean)
-            : [valorCrudo];
+        const valores = [valorCrudo];
         porCampana[camp].total++;
         valores.forEach(v => sumarCategoria(porCampana[camp].porValor, v));
     });
@@ -2356,9 +2331,6 @@ function renderIndicadores() {
         <h3 class="ind-section-title">Perfilamiento</h3>
         ${tablasPerfil || '<p style="color:#888;">Sin respuestas de perfilamiento con los filtros actuales.</p>'}
     `;
-
-    // El <canvas> recién quedó en el DOM — recién ahora se puede dibujar.
-    dibujarGraficoOtrasOpciones(leads);
 }
 window.renderIndicadores = renderIndicadores;
 

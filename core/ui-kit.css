@@ -603,7 +603,9 @@ table tbody tr:hover { background: #fafbff; }
 .ind-td-campana { text-align: center; vertical-align: middle; font-weight: 700; color: var(--color-primary); border-right: 1px solid #eee; background: #fafbff; }
 /* A partir de la 3ra columna (todo valor/indicador numérico o %) todo va
    centrado; encabezados y las 2 primeras columnas mantienen su alineación. */
-.ind-table th:nth-child(n+3), .ind-table td:nth-child(n+3) { text-align: center; }
+.ind-table th:nth-child(n+3) { text-align: center; }
+.ind-table tr:has(.ind-td-campana) td:nth-child(n+3) { text-align: center; }
+.ind-table tr:not(:has(.ind-td-campana)) td:nth-child(n+2) { text-align: center; }
 .ind-row-mes { cursor: pointer; font-weight: 600; background: #fafafa; }
 .ind-row-mes:hover, .ind-row-semana:hover { background: #f5f6ff; }
 .ind-row-semana { cursor: pointer; }
@@ -622,7 +624,7 @@ table tbody tr:hover { background: #fafbff; }
 /* Excepción de la sección 7: "¿Cuáles son sus otras opciones?" no entra al
    flujo de columnas — ocupa todo el ancho, con tabla + gráfico lado a lado. */
 .ind-otras-opciones-card { column-span: all; -webkit-column-span: all; margin: 0 0 16px; }
-.ind-otras-opciones-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
+.ind-otras-opciones-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .ind-otras-opciones-badges { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .ind-otras-opciones-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
 .ind-otras-opciones-badge.instituto { background: rgba(0, 64, 161, 0.1); color: #0040A1; }
@@ -630,7 +632,10 @@ table tbody tr:hover { background: #fafbff; }
 .ind-otras-opciones-badge .dot { width: 8px; height: 8px; border-radius: 50%; }
 .ind-otras-opciones-badge.instituto .dot { background: #0040A1; }
 .ind-otras-opciones-badge.universidad .dot { background: #FB923C; }
-.ind-otras-opciones-chart-wrap { position: relative; }
+.ind-table-instituto-universidad th:nth-child(2), .ind-table-instituto-universidad td:nth-child(2),
+.ind-table-instituto-universidad th:nth-child(4), .ind-table-instituto-universidad td:nth-child(4) { text-align: center; }
+.ind-table-instituto-universidad td:nth-child(2), .ind-table-instituto-universidad td:nth-child(4) { font-weight: 700; color: var(--color-primary); }
+.ind-table-instituto-universidad td:nth-child(3) { border-left: 1px solid #eee; }
 
 /* El calendario de Indicadores se abre hacia la izquierda (el botón que lo
    dispara suele quedar pegado al borde derecho del panel de filtros, así
@@ -642,7 +647,6 @@ table tbody tr:hover { background: #fafbff; }
     #indFiltersContainer.filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ind-row-cards { grid-template-columns: 1fr; }
     .ind-perfil-grid { column-count: 1; }
-    .ind-otras-opciones-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
     .filtros-panel .filters { grid-template-columns: 1fr; }
