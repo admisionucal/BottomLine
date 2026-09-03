@@ -7,6 +7,7 @@ import {
   getAsistenciaRegistros,
   getAsistenciaEmpleados,
   actualizarEstadoAsesor,
+  actualizarCampanasAsesor,
 } from './routes/asistencia';
 import { getLeads } from './routes/leads';
 import { getLeadDetail } from './routes/leadDetail';
@@ -56,6 +57,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env) => Pro
   getAsistenciaRegistros,
   getAsistenciaEmpleados,
   actualizarEstadoAsesor,
+  actualizarCampanasAsesor,
   getLeads,
   getLeadsConAprobacion,
   getLeadDetail,

@@ -15,7 +15,7 @@ import {
     nowPeru, formato12h, normalizarUrlFoto
 } from '../core/utils.js';
 
-import { Sidebar, Toast, Modal, startClock } from '../core/components.js';
+import { Sidebar, Toast, Modal, startClock, createMultiSelect } from '../core/components.js';
 
 // ===== ESTADO =====
 const state = {
@@ -40,6 +40,7 @@ const state = {
         minMinutosAlmuerzo: parseInt(localStorage.getItem('asis_min_almuerzo')) || 20
     },
     configAsesores: {},
+    campanasDisponibles: [], 
     categoriasCalendario: {
         viva: { label: 'PP Viva', color: '#0040A1', status: 'VALORES_PROMESA_DE_PAGO_VIVA', campoFecha: 'FECHA COMPROMISO DE PAGO' },
         muerta: { label: 'PP Muerta', color: '#5e35b1', status: 'VALORES_PROMESA_DE_PAGO_MUERTA', campoFecha: 'FECHA COMPROMISO DE PAGO' },
@@ -316,6 +317,7 @@ async function initPanelMantenimiento() {
                     <p style="font-size:13px;color:#888;margin-bottom:12px;">Activa/desactiva a cada Asesor y define su horario de entrada por día.</p>
                     <div class="colab-cfg-fila colab-cfg-head">
                         <div>Asesor</div><div>Activo</div>
+                        <div>Campañas</div>
                         <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div>
                     </div>
                     <div class="colab-cfg-scroll" id="colabCfgLista">
@@ -1350,12 +1352,12 @@ const DIAS_CFG = [{ dow: 1, lbl: 'Lun' }, { dow: 2, lbl: 'Mar' }, { dow: 3, lbl:
 
 async function renderColabCfgLista() {
     const cont = document.getElementById('colabCfgLista');
-    const ok = await ensureEmpleadosCache();
-    if (!ok) { cont.innerHTML = '<p style="color:#d32f2f;font-size:13px;">No se pudo cargar la lista de Asesores.</p>'; return; }
+    const [okEmp] = await Promise.all([ensureEmpleadosCache(), ensureCampanasDisponibles()]);
+    if (!okEmp) { cont.innerHTML = '<p style="color:#d32f2f;font-size:13px;">No se pudo cargar la lista de Asesores.</p>'; return; }
     const empleados = state.empleadosCache.filter(u => u.rol !== 'admin');
     if (!empleados.length) { cont.innerHTML = '<p style="color:#888;font-size:13px;">Sin Asesores registrados.</p>'; return; }
     cont.innerHTML = empleados.map(u => {
-        const activo = u.activo !== false;               // 👈 viene de Postgres, no de localStorage
+        const activo = u.activo !== false;
         const cfg = state.configAsesores[u.usuario] || { horarios: {} };
         const inputsDias = DIAS_CFG.map(d => `<input type="time" class="colab-cfg-hora" data-usuario="${escapeHtml(u.usuario)}" data-dow="${d.dow}" value="${cfg.horarios && cfg.horarios[d.dow] ? cfg.horarios[d.dow] : ''}" ${activo ? '' : 'disabled'}>`).join('');
         return `
@@ -1365,9 +1367,27 @@ async function renderColabCfgLista() {
                     <input type="checkbox" data-usuario-activo="${escapeHtml(u.usuario)}" ${activo ? 'checked' : ''} onchange="toggleColabActivo(this)">
                     <span class="colab-switch-slider"></span>
                 </label>
+                <div class="multiselect colab-cfg-campanas" id="colabCampanas-${u.usuario}"></div>
                 ${inputsDias}
             </div>`;
     }).join('');
+
+    empleados.forEach(u => {
+        createMultiSelect(`colabCampanas-${u.usuario}`, state.campanasDisponibles, u.campanas || [], 'Sin campañas', null, { permitirTodos: false });
+    });
+}
+
+async function ensureCampanasDisponibles() {
+    if (state.campanasDisponibles.length) return true;
+    try {
+        const d = await callAPI('getCampanasConfig');
+        if (!d || !d.success) throw new Error(d && d.error);
+        state.campanasDisponibles = (d.data || []).filter(c => c.activa).map(c => c.codigo);
+        return true;
+    } catch (e) {
+        state.campanasDisponibles = [];
+        return true; // no bloquea el render de la tabla, solo el multiselect queda "Sin datos"
+    }
 }
 
 async function toggleColabActivo(chk) {
@@ -1418,6 +1438,24 @@ function guardarRestricciones() {
     localStorage.setItem('asis_min_horas', state.config.minHorasTrabajo);
     localStorage.setItem('asis_min_almuerzo', state.config.minMinutosAlmuerzo);
     showToast('Restricciones guardadas', 'ok');
+}
+
+window.addEventListener('multiselect-change', (e) => {
+    if (!e.detail.containerId.startsWith('colabCampanas-')) return;
+    const usuario = e.detail.containerId.replace('colabCampanas-', '');
+    guardarCampanasAsesor(usuario, e.detail.values);
+});
+
+async function guardarCampanasAsesor(usuario, campanas) {
+    try {
+        const r = await callAPI('actualizarCampanasAsesor', { usuario, campanas });
+        if (!r || !r.success) throw new Error(r && r.error);
+        const u = state.empleadosCache.find(e => e.usuario === usuario);
+        if (u) u.campanas = campanas;
+        showToast('Campañas actualizadas', 'ok');
+    } catch (e) {
+        showToast('No se pudieron actualizar las campañas', 'err');
+    }
 }
 
 // Exponer al scope global: se invocan desde onclick="" en HTML generado dinámicamente.

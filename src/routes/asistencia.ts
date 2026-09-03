@@ -155,6 +155,7 @@ export async function getAsistenciaEmpleados(client: Client, body: JsonBody) {
     cargo: u.cargo || '',
     dni: u.dni || '',
     campaña: String(u.campana || '').split(',')[0]?.trim() || '',
+    campanas: String(u.campana || '').split(',').map((c) => c.trim()).filter(Boolean),
     foto: u.foto || '',
     activo: u.activo !== false,
   }));
@@ -181,6 +182,29 @@ export async function actualizarEstadoAsesor(client: Client, body: JsonBody) {
   if (result.rowCount === 0) return jsonError('Asesor no encontrado.');
 
   return jsonOk({ usuario: result.rows[0].usuario, activo: result.rows[0].activo });
+}
+
+// Nueva función, mismo patrón que actualizarEstadoAsesor
+export async function actualizarCampanasAsesor(client: Client, body: JsonBody) {
+  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
+  if (!sesion) return jsonError(error!);
+
+  const usuario = String(body.usuario || '').trim();
+  if (!usuario) return jsonError('Usuario requerido.');
+
+  const campanas = Array.isArray(body.campanas)
+    ? body.campanas.map((c: any) => String(c).trim()).filter(Boolean)
+    : [];
+
+  const result = await client.query(
+    `update usuarios set campana = $1, actualizado_en = now()
+     where lower(usuario) = lower($2)
+     returning usuario, campana`,
+    [campanas.join(','), usuario]
+  );
+
+  if (result.rowCount === 0) return jsonError('Asesor no encontrado.');
+  return jsonOk({ usuario: result.rows[0].usuario, campanas });
 }
 
 function filaAObjeto(r: any) {
