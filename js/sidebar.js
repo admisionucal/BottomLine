@@ -51,7 +51,7 @@ function marcarSubitemActivo(el) {
 }
 
 function ocultarTodasLasVistas() {
-    ['view-bottomline', 'view-placeholder', 'view-calendario', 'view-asistencia', 'view-usuario', 'view-unificar', 'view-cc', 'view-configuracion']
+    ['view-bottomline', 'view-placeholder', 'view-calendario', 'view-asistencia', 'view-usuario', 'view-unificar', 'view-cc', 'view-configuracion', 'view-indicadores']
         .forEach(id => { 
             const el = document.getElementById(id); 
             if (el) el.style.display = 'none'; });
