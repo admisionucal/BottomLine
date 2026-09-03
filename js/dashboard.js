@@ -1101,7 +1101,7 @@ function renderCalendarioAnio(cont) {
 
     let mesesHtml = '';
     for (let m = 0; m < 12; m++) {
-        const nombreMes = new Date(year, m, 1).toLocaleDateString('es-PE', { month: 'long' });
+        const nombreMes = mesAnioCorto(state.calendarioMes);
         const primerDiaSemana = new Date(year, m, 1).getDay();
         const diasEnMes = new Date(year, m + 1, 0).getDate();
         const prefijoMes = `${year}-${String(m + 1).padStart(2, '0')}`;
@@ -1292,9 +1292,7 @@ function exportarMesExcel() {
     const user = getCurrentUser();
     const esAdmin = user && esRolSupervisorOAdmision(user.rol);
     const filasExport = construirFilasExportCalendario(items, esAdmin, true);
-    const nombreMes = state.calendarioMes
-        .toLocaleDateString('es-PE', { month: 'long', year: 'numeric' })
-        .replace(/\s+/g, '_');
+    const nombreMes = mesAnioCorto(state.calendarioMes).replace(/\s+/g, '_');
     descargarExcelCalendario(filasExport, `Calendario_${nombreMes}_${nombreCampanaExport()}.xlsx`);
 }
 
@@ -1399,8 +1397,7 @@ function renderCalendarioFiltroVpPp() {
     if (!grid || !label) return;
 
     const mes = state.calVpPpMes;
-    const labelMes = mes.toLocaleDateString('es-PE', { month: 'long', year: 'numeric' });
-    label.textContent = labelMes.charAt(0).toUpperCase() + labelMes.slice(1);
+    label.textContent = mesAnioCorto(mes);
 
     const mapa = mapaFechasVpPp();
     const seleccionadas = state.filtros.fechaPrimVpPp;
@@ -1750,8 +1747,7 @@ function renderIndCalendarioFiltro() {
     if (!grid || !label) return;
 
     const mes = state.indicadores.calMes;
-    const labelMes = mes.toLocaleDateString('es-PE', { month: 'long', year: 'numeric' });
-    label.textContent = labelMes.charAt(0).toUpperCase() + labelMes.slice(1);
+    label.textContent = mesAnioCorto(mes);
 
     const mapa = mapaFechasIndCal();
     const seleccionadas = state.indicadores.filtros.fechaCalendario;
@@ -1801,8 +1797,11 @@ window.limpiarFiltroIndCal = limpiarFiltroIndCal;
 // ---- Utilidades de agrupación jerárquica de fechas (Mes → Semana → Día) ----
 function claveMesInd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 function labelMesInd(d) {
-    const s = d.toLocaleDateString('es-PE', { month: 'long', year: 'numeric' });
-    return s.charAt(0).toUpperCase() + s.slice(1);
+    return mesAnioCorto(d);
+}
+function mesAnioCorto(d) {
+    const mes = d.toLocaleDateString('es-PE', { month: 'long' });
+    return `${mes.charAt(0).toUpperCase()}${mes.slice(1)} ${d.getFullYear()}`;
 }
 function claveSemanaISOInd(d) {
     const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -1860,19 +1859,43 @@ function render0PerfilamientoResumen(leads) {
         const estado = (l.PERFILAMIENTO_COMPLETO || {}).estado || 'Pendiente Asesor';
         porCampana[camp] = porCampana[camp] || { total: 0, porEstado: {} };
         porCampana[camp].total++;
-        porCampana[camp].porEstado[estado] = (porCampana[camp].porEstado[estado] || 0) + 1;
+        porCampana[camp].porEstado[estado] = porCampana[camp].porEstado[estado] || { n: 0, leads: [] };
+        porCampana[camp].porEstado[estado].n++;
+        porCampana[camp].porEstado[estado].leads.push(l);
     });
 
     const orden = ['Completo', 'Pendiente Supervisor', 'Pendiente Asesor'];
+    const set = state.indicadores.expandido['indPerfilResumen'] = state.indicadores.expandido['indPerfilResumen'] || new Set();
+
     let filas = '';
     Object.keys(porCampana).sort().forEach(camp => {
         const info = porCampana[camp];
-        const filasDeEstaCamp = orden.filter(e => info.porEstado[e]).map(estado => `
-            <tr>{{CAMP_TD}}
-                <td>${escapeHtml(estado)}</td>
-                <td>${info.porEstado[estado]}</td>
-                <td>${pctInd(info.porEstado[estado], info.total)}</td>
-            </tr>`);
+        const filasDeEstaCamp = [];
+
+        orden.filter(e => info.porEstado[e]).forEach(estado => {
+            const grupo = info.porEstado[estado];
+            const clave = `${camp}|${estado}`;
+            const abierto = set.has(clave);
+
+            filasDeEstaCamp.push(`
+                <tr class="ind-row" onclick="window.toggleIndRow('indPerfilResumen','${clave}')">{{CAMP_TD}}
+                    <td><span class="ind-caret">${abierto ? '▾' : '▸'}</span> ${escapeHtml(estado)}</td>
+                    <td>${grupo.n}</td>
+                    <td>${pctInd(grupo.n, info.total)}</td>
+                </tr>`);
+
+            if (abierto) {
+                grupo.leads.forEach(l => {
+                    const id = l[COLUMNAS.ID_PROMETEO] || '-';
+                    const nombre = l[COLUMNAS.NOMBRES] || 'Sin Nombre';
+                    filasDeEstaCamp.push(`
+                        <tr>{{CAMP_TD}}
+                            <td class="ind-indent-1" colspan="3">${escapeHtml(id)} - ${escapeHtml(nombre)}</td>
+                        </tr>`);
+                });
+            }
+        });
+
         filasDeEstaCamp.push(`
             <tr class="ind-row-subtotal">{{CAMP_TD}}
                 <td>Total</td><td>${info.total}</td><td>100%</td>
