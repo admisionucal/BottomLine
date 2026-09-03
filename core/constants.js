@@ -130,6 +130,10 @@ export function esRolSupervisorOAdmision(rol) {
     return rol === ROLES.SUPERVISOR || rol === ROLES.ADMISION;
 }
 
+export function esRolAdmision(rol) {
+    return rol === ROLES.ADMISION;
+}
+
 // ----- OPCIONES PARA SELECTORES (Catálogos estáticos) -----
 export const SELECT_OPTIONS = {
     beneficio: ['Beca Impacto', 'Beca Potencia'],
@@ -159,10 +163,12 @@ export const CARRERAS_ETU = {
 };
 
 // ----- COPIA OCULTA (BCC) POR DEFECTO PARA ENVÍO DE CC, POR CAMPAÑA -----
-export const BCC_DEFAULT_CC = {
-    '26.2': ['onboarding@ucal.edu.pe', 'azamora@ucal.edu.pe', 'renriquez@ucal.edu.pe'],
-    '27.1': ['onboarding@ucal.edu.pe', 'mquiroz@ucal.edu.pe', 'renriquez@ucal.edu.pe']
-};
+export const BCC_DEFAULT_CC = {};
+
+export function setBccDefault(porCampana) {
+    Object.keys(BCC_DEFAULT_CC).forEach(k => delete BCC_DEFAULT_CC[k]);
+    Object.assign(BCC_DEFAULT_CC, porCampana);
+}
 
 // ----- CLAVES DE CACHÉ (sessionStorage) -----
 export const CACHE_KEYS = {
@@ -185,4 +191,5 @@ export const CACHE_KEYS = {
     CATALOGO_QUIEN_FINANCIARA: 'bl_catalogo_quien_financiara',
     CATALOGO_QUE_LE_FALTA: 'bl_catalogo_que_le_falta',
     CATALOGO_OTRAS_OPCIONES: 'bl_catalogo_otras_opciones',
+    CAMPANAS_CONFIG: 'bl_campanas_config',
 };

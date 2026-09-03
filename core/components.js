@@ -2,7 +2,7 @@
 // COMPONENTS - Componentes dinámicos inyectados por DOM
 // ================================================================
 
-import { ROLES, esRolSupervisorOAdmision } from './constants.js';
+import { ROLES, esRolSupervisorOAdmision, esRolAdmision } from './constants.js';
 import { escapeHtml, getCurrentUser, normalizarUrlFoto } from './utils.js';
 
 // ================================================================
@@ -138,13 +138,20 @@ export class Sidebar {
     // Muestra los subitems restringidos a SUPERVISOR/ADMISION.
     aplicarVisibilidadPorRol() {
         const user = getCurrentUser();
-        if (!user || !esRolSupervisorOAdmision(user.rol)) return;
+        if (!user) return;
 
-        ['navUnificarIds', 'navIndicadoresBL', 'navCondicionesCC', 'navAsistenciaAnalisis', 'navAsistenciaMantenimiento']
-            .forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.style.display = '';
-            });
+        if (esRolSupervisorOAdmision(user.rol)) {
+            ['navUnificarIds', 'navCondicionesCC', 'navAsistenciaAnalisis', 'navAsistenciaMantenimiento']
+                .forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = '';
+                });
+        }
+
+        if (esRolAdmision(user.rol)) {
+            const el = document.getElementById('sidebarFooterConfig');
+            if (el) el.style.display = '';
+        }
     }
 
     // Bloque inferior fijo del sidebar: foto, nombre, rol y cerrar sesión.
@@ -163,6 +170,10 @@ export class Sidebar {
                     <span class="sidebar-footer-rol">${escapeHtml(user.rol)}</span>
                 </div>
             </div>
+            <button type="button" class="sidebar-footer-logout" id="sidebarFooterConfig" title="Configuración" style="display:none;" onclick="window.mostrarConfiguracion && mostrarConfiguracion()">
+                <span class="material-symbols-outlined">settings</span>
+                <span class="sidebar-footer-logout-label">Configuración</span>
+            </button>
             <button type="button" class="sidebar-footer-logout" title="Cerrar sesión" onclick="window.logout && window.logout()">
                 <span class="material-symbols-outlined">logout</span>
                 <span class="sidebar-footer-logout-label">Cerrar sesión</span>

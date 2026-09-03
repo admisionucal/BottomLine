@@ -14,6 +14,8 @@ let __unifModuloCargado = false;
 let __unifCargaEnCurso = null;
 let __ccModuloCargado = false;
 let __ccCargaEnCurso = null;
+let __configModuloCargado = false;
+let __configCargaEnCurso = null;
 
 // ===== FUNCIONES DEL SIDEBAR =====
 function toggleSidebar() {
@@ -49,11 +51,10 @@ function marcarSubitemActivo(el) {
 }
 
 function ocultarTodasLasVistas() {
-    ['view-bottomline', 'view-placeholder', 'view-calendario', 'view-asistencia', 'view-usuario', 'view-unificar', 'view-cc', 'view-indicadores']
-        .forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = 'none';
-        });
+    ['view-bottomline', 'view-placeholder', 'view-calendario', 'view-asistencia', 'view-usuario', 'view-unificar', 'view-cc', 'view-configuracion']
+        .forEach(id => { 
+            const el = document.getElementById(id); 
+            if (el) el.style.display = 'none'; });
 }
 
 // ===== VISTA: USUARIO =====
@@ -551,6 +552,89 @@ function asegurarScriptCC() {
     return __ccScriptPromise;
 }
 
+function mostrarConfiguracion() {
+    const viewUsuario = document.getElementById('view-usuario');
+    const viewBottomline = document.getElementById('view-bottomline');
+    const viewConfig = document.getElementById('view-configuracion');
+
+    if (!viewUsuario && !viewBottomline) {
+        window.location.href = 'dashboard.html?view=configuracion';
+        return;
+    }
+
+    ocultarTodasLasVistas();
+    if (viewConfig) viewConfig.style.display = 'block';
+
+    document.querySelectorAll('.nav-group-btn').forEach(b => b.classList.remove('active'));
+
+    if (__configModuloCargado) {
+        if (typeof initConfiguracionEmbebido === 'function') initConfiguracionEmbebido();
+        return;
+    }
+    cargarVistaConfiguracion();
+}
+
+function cargarVistaConfiguracion() {
+    if (__configCargaEnCurso) return __configCargaEnCurso;
+
+    const contenedor = document.getElementById('view-configuracion');
+    if (!contenedor) {
+        window.location.href = 'dashboard.html?view=configuracion';
+        return;
+    }
+
+    __configCargaEnCurso = fetch('configuracion.html')
+        .then(resp => {
+            if (!resp.ok) throw new Error('HTTP ' + resp.status + ' al pedir configuracion.html');
+            return resp.text();
+        })
+        .then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const configApp = doc.getElementById('configuracionApp');
+            if (!configApp) throw new Error('configuracion.html no tiene el elemento #configuracionApp esperado');
+
+            if (!document.querySelector('style[data-config-styles]')) {
+                doc.querySelectorAll('style').forEach(styleTag => {
+                    const clon = styleTag.cloneNode(true);
+                    clon.setAttribute('data-config-styles', '');
+                    document.head.appendChild(clon);
+                });
+            }
+
+            contenedor.innerHTML = '';
+            contenedor.appendChild(configApp.cloneNode(true));
+
+            return asegurarScriptConfiguracion();
+        })
+        .then(() => {
+            __configModuloCargado = true;
+            if (typeof initConfiguracionEmbebido === 'function') return initConfiguracionEmbebido();
+        })
+        .catch(err => {
+            console.error('cargarVistaConfiguracion:', err);
+            contenedor.innerHTML = '<div class="loading" style="color:#d32f2f;">Error al cargar Configuración: ' + err.message + '</div>';
+        })
+        .finally(() => { __configCargaEnCurso = null; });
+
+    return __configCargaEnCurso;
+}
+
+let __configScriptPromise = null;
+function asegurarScriptConfiguracion() {
+    if (typeof initConfiguracionEmbebido === 'function') return Promise.resolve();
+    if (!__configScriptPromise) {
+        __configScriptPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.src = 'js/configuracion.js';
+            script.onload = resolve;
+            script.onerror = () => { __configScriptPromise = null; reject(new Error('No se pudo cargar js/configuracion.js')); };
+            document.body.appendChild(script);
+        });
+    }
+    return __configScriptPromise;
+}
+
 function logout() {
     sessionStorage.removeItem('bl_user');
     window.location.href = 'index.html';
@@ -571,4 +655,5 @@ window.mostrarCalendario = mostrarCalendario;
 window.mostrarUnificar = mostrarUnificar;
 window.mostrarCC = mostrarCC;
 window.logout = logout;
-window.irAMarcarAsistenciaDesdeUsuario = irAMarcarAsistenciaDesdeUsuario;
+window.irAMarcarAsistenciaDesdeUsuario = irAMarcarAsistenciaDesdeUsuario;
+window.mostrarConfiguracion = mostrarConfiguracion;

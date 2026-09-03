@@ -2251,7 +2251,6 @@ function render7OtrasOpciones(leads) {
             <div class="ind-otras-opciones-grid">
                 <div>${tabla}</div>
                 <div>
-                    <h3>Instituto vs. Universidad</h3>
                     ${contenidoInstUni}
                 </div>
             </div>

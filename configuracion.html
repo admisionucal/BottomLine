@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RUMBO GAC - Configuración</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="core/ui-kit.css">
+    <style>
+        .container { width: 95%; max-width: 1400px; margin: 0 auto; padding: 24px 0; }
+
+        .cfg-campanas-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .cfg-campana-card {
+            background: white;
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: box-shadow .15s, border-color .15s;
+        }
+        .cfg-campana-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+        .cfg-campana-card.selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px rgba(0,64,161,.12); }
+        .cfg-campana-card.inactiva { opacity: .55; }
+
+        .cfg-campana-top { display: flex; justify-content: space-between; align-items: center; }
+        .cfg-campana-codigo { font-size: 20px; font-weight: 700; color: var(--color-primary); }
+        .cfg-campana-meta { font-size: 12px; color: #777; margin-top: 4px; }
+
+        .cfg-switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+        .cfg-switch input { opacity: 0; width: 0; height: 0; }
+        .cfg-switch-slider {
+            position: absolute; cursor: pointer; inset: 0;
+            background: #ccc; border-radius: 22px; transition: .15s;
+        }
+        .cfg-switch-slider::before {
+            content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px;
+            background: white; border-radius: 50%; transition: .15s;
+        }
+        .cfg-switch input:checked + .cfg-switch-slider { background: #31A24C; }
+        .cfg-switch input:checked + .cfg-switch-slider::before { transform: translateX(16px); }
+
+        .cfg-nueva-campana-btn {
+            border: 2px dashed var(--color-border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            color: #777;
+            font-weight: 600;
+            cursor: pointer;
+            min-height: 84px;
+            background: transparent;
+        }
+        .cfg-nueva-campana-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+        .cfg-detalle {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+            padding: 24px;
+        }
+
+        .cfg-form-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+        .cfg-campo { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #555; flex: 1; min-width: 160px; }
+        .cfg-campo input { padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 13px; }
+
+        .cfg-archivos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 14px;
+            margin-top: 8px;
+        }
+
+        .cfg-archivo-card {
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .cfg-archivo-titulo { font-size: 13px; font-weight: 700; color: #222; }
+        .cfg-archivo-estado { font-size: 12px; color: #777; display: flex; align-items: center; gap: 6px; }
+        .cfg-archivo-estado.cargado { color: #0f8f5f; }
+        .cfg-archivo-acciones { display: flex; gap: 8px; margin-top: 4px; }
+        .cfg-archivo-acciones .btn-export { font-size: 12px; padding: 6px 10px; }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-area">
+            <div class="container">
+                <div id="configuracionApp">
+                    <h2 style="margin-bottom:4px;">Configuración de Campañas</h2>
+                    <p style="color:#777; font-size:13px; margin-bottom:20px;">
+                        Activa, desactiva o crea campañas, y sube los archivos (Lineamientos de Admisión y T&amp;C) que se envían con cada Condición Comercial.
+                    </p>
+
+                    <div class="cfg-campanas-grid" id="cfgCampanasGrid">
+                        <div class="loading">Cargando campañas…</div>
+                    </div>
+
+                    <div class="cfg-detalle" id="cfgDetalle" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="core/utils.js"></script>
+    <script type="module" src="core/constants.js"></script>
+    <script type="module" src="core/components.js"></script>
+    <script type="module" src="js/sidebar.js"></script>
+    <script type="module" src="js/configuracion.js"></script>
+</body>
+</html>

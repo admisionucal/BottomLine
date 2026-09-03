@@ -48,15 +48,11 @@ export async function login(client: Client, body: JsonBody, env: Env) {
   let campanas: string[] = [];
   const raw = String(user.campana || '');
   if (raw.toLowerCase() === 'todas') {
-    // No existe (ni hace falta) una tabla aparte de campañas: 'leads' ya
-    // tiene la columna 'campana', así que basta con los valores distintos
-    // que ya existen ahí. Se mantiene el try/catch como red de seguridad
-    // para no romper el login si la tabla aún no tiene datos.
     try {
       const camResult = await client.query(
-        `select distinct campana from leads where campana is not null and campana <> '' order by campana`
+        `select codigo from campanas where activa = true order by codigo`
       );
-      campanas = camResult.rows.map((r) => r.campana).filter(Boolean);
+      campanas = camResult.rows.map((r) => r.codigo).filter(Boolean);
     } catch (_e) {
       campanas = [];
     }

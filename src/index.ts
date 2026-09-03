@@ -29,6 +29,14 @@ import {
 import { getSolicitudesCC, getSolicitudCC, getSolicitudesCCCount } from './routes/solicitudesCCRead';
 import { actualizarSolicitudCC } from './routes/solicitudCCDualWrite';
 import { exigirSesion } from './lib/session';
+import {
+  getCampanasConfig,
+  guardarCampana,
+  toggleCampanaActiva,
+  subirArchivoCampana,
+  eliminarArchivoCampana,
+  obtenerArchivoCampanaBase64,
+} from './routes/campanas';
 
 // Igual que getLeadsConAprobacion(body) en code.gs: mismo getLeads, pero
 // solo accesible para SUPERVISOR/ADMISION.
@@ -70,6 +78,12 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env) => Pro
   actualizarSolicitudCC,
   actualizarLeadsHoy,
   actualizarLeadsBase,
+  getCampanasConfig,
+  guardarCampana,
+  toggleCampanaActiva,
+  subirArchivoCampana,
+  eliminarArchivoCampana,
+  obtenerArchivoCampanaBase64,
 };
 
 export default {

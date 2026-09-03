@@ -2,14 +2,14 @@
 // CONDICIONES COMERCIALES - Módulo de solicitudes CC (Supervisor/Admisión)
 // ================================================================
 
-import { API_URL, esRolSupervisorOAdmision, COLUMNAS, CACHE_KEYS, BCC_DEFAULT_CC, SELECT_OPTIONS } from '../core/constants.js';
+import { API_URL, esRolSupervisorOAdmision, COLUMNAS, CACHE_KEYS, BCC_DEFAULT_CC, SELECT_OPTIONS, setBccDefault } from '../core/constants.js';
 import {
     getCurrentUser, getUserCampanas, getSessionToken,
     cacheGet, cacheSet, cacheRemove,
     escapeHtml, formatearFecha, getEspecializacionETU
 } from '../core/utils.js';
 import { Sidebar, renderTable, Toast, createMultiSelect } from '../core/components.js';
-import { construirDatosCC, renderPlantillaCC, renderPlantillaCCPreview, detectarTipoReferido, precargarLogoCC } from './cc-template.js';
+import { construirDatosCC, renderPlantillaCC, renderPlantillaCCPreview, detectarTipoReferido, precargarLogoCC, setConfigCampanas } from './cc-template.js';
 import { buscarDuplicados, limpiarCacheDuplicados } from './duplicados-sugeridos.js';
 import { unificarLeads } from './unificar-core.js';
 
@@ -22,14 +22,11 @@ import { unificarLeads } from './unificar-core.js';
 function nombrePdf(nombreBase) {
     return `${nombreBase}.pdf`;
 }
-function rutaAsset(nombreArchivo) {
-    return 'assets/' + encodeURIComponent(nombreArchivo);
-}
-const NOMBRE_LINEAMIENTOS_5C = (periodo) => nombrePdf(`Lineamientos de Admisión para ingresantes al semestre académico ${periodo}`);
-const NOMBRE_LINEAMIENTOS_6C = (periodo) => nombrePdf(`Lineamientos de Admisión para ingresantes al semestre académico ${periodo} - 6c`);
 
-function nombreLineamientosSegunCuotas(datosCC) {
-    return datosCC.mostrar6Cuotas ? NOMBRE_LINEAMIENTOS_6C(datosCC.periodo) : NOMBRE_LINEAMIENTOS_5C(datosCC.periodo);
+async function obtenerArchivoCampana(campana, tipo) {
+    const result = await callAPI('obtenerArchivoCampanaBase64', { campana, tipo });
+    if (!result.success) throw new Error(result.error || `No se pudo obtener el archivo "${tipo}" de la campaña ${campana}.`);
+    return { nombre: result.nombreArchivo, base64: result.archivoBase64 };
 }
 
 function campoHTML(label, value) {
@@ -73,12 +70,6 @@ let modoEmbebido = false;
 // — ej. el catálogo real usa "Referido - 50% dscto. 1ra boleta", no
 // "Descuento referido - 50% dscto. 1ra boleta". Ahora ambos archivos usan
 // el mismo detector por palabras clave, para que no se desincronicen).
-
-// PDFs de Referidos/Referentes (mismo patrón que NOMBRE_LINEAMIENTOS_5C).
-// stock = alumno ya matriculado; nuevo = ingresante en proceso de admisión.
-const NOMBRE_TERMINOS_REFERIDO = (periodo) => nombrePdf(`T&C - REFERIDO ${periodo}`);
-const NOMBRE_TERMINOS_REFERENTE_ALUMNO = (periodo) => nombrePdf(`T&C - REFERENTE ALUMNO ${periodo}`);
-const NOMBRE_TERMINOS_REFERENTE_INGRESANTE = (periodo) => nombrePdf(`T&C - REFERENTE INGRESANTE ${periodo}`);
 
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -401,16 +392,22 @@ async function mostrarVistaDetalle(idSolicitud, solicitudPrecargada) {
         state.tipoReferente = 'nuevo';
         state.tipoReferidoActual = null;
 
-        const [resultLead, resultCatalogos] = await Promise.all([
+        const [resultLead, resultCatalogos, , resultCampanas] = await Promise.all([
             callAPI('getLeadDetail', { id: solicitud.ID_PROMETEO, campana: solicitud.CAMPANA }),
             callAPI('getCatalogos', {}),
-            precargarLogoCC()
+            precargarLogoCC(),
+            callAPI('getCampanasConfig', {})
         ]);
 
-        if (!resultLead.success) throw new Error(resultLead.error || 'No se pudo cargar el lead');
-
-        state.leadActual = resultLead.data;
-        state.catalogoBeneficios = (resultCatalogos.success && resultCatalogos.data.beneficios) || [];
+        if (resultCampanas.success) {
+            const porCampana = {}, bccPorCampana = {};
+            (resultCampanas.data || []).forEach(c => {
+                porCampana[c.codigo] = { periodo: c.periodo, perC: c.perC, inicioClases: c.inicioClases };
+                bccPorCampana[c.codigo] = c.bccDefault || [];
+            });
+            setConfigCampanas(porCampana);
+            setBccDefault(bccPorCampana);
+        }
 
         renderDetalleCC();
     } catch (e) {
@@ -962,8 +959,8 @@ async function enviarCC() {
     try {
         const datosCC = construirDatosCC(state.leadActual, state.solicitudActual.CAMPANA, state.overrides);
         const htmlFinal = renderPlantillaCC(datosCC);
-        const lineamientosNombre = nombreLineamientosSegunCuotas(datosCC);
-        const lineamientosBase64 = await fetchAssetBase64(rutaAsset(lineamientosNombre));
+        const tipoLineamientos = datosCC.mostrar6Cuotas ? 'lineamientos_6c' : 'lineamientos_5c';
+        const { nombre: lineamientosNombre, base64: lineamientosBase64 } = await obtenerArchivoCampana(state.solicitudActual.CAMPANA, tipoLineamientos);
 
         // Referidos/Referentes: se captura recién aquí (Vista 2), no en el
         // modal del asesor — el backend necesita el PDF correcto según el
@@ -980,15 +977,15 @@ async function enviarCC() {
         let terminosReferenteBase64 = null;
         let terminosReferenteNombre = null;
         if (state.tipoReferidoActual === 'REFERIDO') {
-            terminosReferidoNombre = NOMBRE_TERMINOS_REFERIDO(datosCC.periodo);
-            terminosReferidoBase64 = await fetchAssetBase64(rutaAsset(terminosReferidoNombre));
-            terminosReferenteNombre = state.tipoReferente === 'stock'
-                ? NOMBRE_TERMINOS_REFERENTE_ALUMNO(datosCC.periodo)
-                : NOMBRE_TERMINOS_REFERENTE_INGRESANTE(datosCC.periodo);
-            terminosReferenteBase64 = await fetchAssetBase64(rutaAsset(terminosReferenteNombre));
+            const ref = await obtenerArchivoCampana(state.solicitudActual.CAMPANA, 'terminos_referido');
+            terminosReferidoNombre = ref.nombre; terminosReferidoBase64 = ref.base64;
+
+            const tipoArchivoReferente = state.tipoReferente === 'stock' ? 'terminos_referente_alumno' : 'terminos_referente_ingresante';
+            const referente = await obtenerArchivoCampana(state.solicitudActual.CAMPANA, tipoArchivoReferente);
+            terminosReferenteNombre = referente.nombre; terminosReferenteBase64 = referente.base64;
         } else if (state.tipoReferidoActual === 'REFERENTE') {
-            terminosReferidoNombre = NOMBRE_TERMINOS_REFERIDO(datosCC.periodo);
-            terminosReferidoBase64 = await fetchAssetBase64(rutaAsset(terminosReferidoNombre));
+            const ref = await obtenerArchivoCampana(state.solicitudActual.CAMPANA, 'terminos_referido');
+            terminosReferidoNombre = ref.nombre; terminosReferidoBase64 = ref.base64;
         }
 
         const result = await callAPI('enviarCC', {

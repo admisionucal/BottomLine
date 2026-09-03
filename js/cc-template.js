@@ -29,10 +29,12 @@ function logoSrcCC() {
 }
 
 // Config por campaña
-export const CONFIG_CC = {
-    '26.2': { periodo: '2026-2', perC: '26-2', inicioClases: 'Agosto' },
-    '27.1': { periodo: '2027-1', perC: '27-1', inicioClases: 'Marzo' }
-};
+export const CONFIG_CC = {};
+
+export function setConfigCampanas(porCampana) {
+    Object.keys(CONFIG_CC).forEach(k => delete CONFIG_CC[k]);
+    Object.assign(CONFIG_CC, porCampana);
+}
 
 // Detecta si el beneficio de primera boleta corresponde a un caso de Referidos
 export function detectarTipoReferido(label) {
