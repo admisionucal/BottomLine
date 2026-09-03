@@ -585,7 +585,7 @@ table tbody tr:hover { background: #fafbff; }
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 4px 24px;
-    padding: 4px 0 14px;
+    padding: 4px 20px 14px;
     background: white;
 }
 .ind-tabs {

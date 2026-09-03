@@ -21,6 +21,7 @@ const MAPEO_LEADS: Record<string, string> = {
   'STATUS DE GESTION': 'status_gestion',
   'FECHA COMPROMISO DE PAGO': 'fecha_compromiso_pago',
   'FECHA VISITA GUIADA': 'fecha_visita_guiada',
+  'FECHA PRIM VP/PP': 'fecha_prim_vp_pp',
   '# DE VPs DIF TI INTE': 'vps_dif_ti_inte',
 };
 

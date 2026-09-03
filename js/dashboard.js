@@ -2432,8 +2432,8 @@ function renderIndicadores() {
         </div>`;
 
     contVentas.innerHTML = `
-        ${render2Ventas(leadsSinFiltroStatus)}
         ${render2CondicionesComerciales(leadsSinFiltroStatus)}
+        ${render2Ventas(leadsSinFiltroStatus)}
     `;
 
     contPerfil.innerHTML = `
