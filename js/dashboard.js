@@ -2369,10 +2369,6 @@ function renderIndicadores() {
     const tablasPerfil = render3Perfilamiento(leads);
 
     cont.innerHTML = `
-        <h3 class="ind-section-title">Perfilamiento</h3>
-        ${render0PerfilamientoResumen(leads)}
-        ${tablasPerfil || '<p style="color:#888;">Sin respuestas de perfilamiento con los filtros actuales.</p>'}
-
         <h3 class="ind-section-title">Status de Gestión</h3>
         <div class="ind-row-cards">
             ${render1_1StatusGestion(leads)}
@@ -2384,6 +2380,7 @@ function renderIndicadores() {
         ${render2CondicionesComerciales(leads)}
 
         <h3 class="ind-section-title">Perfilamiento</h3>
+        ${render0PerfilamientoResumen(leads)}
         ${tablasPerfil || '<p style="color:#888;">Sin respuestas de perfilamiento con los filtros actuales.</p>'}
     `;
 }
