@@ -141,7 +141,7 @@ export class Sidebar {
         if (!user) return;
 
         if (esRolSupervisorOAdmision(user.rol)) {
-            ['navUnificarIds', 'navCondicionesCC', 'navAsistenciaAnalisis', 'navAsistenciaMantenimiento']
+            ['navIndicadoresBL', 'navUnificarIds', 'navCondicionesCC', 'navAsistenciaAnalisis', 'navAsistenciaMantenimiento']
                 .forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.style.display = '';
