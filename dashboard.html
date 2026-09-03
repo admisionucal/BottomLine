@@ -338,7 +338,16 @@
                             <div class="filter-group"><label class="filter-label">PERFILAMIENTO</label><div class="multiselect" id="indFilterPerfil"></div></div>
                         </div>
                     </div>
-                    <div id="indContent"><div class="loading">Cargando indicadores…</div></div>
+                    <div class="ind-tabs" id="indTabs">
+                        <button type="button" class="active" data-indtab="status">Status de Gestión</button>
+                        <button type="button" data-indtab="ventas">Ventas y Condiciones Comerciales</button>
+                        <button type="button" data-indtab="perfil">Perfilamiento</button>
+                    </div>
+                    <div id="indContent">
+                        <div class="ind-tab-content" id="indTab-status"><div class="loading">Cargando indicadores…</div></div>
+                        <div class="ind-tab-content" id="indTab-ventas" style="display:none;"></div>
+                        <div class="ind-tab-content" id="indTab-perfil" style="display:none;"></div>
+                    </div>
                 </div>
             
                 <!-- VISTA: CONFIGURACIONES -->

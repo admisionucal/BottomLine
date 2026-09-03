@@ -46,7 +46,7 @@ let state = {
     ultimaActualizacion: null,
     calVpPpMes: new Date(),
     indicadores: {
-        filtros: { campana: [], programa: [], modalidad: [], ingreso: [], asesor: [], canal: [], status: [], perfil: [], fechaCalendario: [] },
+        filtros: { campana: [], programa: [], modalidad: [], ingreso: [], asesor: [], canal: [], status: [STATUS.VP_VIVA, STATUS.PP_VIVA], perfil: [], fechaCalendario: [] },
         expandido: {},
         calMes: new Date(),
         cargado: false,
@@ -1519,6 +1519,7 @@ async function inicializarIndicadores() {
     }
 
     poblarFiltrosIndicadores();
+    configurarTabsIndicadores();
     renderIndicadores();
 }
 window.inicializarIndicadores = inicializarIndicadores;
@@ -1563,6 +1564,20 @@ async function cargarLeadsIndicadores(forceRefresh = false) {
 
     state.indicadores.leadsPorCampana = {};
     resultados.forEach(({ campana, leads }) => { state.indicadores.leadsPorCampana[campana] = leads; });
+}
+
+function configurarTabsIndicadores() {
+    if (state.indicadores.tabsListenerListo) return;
+    document.querySelectorAll('#indTabs button[data-indtab]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#indTabs button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.ind-tab-content').forEach(tc => tc.style.display = 'none');
+            const target = document.getElementById('indTab-' + btn.dataset.indtab);
+            if (target) target.style.display = 'block';
+        });
+    });
+    state.indicadores.tabsListenerListo = true;
 }
 
 // Aplana state.indicadores.leadsPorCampana (TODAS las campañas activas del
@@ -2363,23 +2378,27 @@ function render3Perfilamiento(leads) {
 
 // ---- Orquestador ----
 function renderIndicadores() {
-    const cont = document.getElementById('indContent');
-    if (!cont) return;
+    const contStatus = document.getElementById('indTab-status');
+    const contVentas = document.getElementById('indTab-ventas');
+    const contPerfil = document.getElementById('indTab-perfil');
+    if (!contStatus || !contVentas || !contPerfil) return;
+
     const leads = leadsIndicadoresFiltrados();
+    const leadsSinFiltroStatus = leadsIndicadoresFiltradosExcluyendo('status');
     const tablasPerfil = render3Perfilamiento(leads);
 
-    cont.innerHTML = `
-        <h3 class="ind-section-title">Status de Gestión</h3>
+    contStatus.innerHTML = `
         <div class="ind-row-cards">
             ${render1_1StatusGestion(leads)}
             ${render1_2DiasConversion(leads)}
-        </div>
+        </div>`;
 
-        <h3 class="ind-section-title">Ventas y Condiciones Comerciales</h3>
-        ${render2Ventas(leads)}
-        ${render2CondicionesComerciales(leads)}
+    contVentas.innerHTML = `
+        ${render2Ventas(leadsSinFiltroStatus)}
+        ${render2CondicionesComerciales(leadsSinFiltroStatus)}
+    `;
 
-        <h3 class="ind-section-title">Perfilamiento</h3>
+    contPerfil.innerHTML = `
         ${render0PerfilamientoResumen(leads)}
         ${tablasPerfil || '<p style="color:#888;">Sin respuestas de perfilamiento con los filtros actuales.</p>'}
     `;

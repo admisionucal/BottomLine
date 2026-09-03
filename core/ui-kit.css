@@ -588,6 +588,26 @@ table tbody tr:hover { background: #fafbff; }
     padding: 4px 0 14px;
     background: white;
 }
+.ind-tabs {
+    display: flex;
+    gap: 4px;
+    margin: 0 20px;
+    border-bottom: 2px solid var(--color-border);
+}
+.ind-tabs button {
+    padding: 12px 24px;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    color: #777;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+}
+.ind-tabs button.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+.ind-tabs button:hover { color: var(--color-primary); }
+.ind-tab-content { padding: 16px 20px 0; }
 .ind-section-title { margin: 24px 0 10px; font-size: 15px; color: var(--color-primary); }
 /* 1.1 Status de Gestión y 1.2 Cantidad de días para conversión, lado a lado */
 .ind-row-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
