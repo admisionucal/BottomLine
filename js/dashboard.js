@@ -627,6 +627,17 @@ function verDetalle(id) {
 
 window.verDetalle = verDetalle;
 
+function verDetalleIndicadores(id, campana) {
+    const lead = leadsIndicadoresFiltrados().find(l =>
+        String(l[COLUMNAS.ID_PROMETEO]) === String(id) && l[COLUMNAS.CAMPANA] === campana
+    );
+    if (lead) {
+        cacheSet(CACHE_KEYS.LEAD_SELECTED(id, campana), lead);
+    }
+    window.location.href = `lead-detail.html?id=${encodeURIComponent(id)}&campana=${encodeURIComponent(campana)}`;
+}
+window.verDetalleIndicadores = verDetalleIndicadores;
+
 async function revisarDuplicadosVisibles(leads) {
     await Promise.all(leads.map(async lead => {
         const id = lead[COLUMNAS.ID_PROMETEO];
@@ -1888,9 +1899,13 @@ function render0PerfilamientoResumen(leads) {
                 grupo.leads.forEach(l => {
                     const id = l[COLUMNAS.ID_PROMETEO] || '-';
                     const nombre = l[COLUMNAS.NOMBRES] || 'Sin Nombre';
+                    const campLead = l[COLUMNAS.CAMPANA] || camp;
                     filasDeEstaCamp.push(`
                         <tr>{{CAMP_TD}}
-                            <td class="ind-indent-1" colspan="3">${escapeHtml(id)} - ${escapeHtml(nombre)}</td>
+                            <td class="ind-indent-1 ind-link" colspan="3"
+                                onclick="window.verDetalleIndicadores('${id}', '${campLead}')">
+                                ${escapeHtml(id)} - ${escapeHtml(nombre)}
+                            </td>
                         </tr>`);
                 });
             }

@@ -654,6 +654,8 @@ table tbody tr:hover { background: #fafbff; }
 .ind-table-instituto-universidad th:nth-child(4), .ind-table-instituto-universidad td:nth-child(4) { text-align: center; }
 .ind-table-instituto-universidad td:nth-child(2), .ind-table-instituto-universidad td:nth-child(4) { font-weight: 700; color: var(--color-primary); }
 .ind-table-instituto-universidad td:nth-child(3) { border-left: 1px solid #eee; }
+.ind-link { cursor: pointer; color: var(--color-primary); }
+.ind-link:hover { text-decoration: underline; }
 
 /* El calendario de Indicadores se abre hacia la izquierda (el botón que lo
    dispara suele quedar pegado al borde derecho del panel de filtros, así
