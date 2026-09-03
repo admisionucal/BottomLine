@@ -46,7 +46,7 @@ let state = {
     ultimaActualizacion: null,
     calVpPpMes: new Date(),
     indicadores: {
-        filtros: { campana: [], programa: [], modalidad: [], ingreso: [], asesor: [], canal: [], fechaCalendario: [] },
+        filtros: { campana: [], programa: [], modalidad: [], ingreso: [], asesor: [], canal: [], status: [], perfil: [], fechaCalendario: [] },
         expandido: {},
         calMes: new Date(),
         cargado: false,
@@ -103,6 +103,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupBuscador();
     await loadLeads();
     await cargarLeadsCalendario();
+
+    if (vistaInicial !== 'indicadores') {
+        cargarLeadsIndicadores().catch(() => {});
+    }
 
     // Eventos
     document.getElementById('btnActualizar')?.addEventListener('click', () => loadLeads(true));
@@ -1614,12 +1618,15 @@ function poblarFiltrosIndicadores() {
     }
 
     createMultiSelect('indFilterCanal', valoresUnicos(COLUMNAS.CANAL, 'canal'), state.indicadores.filtros.canal, 'Todos');
+    createMultiSelect('indFilterStatus', valoresUnicos(COLUMNAS.STATUS_GESTION, 'status'), state.indicadores.filtros.status, 'Todos', STATUS_LABELS);
+    createMultiSelect('indFilterPerfil', ['Completo', 'Pendiente Supervisor', 'Pendiente Asesor'], state.indicadores.filtros.perfil, 'Todos');
 
     if (!state.indicadores.filtrosListenerListo) {
         window.addEventListener('multiselect-change', (e) => {
             const map = {
                 indFilterPrograma: 'programa', indFilterIngreso: 'ingreso', indFilterModalidad: 'modalidad',
-                indFilterAsesor: 'asesor', indFilterCampana: 'campana', indFilterCanal: 'canal'
+                indFilterAsesor: 'asesor', indFilterCampana: 'campana', indFilterCanal: 'canal',
+                indFilterStatus: 'status', indFilterPerfil: 'perfil'
             };
             const filtroKey = map[e.detail.containerId];
             if (!filtroKey) return;
@@ -1666,6 +1673,8 @@ function leadsIndicadoresFiltradosExcluyendo(excluirClave) {
             if (!d) return false;
             if (!f.fechaCalendario.includes(fechaAClaveISO(d))) return false;
         }
+        if (excluirClave !== 'status' && f.status.length && !f.status.includes(lead[COLUMNAS.STATUS_GESTION] || '')) return false;
+        if (excluirClave !== 'perfil' && f.perfil.length && !f.perfil.includes((lead.PERFILAMIENTO_COMPLETO || {}).estado || '')) return false;
         return true;
     });
 }
@@ -1827,6 +1836,44 @@ window.toggleIndRow = toggleIndRow;
 // leads_bottom, expuesta en cada lead vía bottomToUpper en getLeads).
 function fechaStatusActual(lead) {
     return lead[COLUMNAS.FECHA_ULT_MODIFICACION];
+}
+
+function render0PerfilamientoResumen(leads) {
+    const porCampana = {};
+    leads.forEach(l => {
+        const camp = l[COLUMNAS.CAMPANA] || '-';
+        const estado = (l.PERFILAMIENTO_COMPLETO || {}).estado || 'Pendiente Asesor';
+        porCampana[camp] = porCampana[camp] || { total: 0, porEstado: {} };
+        porCampana[camp].total++;
+        porCampana[camp].porEstado[estado] = (porCampana[camp].porEstado[estado] || 0) + 1;
+    });
+
+    const orden = ['Completo', 'Pendiente Supervisor', 'Pendiente Asesor'];
+    let filas = '';
+    Object.keys(porCampana).sort().forEach(camp => {
+        const info = porCampana[camp];
+        const filasDeEstaCamp = orden.filter(e => info.porEstado[e]).map(estado => `
+            <tr>{{CAMP_TD}}
+                <td>${escapeHtml(estado)}</td>
+                <td>${info.porEstado[estado]}</td>
+                <td>${pctInd(info.porEstado[estado], info.total)}</td>
+            </tr>`);
+        filasDeEstaCamp.push(`
+            <tr class="ind-row-subtotal">{{CAMP_TD}}
+                <td>Total</td><td>${info.total}</td><td>100%</td>
+            </tr>`);
+        filas += emitirFilasConCampana(filasDeEstaCamp, camp);
+    });
+    if (!filas) filas = `<tr><td colspan="4" style="text-align:center;color:#888;">Sin datos</td></tr>`;
+
+    return `
+        <div class="card ind-card">
+            <h3>Resumen de Perfilamiento</h3>
+            <table class="ind-table">
+                <thead><tr><th>Campaña</th><th>Estado</th><th># Leads</th><th>%</th></tr></thead>
+                <tbody>${filas}</tbody>
+            </table>
+        </div>`;
 }
 
 function render1_1StatusGestion(leads) {
@@ -2322,6 +2369,10 @@ function renderIndicadores() {
     const tablasPerfil = render3Perfilamiento(leads);
 
     cont.innerHTML = `
+        <h3 class="ind-section-title">Perfilamiento</h3>
+        ${render0PerfilamientoResumen(leads)}
+        ${tablasPerfil || '<p style="color:#888;">Sin respuestas de perfilamiento con los filtros actuales.</p>'}
+
         <h3 class="ind-section-title">Status de Gestión</h3>
         <div class="ind-row-cards">
             ${render1_1StatusGestion(leads)}
