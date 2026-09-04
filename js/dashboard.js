@@ -45,6 +45,7 @@ let state = {
     diaSeleccionado: null,
     ultimaActualizacion: null,
     calVpPpMes: new Date(),
+    solicitudesCC: [],
     indicadores: {
         filtros: { campana: [], programa: [], modalidad: [], ingreso: [], asesor: [], canal: [], status: [STATUS.VP_VIVA, STATUS.PP_VIVA], perfil: [], fechaCalendario: [] },
         expandido: {},
@@ -1626,6 +1627,16 @@ async function cargarLeadsIndicadores(forceRefresh = false) {
 
     state.indicadores.leadsPorCampana = {};
     resultados.forEach(({ campana, leads }) => { state.indicadores.leadsPorCampana[campana] = leads; });
+
+    try {
+        const result = await callAPI('getSolicitudesCC', { 
+            campanas: getUserCampanas(), 
+            incluirResueltas: true 
+        });
+        state.solicitudesCC = result.success ? (result.data || []) : [];
+    } catch (e) {
+        state.solicitudesCC = [];
+    }
 }
 
 function configurarTabsIndicadores() {
