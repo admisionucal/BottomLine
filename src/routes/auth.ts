@@ -9,7 +9,7 @@ import {
   limpiarIntentosFallidos,
 } from '../lib/session';
 
-export async function login(client: Client, body: JsonBody, env: Env) {
+export async function login(client: Client, body: JsonBody, env: Env, ctx: ExecutionContext) {
   const usuarioNorm = String(body.usuario || '').trim().toLowerCase();
 
   if (await loginBloqueado(client, usuarioNorm)) {
@@ -70,10 +70,11 @@ export async function login(client: Client, body: JsonBody, env: Env) {
 
   // Registramos el mismo token en Apps Script, para que las acciones
   // todavía no migradas (que se reenvían allá) también lo reconozcan.
-  // "Best effort": si esto falla, el login igual continúa; solo afectaría
-  // a acciones no migradas, no a las que ya corren en Postgres.
-  try {
-    await fetch(env.APPS_SCRIPT_URL, {
+  // "Best effort": ya NO se espera esta llamada (ctx.waitUntil la deja
+  // corriendo en background) — así no le suma latencia al login. Si falla,
+  // solo afectaría a acciones no migradas, no a las que ya corren en Postgres.
+  ctx.waitUntil(
+    fetch(env.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -84,10 +85,8 @@ export async function login(client: Client, body: JsonBody, env: Env) {
         rol: user.rol,
         nombre: user.nombre_aux || user.nombre,
       }),
-    });
-  } catch (_e) {
-    // No bloqueamos el login por esto.
-  }
+    }).catch(() => {})
+  );
 
   return jsonOk({
     user: {

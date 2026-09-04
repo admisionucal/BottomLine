@@ -49,7 +49,10 @@ async function getLeadsConAprobacion(client: any, body: any, env: Env) {
 
 // Acciones ya migradas a Postgres. Todo lo que NO esté aquí se reenvía
 // automáticamente a tu Apps Script actual (fallback transparente).
-const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env) => Promise<Response>> = {
+// El 4to parámetro (ctx) es opcional: solo lo usan las acciones que
+// necesitan disparar trabajo en background sin bloquear la respuesta
+// (por ahora, solo login).
+const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: ExecutionContext) => Promise<Response>> = {
   login,
   logout,
   marcarAsistencia,
@@ -89,7 +92,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env) => Pro
 };
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     // Prueba de humo de la Fase 1 (la dejamos, no estorba).
@@ -118,7 +121,7 @@ export default {
       if (handler) {
         const client = await getClient(env);
         try {
-          return await handler(client, body, env);
+          return await handler(client, body, env, ctx);
         } catch (err: any) {
           return jsonError('Error interno: ' + err.message, 500);
         } finally {
