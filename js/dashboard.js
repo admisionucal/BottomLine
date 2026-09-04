@@ -50,7 +50,8 @@ let state = {
         expandido: {},
         calMes: new Date(),
         cargado: false,
-        leadsPorCampana: {}
+        leadsPorCampana: {},
+        perfilPopupData: {}
     }
 };
 
@@ -1938,7 +1939,6 @@ const COLS_PP_VP_PERFIL = [
 function render0PerfilamientoResumen(leads) {
     const porCampana = {};
     const totalesPorStatusPerfil = {}; // decide qué columnas PP/VP Viva mostrar
-    state.indicadores.perfilPopupData[clave] = { estado, leads: grupo.leads, campana: camp };
 
     leads.forEach(l => {
         const camp = l[COLUMNAS.CAMPANA] || '-';
@@ -1979,8 +1979,8 @@ function render0PerfilamientoResumen(leads) {
         orden.filter(e => info.porEstado[e]).forEach(estado => {
             const grupo = info.porEstado[estado];
             const clave = `${camp}|${estado}`;
-            state.indicadores.perfilPopupData[clave] = { estado, leads: grupo.leads };
-
+            state.indicadores.perfilPopupData[clave] = { estado, leads: grupo.leads, campana: camp };
+            
             Object.keys(grupo.porStatus).forEach(st => {
                 totalPorStatusCamp[st] = (totalPorStatusCamp[st] || 0) + grupo.porStatus[st];
             });
