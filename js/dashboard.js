@@ -105,10 +105,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadLeads();
     await cargarLeadsCalendario();
 
-    if (vistaInicial !== 'indicadores') {
-        cargarLeadsIndicadores().catch(() => {});
-    }
-
     // Eventos
     document.getElementById('btnActualizar')?.addEventListener('click', () => loadLeads(true));
     document.getElementById('btnExportar')?.addEventListener('click', exportarExcel);
@@ -1570,30 +1566,40 @@ function pctInd(n, total) {
 }
 
 async function inicializarIndicadores() {
-    // A diferencia del calendario del Dashboard (que solo trae las campañas
-    // "efectivas" según su propio selector), Indicadores siempre debe
-    // mostrar TODAS las campañas activas del usuario — por eso usa su
-    // propio loader (cargarLeadsIndicadores), independiente del filtro de
-    // campaña del calendario del Dashboard.
-    if (!state.indicadores.leadsPorCampana || Object.keys(state.indicadores.leadsPorCampana).length === 0) {
-        await cargarLeadsIndicadores();
+    // Usar datos que YA están cargados en el Dashboard
+    if (state.leadsRaw && state.leadsRaw.length > 0) {
+        const leadsPorCampana = {};
+        state.leadsRaw.forEach(lead => {
+            const campana = lead['CAMPAÑA'] || state.campana;
+            if (!leadsPorCampana[campana]) leadsPorCampana[campana] = [];
+            leadsPorCampana[campana].push(lead);
+        });
+        state.indicadores.leadsPorCampana = leadsPorCampana;
+        state.indicadores.cargado = true;
+        poblarFiltrosIndicadores();
+        configurarTabsIndicadores();
+        renderIndicadores();
+        renderIndCalendarioFiltro();
+        
+        setTimeout(() => {
+            document.querySelectorAll('.ind-tab-content').forEach(el => {
+                el.style.opacity = '1';
+            });
+        }, 50);
+        return;
     }
-    // El módulo de Condiciones Comerciales guarda su data en su PROPIO
-    // `state` (cada módulo ES tiene el suyo, no se comparten entre sí), así
-    // que para cruzar Condiciones Comerciales con Ventas se llama la misma
-    // API acá y se guarda en el `state.solicitudesCC` de este módulo.
-    if (!state.solicitudesCC) {
-        try {
-            const result = await callAPI('getSolicitudesCC', { campanas: getUserCampanas(), incluirResueltas: true });
-            state.solicitudesCC = result.success ? (result.data || []) : [];
-        } catch (e) {
-            state.solicitudesCC = [];
-        }
-    }
-
+    // Si no hay datos, cargar SOLO la campaña actual
+    await cargarLeadsIndicadores();
     poblarFiltrosIndicadores();
     configurarTabsIndicadores();
     renderIndicadores();
+    renderIndCalendarioFiltro();
+    
+    setTimeout(() => {
+        document.querySelectorAll('.ind-tab-content').forEach(el => {
+            el.style.opacity = '1';
+        });
+    }, 50);
 }
 window.inicializarIndicadores = inicializarIndicadores;
 
@@ -1611,7 +1617,8 @@ async function cargarLeadsIndicadores(forceRefresh = false) {
         return;
     }
 
-    const resultados = await Promise.all(campanas.map(async (campana) => {
+    const campanasACargar = campanas.length > 3 ? campanas.slice(0, 3) : campanas;
+    const resultados = await Promise.all(campanasACargar.map(async (campana) => {
         const cacheKey = CACHE_KEYS.LEADS_RAW(user.email, user.rol, campana);
         if (!forceRefresh) {
             const cached = cacheGet(cacheKey);
