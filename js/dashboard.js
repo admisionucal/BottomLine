@@ -2527,7 +2527,7 @@ function renderIndicadores() {
 
     contStatus.innerHTML = `
         <div class="ind-row-cards">
-            ${render1_1StatusGestion(leads)}
+            ${render1_1StatusGestion(leadsSinFiltroStatus)}
             ${render1_2DiasConversion(leads)}
         </div>`;
 
