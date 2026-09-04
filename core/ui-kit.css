@@ -714,10 +714,10 @@ table tbody tr:hover { background: #fafbff; }
 @media (max-width: 900px) { .mant-layout { grid-template-columns: 1fr; } }
 
 .colab-cfg-fila {
-    display: grid; grid-template-columns: 140px auto 170px repeat(6, 100px); gap: 8px; align-items: center;
+    display: grid; grid-template-columns: 140px auto 90px repeat(6, 100px); gap: 8px; align-items: center;
     padding: 10px 6px; border-bottom: 1px solid #eee;
 }
-.colab-cfg-campanas .multiselect-btn { font-size: 12px; padding: 5px 26px 5px 8px; }
+.colab-cfg-campanas .multiselect-btn { font-size: 12px; padding: 5px 20px 5px 6px; }
 .colab-cfg-fila:last-child { border-bottom: none; }
 .colab-cfg-head { font-size: 10px; text-transform: uppercase; color: #888; font-weight: 600; text-align: center; }
 .colab-cfg-nombre { font-size: 13px; font-weight: 600; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

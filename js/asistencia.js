@@ -1373,7 +1373,7 @@ async function renderColabCfgLista() {
     }).join('');
 
     empleados.forEach(u => {
-        createMultiSelect(`colabCampanas-${u.usuario}`, state.campanasDisponibles, u.campanas || [], 'Sin campañas', null, { permitirTodos: false });
+        createMultiSelect(`colabCampanas-${u.usuario}`, state.campanasDisponibles, u.campanas || [], 'Sin campañas', null, { permitirTodos: true, mostrarValores: true });
     });
 }
 

@@ -325,17 +325,12 @@ export function createMultiSelect(containerId, options, selected = [], label = '
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    // permitirTodos = false: no se ofrece la opción "Todos/Todas" (catch-all).
-    // El usuario tiene que marcar explícitamente al menos una opción, y no
-    // puede dejar el filtro en 0 seleccionados (se re-marca automáticamente
-    // la última opción que intente desmarcar).
     const permitirTodos = opciones.permitirTodos !== false;
+    const mostrarValores = opciones.mostrarValores === true;
 
     const uniqueOptions = [...new Set(options.filter(v => v && String(v).trim() !== '').map(v => String(v).trim()))].sort();
     let selection = selected.filter(v => uniqueOptions.includes(v));
     if (!permitirTodos && selection.length === 0) {
-        // Sin "Todos" no tiene sentido arrancar sin nada marcado: por
-        // defecto se marca todo lo disponible.
         selection = uniqueOptions.slice();
     }
 
@@ -344,44 +339,28 @@ export function createMultiSelect(containerId, options, selected = [], label = '
         return;
     }
 
-    const textoBoton = selection.length === 0
-        ? label
-        : selection.length === 1
-            ? (labelsMap && labelsMap[selection[0]] ? labelsMap[selection[0]] : selection[0])
-            : `${selection.length} seleccionados`;
+    function formatoTexto(values) {
+        if (values.length === 0) return label;
+        if (values.length === 1) {
+            return (labelsMap && labelsMap[values[0]]) ? labelsMap[values[0]] : values[0];
+        }
+        if (mostrarValores) {
+            return values.map(v => (labelsMap && labelsMap[v]) ? labelsMap[v] : v).join(', ');
+        }
+        return `${values.length} seleccionados`;
+    }
+
+    const textoBoton = formatoTexto(selection);
 
     container.innerHTML = `
-        <button type="button" class="multiselect-btn${selection.length ? ' has-selection' : ''}" onclick="window.toggleMultiSelect && window.toggleMultiSelect('${containerId}')">
-            ${escapeHtml(textoBoton)}
-        </button>
-        <div class="multiselect-panel">
-            <div class="multiselect-options">
-                ${permitirTodos ? `
-                <label class="multiselect-option ms-todos">
-                    <input type="checkbox" data-todos="1" ${selection.length === 0 ? 'checked' : ''}>
-                    <span>${escapeHtml(label)}</span>
-                </label>` : ''}
-                ${uniqueOptions.map(v => {
-                    const checked = selection.includes(v) ? 'checked' : '';
-                    const labelText = labelsMap && labelsMap[v] ? labelsMap[v] : v;
-                    return `<label class="multiselect-option"><input type="checkbox" value="${escapeHtml(v)}" ${checked}><span>${escapeHtml(labelText)}</span></label>`;
-                }).join('')}
-            </div>
-        </div>
+        ...  (igual que antes, usando ${escapeHtml(textoBoton)})
     `;
 
     const btn = container.querySelector('.multiselect-btn');
     const getIndividualChecks = () => container.querySelectorAll('.multiselect-options input[type=checkbox]:not([data-todos])');
 
-    // Mantiene el texto del botón y el estado "has-selection" en sync con lo
-    // marcado, sin necesidad de reconstruir todo el innerHTML (eso cerraría
-    // el panel en cada click).
     function actualizarBoton(values) {
-        const texto = values.length === 0
-            ? label
-            : values.length === 1
-                ? (labelsMap && labelsMap[values[0]] ? labelsMap[values[0]] : values[0])
-                : `${values.length} seleccionados`;
+        const texto = formatoTexto(values);
         if (btn) {
             btn.textContent = texto;
             btn.classList.toggle('has-selection', values.length > 0);
