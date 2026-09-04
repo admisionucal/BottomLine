@@ -373,8 +373,6 @@ async function mostrarVistaDetalle(idSolicitud, solicitudPrecargada) {
     container.innerHTML = '<div class="loading">Cargando solicitud...</div>';
 
     try {
-        // Si venimos del listado ya tenemos la solicitud; si venimos de una URL
-        // directa (?id=...), hay que buscarla en el listado completo primero.
         let solicitud = solicitudPrecargada;
         if (!solicitud) {
             const resultLista = await callAPI('getSolicitudesCC', {
@@ -403,6 +401,8 @@ async function mostrarVistaDetalle(idSolicitud, solicitudPrecargada) {
             throw new Error(resultLead.error || 'No se pudo cargar los datos del lead');
         }
         state.leadActual = resultLead.data;
+
+        state.catalogoBeneficios = resultCatalogos.success ? (resultCatalogos.data?.beneficios || []) : [];
 
         if (resultCampanas.success) {
             const porCampana = {}, bccPorCampana = {};
