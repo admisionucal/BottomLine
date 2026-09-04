@@ -160,9 +160,9 @@ async function cargarVpPpAsesor(user) {
 
     let vpTotal = 0, vpCompletos = 0, ppTotal = 0, ppCompletos = 0;
     campanas.forEach(c => {
-        const r = resumen[c] || { vpTotal: 0, vpCompletos: 0, ppTotal: 0, ppCompletos: 0 };
-        vpTotal += r.vpTotal; vpCompletos += r.vpCompletos;
-        ppTotal += r.ppTotal; ppCompletos += r.ppCompletos;
+        const r = resumen[c] || { vpTotal: 0, vpCompleto: 0, ppTotal: 0, ppCompleto: 0 };
+        vpTotal += r.vpTotal; vpCompletos += r.vpCompleto;
+        ppTotal += r.ppTotal; ppCompletos += r.ppCompleto;
     });
 
     cont.innerHTML = renderTarjetaVpPp('Valoraciones Positivas (VP)', vpTotal, vpCompletos, 'trending_up') +
@@ -182,8 +182,11 @@ async function cargarVpPpPorCampanaAdmin(user) {
 
     let html = '';
     campanas.forEach(campana => {
-        const r = resumen[campana] || { vpTotal: 0, vpCompletos: 0, ppTotal: 0, ppCompletos: 0 };
-        html += renderTarjetaCampana(campana, r.vpTotal, r.vpCompletos, r.ppTotal, r.ppCompletos);
+        const r = resumen[campana] || {
+            vpTotal: 0, vpCompleto: 0, vpPendienteSupervisor: 0, vpPendienteAsesor: 0,
+            ppTotal: 0, ppCompleto: 0, ppPendienteSupervisor: 0, ppPendienteAsesor: 0
+        };
+        html += renderTarjetaCampana(campana, r);
     });
 
     cont.innerHTML = html;
@@ -216,23 +219,31 @@ function renderTarjetaVpPp(titulo, total, completos, icono) {
     `;
 }
 
-function renderTarjetaCampana(campana, vpTotal, vpCompletos, ppTotal, ppCompletos) {
+function renderTarjetaCampana(campana, r) {
     return `
         <div class="user-kpi-card user-kpi-card-campana">
-            <span class="material-symbols-outlined user-kpi-icon">apartment</span>
-            <div class="user-kpi-body">
+            <div class="ukc-header">
+                <span class="material-symbols-outlined user-kpi-icon">apartment</span>
                 <span class="user-kpi-title">${escapeHtml(campana)}</span>
-                <div class="ukc-stats">
-                    <div class="ukc-stat">
-                        <span class="ukc-stat-label">VP</span>
-                        <span class="ukc-stat-value">${vpTotal}</span>
-                        <span class="ukc-stat-sub">${vpCompletos} completos</span>
+            </div>
+            <div class="ukc-stats-col">
+                <div class="ukc-group">
+                    <div class="ukc-group-head">
+                        <span class="ukc-group-label">VPs</span>
+                        <span class="ukc-group-total">${r.vpTotal}</span>
                     </div>
-                    <div class="ukc-stat">
-                        <span class="ukc-stat-label">PP</span>
-                        <span class="ukc-stat-value">${ppTotal}</span>
-                        <span class="ukc-stat-sub">${ppCompletos} completos</span>
+                    <div class="ukc-detail-row"><span>Perfilamiento Completo</span><span class="ukc-detail-value">${r.vpCompleto}</span></div>
+                    <div class="ukc-detail-row"><span>Pendiente por Supervisor</span><span class="ukc-detail-value">${r.vpPendienteSupervisor}</span></div>
+                    <div class="ukc-detail-row"><span>Pendiente por Asesor</span><span class="ukc-detail-value">${r.vpPendienteAsesor}</span></div>
+                </div>
+                <div class="ukc-group">
+                    <div class="ukc-group-head">
+                        <span class="ukc-group-label">PPs</span>
+                        <span class="ukc-group-total">${r.ppTotal}</span>
                     </div>
+                    <div class="ukc-detail-row"><span>Perfilamiento Completo</span><span class="ukc-detail-value">${r.ppCompleto}</span></div>
+                    <div class="ukc-detail-row"><span>Pendiente por Supervisor</span><span class="ukc-detail-value">${r.ppPendienteSupervisor}</span></div>
+                    <div class="ukc-detail-row"><span>Pendiente por Asesor</span><span class="ukc-detail-value">${r.ppPendienteAsesor}</span></div>
                 </div>
             </div>
         </div>

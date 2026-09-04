@@ -50,28 +50,36 @@ export async function getResumenVpPp(client: Client, body: JsonBody) {
     `;
     const result = await client.query(sql, params);
 
-    let vpTotal = 0,
-      vpCompletos = 0,
-      ppTotal = 0,
-      ppCompletos = 0;
+    let vpTotal = 0, vpCompleto = 0, vpPendienteSupervisor = 0, vpPendienteAsesor = 0,
+        ppTotal = 0, ppCompleto = 0, ppPendienteSupervisor = 0, ppPendienteAsesor = 0;
 
     for (const r of result.rows) {
       const asesorResp = CAMPOS_ASESOR.filter((c) => r[c] && String(r[c]).trim() !== '').length;
       const supCompleto = !!(r.acciones_definidas && String(r.acciones_definidas).trim() !== '');
       const asesorCompleto = asesorResp === CAMPOS_ASESOR.length;
-      const completo = esAdmin ? supCompleto : asesorCompleto;
+
+      const estado = esAdmin
+        ? (supCompleto ? 'Completo' : asesorCompleto ? 'Pendiente Supervisor' : 'Pendiente Asesor')
+        : (asesorCompleto ? 'Completo' : 'Pendiente Asesor');
 
       if (r.status_final === 'VALORES_VALORACIONES_POSITIVAS_VIVA') {
         vpTotal++;
-        if (completo) vpCompletos++;
+        if (estado === 'Completo') vpCompleto++;
+        else if (estado === 'Pendiente Supervisor') vpPendienteSupervisor++;
+        else vpPendienteAsesor++;
       }
       if (r.status_final === 'VALORES_PROMESA_DE_PAGO_VIVA') {
         ppTotal++;
-        if (completo) ppCompletos++;
+        if (estado === 'Completo') ppCompleto++;
+        else if (estado === 'Pendiente Supervisor') ppPendienteSupervisor++;
+        else ppPendienteAsesor++;
       }
     }
 
-    resumen[campana] = { vpTotal, vpCompletos, ppTotal, ppCompletos };
+    resumen[campana] = {
+      vpTotal, vpCompleto, vpPendienteSupervisor, vpPendienteAsesor,
+      ppTotal, ppCompleto, ppPendienteSupervisor, ppPendienteAsesor,
+    };
   }
 
   return jsonOk({ data: resumen });

@@ -1243,7 +1243,7 @@ const PERFIL_POPUP_TITULOS = {
 function abrirPopupPerfilamiento(clave) {
     const data = state.indicadores.perfilPopupData && state.indicadores.perfilPopupData[clave];
     if (!data) return;
-    const { estado, leads } = data;
+    const { estado, leads, campana } = data;
     const tituloEstado = PERFIL_POPUP_TITULOS[estado] || estado;
 
     let filas = '';
@@ -1270,7 +1270,7 @@ function abrirPopupPerfilamiento(clave) {
         <div class="cal-modal-overlay cal-modal-overlay-top" id="perfilModalOverlay" onclick="cerrarPopupPerfilamiento(event)">
             <div class="cal-modal" onclick="event.stopPropagation()">
                 <div class="cal-modal-header">
-                    <strong>27.1 - Leads ${escapeHtml(tituloEstado)}</strong>
+                    <strong>${escapeHtml(campana)} - Leads ${escapeHtml(tituloEstado)}</strong>
                     <button class="cal-modal-close" onclick="cerrarPopupPerfilamiento()"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
                 </div>
                 <div class="cal-modal-toolbar">
@@ -1938,7 +1938,7 @@ const COLS_PP_VP_PERFIL = [
 function render0PerfilamientoResumen(leads) {
     const porCampana = {};
     const totalesPorStatusPerfil = {}; // decide qué columnas PP/VP Viva mostrar
-    state.indicadores.perfilPopupData = state.indicadores.perfilPopupData || {};
+    state.indicadores.perfilPopupData[clave] = { estado, leads: grupo.leads, campana: camp };
 
     leads.forEach(l => {
         const camp = l[COLUMNAS.CAMPANA] || '-';
