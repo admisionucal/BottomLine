@@ -2282,6 +2282,7 @@ function datosInstitutoVsUniversidad(leads) {
 
     const grupos = { instituto: {}, universidad: {} };
     let totalInstituto = 0, totalUniversidad = 0;
+    let sinNombreInstituto = 0, sinNombreUniversidad = 0; // NUEVO
 
     relevantes.forEach(l => {
         const tipoCrudo = claveCategoriaLocal(l[COLUMNAS.OPCION_INSTITUCION]);
@@ -2289,9 +2290,11 @@ function datosInstitutoVsUniversidad(leads) {
         if (tipoCrudo.startsWith('instituto')) {
             totalInstituto++;
             if (nombre) sumarCategoria(grupos.instituto, nombre);
+            else sinNombreInstituto++; // NUEVO
         } else if (tipoCrudo.startsWith('universidad')) {
             totalUniversidad++;
             if (nombre) sumarCategoria(grupos.universidad, nombre);
+            else sinNombreUniversidad++; // NUEVO
         }
     });
 
@@ -2301,19 +2304,27 @@ function datosInstitutoVsUniversidad(leads) {
         totalInstituto, totalUniversidad,
         topInstituto: topN(grupos.instituto),
         topUniversidad: topN(grupos.universidad),
+        sinNombreInstituto, sinNombreUniversidad,
     };
 }
+
 function claveCategoriaLocal(s) { return limpiarEspacios(s).toLowerCase(); }
 
 // Sección 7: tabla (izquierda) + gráfico Instituto vs. Universidad con su
 // Top 5 (derecha), lado a lado. Va aparte del grid de Perfilamiento (no
 // participa del empaquetado dinámico de la sección 4).
-function filasInstitutoVsUniversidad(topInstituto, topUniversidad, totalInstituto, totalUniversidad) {
-    const n = Math.max(topInstituto.length, topUniversidad.length);
+function filasInstitutoVsUniversidad(topInstituto, topUniversidad, totalInstituto, totalUniversidad, sinNombreInstituto, sinNombreUniversidad) {
+    const instFilas = [...topInstituto];
+    if (sinNombreInstituto > 0) instFilas.push({ label: 'No seleccionó', total: sinNombreInstituto });
+
+    const uniFilas = [...topUniversidad];
+    if (sinNombreUniversidad > 0) uniFilas.push({ label: 'No seleccionó', total: sinNombreUniversidad });
+
+    const n = Math.max(instFilas.length, uniFilas.length);
     let filas = '';
     for (let i = 0; i < n; i++) {
-        const inst = topInstituto[i];
-        const uni = topUniversidad[i];
+        const inst = instFilas[i];
+        const uni = uniFilas[i];
         filas += `
             <tr>
                 <td>${inst ? escapeHtml(inst.label) : ''}</td>
@@ -2336,14 +2347,14 @@ function render7OtrasOpciones(leads) {
     const tabla = renderTablaOtrasOpciones(leads);
     if (!tabla) return '';
 
-    const { totalInstituto, totalUniversidad, topInstituto, topUniversidad } = datosInstitutoVsUniversidad(leads);
+    const { totalInstituto, totalUniversidad, topInstituto, topUniversidad, sinNombreInstituto, sinNombreUniversidad } = datosInstitutoVsUniversidad(leads);
 
     const contenidoInstUni = (totalInstituto === 0 && totalUniversidad === 0)
         ? `<p style="color:#888;">Sin datos con los filtros actuales</p>`
         : `
             <table class="ind-table ind-table-instituto-universidad">
                 <thead><tr><th>Instituto</th><th>#</th><th>Universidad</th><th>#</th></tr></thead>
-                <tbody>${filasInstitutoVsUniversidad(topInstituto, topUniversidad, totalInstituto, totalUniversidad)}</tbody>
+                <tbody>${filasInstitutoVsUniversidad(topInstituto, topUniversidad, totalInstituto, totalUniversidad, sinNombreInstituto, sinNombreUniversidad)}</tbody>
             </table>`;
 
     return `
