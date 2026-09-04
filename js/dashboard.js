@@ -1234,6 +1234,70 @@ function cerrarDetalleDia(e) {
     state.diaSeleccionado = null;
 }
 
+const PERFIL_POPUP_TITULOS = {
+    'Completo': 'con Perfilamiento Completo',
+    'Pendiente Supervisor': 'con Perfilamiento Pendiente por Supervisor',
+    'Pendiente Asesor': 'con Perfilamiento Pendiente por Asesor'
+};
+
+function abrirPopupPerfilamiento(clave) {
+    const data = state.indicadores.perfilPopupData && state.indicadores.perfilPopupData[clave];
+    if (!data) return;
+    const { estado, leads } = data;
+    const tituloEstado = PERFIL_POPUP_TITULOS[estado] || estado;
+
+    let filas = '';
+    leads.forEach(l => {
+        const id = l[COLUMNAS.ID_PROMETEO] || '-';
+        const nombre = l[COLUMNAS.NOMBRES] || 'Sin Nombre';
+        const carrera = l[COLUMNAS.CARRERA] || l['PROGRAMA'] || '-';
+        const modalidad = l[COLUMNAS.MODALIDAD] || '-';
+        const boleta = l[COLUMNAS.BOLETA_FINAL] || l[COLUMNAS.BOLETA] || '-';
+        const asesor = l[COLUMNAS.ASESOR_ULTIMO_CONTACTO] || '-';
+        const campLead = l[COLUMNAS.CAMPANA] || '';
+        filas += `
+            <tr>
+                <td>${escapeHtml(asesor)}</td>
+                <td><a href="#" class="id-link" onclick="window.verDetalleIndicadores('${escapeHtml(id)}', '${escapeHtml(campLead)}'); return false;">${escapeHtml(id)}</a></td>
+                <td>${escapeHtml(nombre)}</td>
+                <td>${escapeHtml(carrera)}</td>
+                <td>${escapeHtml(modalidad)}</td>
+                <td>S/ ${escapeHtml(boleta)}</td>
+            </tr>`;
+    });
+
+    const modalHtml = `
+        <div class="cal-modal-overlay cal-modal-overlay-top" id="perfilModalOverlay" onclick="cerrarPopupPerfilamiento(event)">
+            <div class="cal-modal" onclick="event.stopPropagation()">
+                <div class="cal-modal-header">
+                    <strong>27.1 - Leads ${escapeHtml(tituloEstado)}</strong>
+                    <button class="cal-modal-close" onclick="cerrarPopupPerfilamiento()"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
+                </div>
+                <div class="cal-modal-toolbar">
+                    <span>${leads.length} registro${leads.length === 1 ? '' : 's'}</span>
+                </div>
+                <div class="cal-modal-body">
+                    <table>
+                        <thead><tr>
+                            <th>ASESOR</th><th>ID</th><th>NOMBRE DEL LEAD</th><th>CARRERA</th><th>MODALIDAD</th><th>BOLETA</th>
+                        </tr></thead>
+                        <tbody>${filas || '<tr><td colspan="6" style="text-align:center;color:#888;padding:20px;">Sin registros</td></tr>'}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+window.abrirPopupPerfilamiento = abrirPopupPerfilamiento;
+
+function cerrarPopupPerfilamiento(e) {
+    if (e && e.target && e.target.id !== 'perfilModalOverlay') return;
+    const overlay = document.getElementById('perfilModalOverlay');
+    if (overlay) overlay.remove();
+}
+window.cerrarPopupPerfilamiento = cerrarPopupPerfilamiento;
+
 function verDetalleDesdeCalendario(id) {
     verDetalle(id);
 }
@@ -1863,67 +1927,92 @@ function fechaStatusActual(lead) {
     return lead[COLUMNAS.FECHA_ULT_MODIFICACION];
 }
 
+// Columnas condicionales, igual que STATUS_CC_COLS en Condiciones Comerciales:
+// solo se muestran (con su cantidad y su %) si tienen al menos 1 lead > 0
+// en el conjunto actualmente filtrado.
+const COLS_PP_VP_PERFIL = [
+    { status: STATUS.PP_VIVA, label: 'PPs Vivas' },
+    { status: STATUS.VP_VIVA, label: 'VPs Vivas' },
+];
+
 function render0PerfilamientoResumen(leads) {
     const porCampana = {};
+    const totalesPorStatusPerfil = {}; // decide qué columnas PP/VP Viva mostrar
+    state.indicadores.perfilPopupData = state.indicadores.perfilPopupData || {};
+
     leads.forEach(l => {
         const camp = l[COLUMNAS.CAMPANA] || '-';
         const estado = (l.PERFILAMIENTO_COMPLETO || {}).estado || 'Pendiente Asesor';
+        const statusGestion = l[COLUMNAS.STATUS_GESTION] || '-';
+
         porCampana[camp] = porCampana[camp] || { total: 0, porEstado: {} };
         porCampana[camp].total++;
-        porCampana[camp].porEstado[estado] = porCampana[camp].porEstado[estado] || { n: 0, leads: [] };
-        porCampana[camp].porEstado[estado].n++;
-        porCampana[camp].porEstado[estado].leads.push(l);
+
+        porCampana[camp].porEstado[estado] = porCampana[camp].porEstado[estado] || { n: 0, leads: [], porStatus: {} };
+        const grupo = porCampana[camp].porEstado[estado];
+        grupo.n++;
+        grupo.leads.push(l);
+        grupo.porStatus[statusGestion] = (grupo.porStatus[statusGestion] || 0) + 1;
+
+        totalesPorStatusPerfil[statusGestion] = (totalesPorStatusPerfil[statusGestion] || 0) + 1;
     });
 
+    // Igual que en CC: se recalcula en cada render, así que las columnas
+    // PPs Vivas / VPs Vivas aparecen o desaparecen solas según los filtros.
+    const columnasVisiblesPerfil = COLS_PP_VP_PERFIL.filter(c => (totalesPorStatusPerfil[c.status] || 0) > 0);
+
+    function celdasPPVP(porStatus, totalCamp) {
+        return columnasVisiblesPerfil.map(c => {
+            const n = porStatus[c.status] || 0;
+            return `<td>${n}</td><td>${pctInd(n, totalCamp)}</td>`;
+        }).join('');
+    }
+
     const orden = ['Completo', 'Pendiente Supervisor', 'Pendiente Asesor'];
-    const set = state.indicadores.expandido['indPerfilResumen'] = state.indicadores.expandido['indPerfilResumen'] || new Set();
 
     let filas = '';
     Object.keys(porCampana).sort().forEach(camp => {
         const info = porCampana[camp];
         const filasDeEstaCamp = [];
+        const totalPorStatusCamp = {};
 
         orden.filter(e => info.porEstado[e]).forEach(estado => {
             const grupo = info.porEstado[estado];
             const clave = `${camp}|${estado}`;
-            const abierto = set.has(clave);
+            state.indicadores.perfilPopupData[clave] = { estado, leads: grupo.leads };
+
+            Object.keys(grupo.porStatus).forEach(st => {
+                totalPorStatusCamp[st] = (totalPorStatusCamp[st] || 0) + grupo.porStatus[st];
+            });
 
             filasDeEstaCamp.push(`
-                <tr class="ind-row" onclick="window.toggleIndRow('indPerfilResumen','${clave}')">{{CAMP_TD}}
-                    <td><span class="ind-caret">${abierto ? '▾' : '▸'}</span> ${escapeHtml(estado)}</td>
+                <tr class="ind-row" onclick="window.abrirPopupPerfilamiento('${escapeHtml(clave)}')">{{CAMP_TD}}
+                    <td>${escapeHtml(estado)}</td>
+                    ${celdasPPVP(grupo.porStatus, info.total)}
                     <td>${grupo.n}</td>
                     <td>${pctInd(grupo.n, info.total)}</td>
                 </tr>`);
-
-            if (abierto) {
-                grupo.leads.forEach(l => {
-                    const id = l[COLUMNAS.ID_PROMETEO] || '-';
-                    const nombre = l[COLUMNAS.NOMBRES] || 'Sin Nombre';
-                    const campLead = l[COLUMNAS.CAMPANA] || camp;
-                    filasDeEstaCamp.push(`
-                        <tr>{{CAMP_TD}}
-                            <td class="ind-indent-1 ind-link" colspan="3"
-                                onclick="window.verDetalleIndicadores('${id}', '${campLead}')">
-                                ${escapeHtml(id)} - ${escapeHtml(nombre)}
-                            </td>
-                        </tr>`);
-                });
-            }
         });
 
         filasDeEstaCamp.push(`
             <tr class="ind-row-subtotal">{{CAMP_TD}}
-                <td>Total</td><td>${info.total}</td><td>100%</td>
+                <td>Total</td>
+                ${celdasPPVP(totalPorStatusCamp, info.total)}
+                <td>${info.total}</td><td>100%</td>
             </tr>`);
         filas += emitirFilasConCampana(filasDeEstaCamp, camp);
     });
-    if (!filas) filas = `<tr><td colspan="4" style="text-align:center;color:#888;">Sin datos</td></tr>`;
+
+    const totalColumnas = 4 + columnasVisiblesPerfil.length * 2; // Campaña, Estado, #Leads, % + PP/VP
+    if (!filas) filas = `<tr><td colspan="${totalColumnas}" style="text-align:center;color:#888;">Sin datos</td></tr>`;
+
+    const headerPPVP = columnasVisiblesPerfil.map(c => `<th>${escapeHtml(c.label)}</th><th>%</th>`).join('');
 
     return `
         <div class="card ind-card">
             <h3>Resumen de Perfilamiento</h3>
             <table class="ind-table">
-                <thead><tr><th>Campaña</th><th>Estado</th><th># Leads</th><th>%</th></tr></thead>
+                <thead><tr><th>Campaña</th><th>Estado</th>${headerPPVP}<th># Leads</th><th>%</th></tr></thead>
                 <tbody>${filas}</tbody>
             </table>
         </div>`;
