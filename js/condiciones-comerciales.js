@@ -399,6 +399,11 @@ async function mostrarVistaDetalle(idSolicitud, solicitudPrecargada) {
             callAPI('getCampanasConfig', {})
         ]);
 
+        if (!resultLead.success || !resultLead.data) {
+            throw new Error(resultLead.error || 'No se pudo cargar los datos del lead');
+        }
+        state.leadActual = resultLead.data;
+
         if (resultCampanas.success) {
             const porCampana = {}, bccPorCampana = {};
             (resultCampanas.data || []).forEach(c => {
