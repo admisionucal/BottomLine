@@ -353,7 +353,23 @@ export function createMultiSelect(containerId, options, selected = [], label = '
     const textoBoton = formatoTexto(selection);
 
     container.innerHTML = `
-        ...  (igual que antes, usando ${escapeHtml(textoBoton)})
+        <button type="button" class="multiselect-btn${selection.length ? ' has-selection' : ''}" onclick="window.toggleMultiSelect && window.toggleMultiSelect('${containerId}')">
+            ${escapeHtml(textoBoton)}
+        </button>
+        <div class="multiselect-panel">
+            <div class="multiselect-options">
+                ${permitirTodos ? `
+                <label class="multiselect-option ms-todos">
+                    <input type="checkbox" data-todos="1" ${selection.length === 0 ? 'checked' : ''}>
+                    <span>${escapeHtml(label)}</span>
+                </label>` : ''}
+                ${uniqueOptions.map(v => {
+                    const checked = selection.includes(v) ? 'checked' : '';
+                    const labelText = labelsMap && labelsMap[v] ? labelsMap[v] : v;
+                    return `<label class="multiselect-option"><input type="checkbox" value="${escapeHtml(v)}" ${checked}><span>${escapeHtml(labelText)}</span></label>`;
+                }).join('')}
+            </div>
+        </div>
     `;
 
     const btn = container.querySelector('.multiselect-btn');
