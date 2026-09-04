@@ -103,6 +103,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupCalendarioCampanaFiltro(user);
     setupBuscador();
     await loadLeads();
+    cargarLeadsIndicadores().catch(() => {});
     await cargarLeadsCalendario();
 
     // Eventos
@@ -1566,40 +1567,21 @@ function pctInd(n, total) {
 }
 
 async function inicializarIndicadores() {
-    // Usar datos que YA están cargados en el Dashboard
-    if (state.leadsRaw && state.leadsRaw.length > 0) {
-        const leadsPorCampana = {};
-        state.leadsRaw.forEach(lead => {
-            const campana = lead['CAMPAÑA'] || state.campana;
-            if (!leadsPorCampana[campana]) leadsPorCampana[campana] = [];
-            leadsPorCampana[campana].push(lead);
-        });
-        state.indicadores.leadsPorCampana = leadsPorCampana;
-        state.indicadores.cargado = true;
+    // Usar datos precargados de TODAS las campañas
+    if (state.indicadores.leadsPorCampana && Object.keys(state.indicadores.leadsPorCampana).length > 0) {
         poblarFiltrosIndicadores();
         configurarTabsIndicadores();
         renderIndicadores();
         renderIndCalendarioFiltro();
-        
-        setTimeout(() => {
-            document.querySelectorAll('.ind-tab-content').forEach(el => {
-                el.style.opacity = '1';
-            });
-        }, 50);
         return;
     }
-    // Si no hay datos, cargar SOLO la campaña actual
+    
+    // Si no hay datos precargados, cargar ahora
     await cargarLeadsIndicadores();
     poblarFiltrosIndicadores();
     configurarTabsIndicadores();
     renderIndicadores();
     renderIndCalendarioFiltro();
-    
-    setTimeout(() => {
-        document.querySelectorAll('.ind-tab-content').forEach(el => {
-            el.style.opacity = '1';
-        });
-    }, 50);
 }
 window.inicializarIndicadores = inicializarIndicadores;
 
