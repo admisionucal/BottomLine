@@ -635,7 +635,11 @@ function construirConsideracionesHTML(d) {
     if (!d.mostrarTrasladoConvalidacion) {
         items.push(`Aquellos alumnos que cuenten con exoneración parcial o total del examen de admisión deberán rendirlo dentro de los treinta (30) días calendario posteriores al pago de la primera cuota. De no cumplir con ello, el monto correspondiente al examen será cobrado íntegramente en la tercera cuota.`);
     }
-    
+
+    if (d.perC === '26-2') {
+        items.push(`Los postulantes que cuenten con un pagaré previamente aceptado por la Universidad podrán regularizar el pago correspondiente hasta el 16 de septiembre de 2026. El pago efectuado dentro de dicho plazo permitirá conservar las condiciones comerciales otorgadas por la Universidad al momento de la aceptación del pagaré, siempre que se cumplan los términos y condiciones establecidos para su aplicación.`);
+    }
+
     items.push(`Los horarios del primer ciclo son asignados por la universidad sin opción a cambios o ajustes. A partir del segundo ciclo, los alumnos podrán elegir sus horarios en función a la apertura de cursos y disponibilidad de horarios.`);
     items.push(`Los descuentos sobre los conceptos de examen de admisión, matrícula y/o primera boleta solo aplicarán para el primer período académico regular del semestre de ingreso del alumno.`);
     items.push(`Los buses son exclusivos para estudiantes y operan con horarios y paraderos fijos según las rutas establecidas. Para el semestre ${escapeHtml(d.periodo)}, los horarios y paraderos serán confirmados antes del inicio de clases.`);
