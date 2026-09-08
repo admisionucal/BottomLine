@@ -848,7 +848,6 @@ function construirMapaAsesor() {
         if (!mapa[clave]) mapa[clave] = { viva: [], visitaGuiada: [] };
         mapa[clave][catKey].push({ lead, campana });
     };
-
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
@@ -874,13 +873,14 @@ function construirMapaAsesor() {
 
 function construirMapaAdmin() {
     const mapa = {};
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
     const categoriasEstado = {
         viva: { status: STATUS.PP_VIVA, campo: COLUMNAS.FECHA_COMPROMISO_PAGO },
         muerta: { status: STATUS.PP_MUERTA, campo: COLUMNAS.FECHA_COMPROMISO_PAGO },
         pagoCompleto: { status: STATUS.PAGO_COMPLETO, campo: COLUMNAS.FECHA_PAGO_COMPLETO },
         pagoFraccionado: { status: STATUS.PAGO_FRACCIONADO, campo: COLUMNAS.FECHA_PROMESA_PAGO }
     };
-
     const agregar = (clave, catKey, lead, campana) => {
         if (!mapa[clave]) mapa[clave] = { viva: [], muerta: [], pagoCompleto: [], pagoFraccionado: [], visitaGuiada: [] };
         mapa[clave][catKey].push({ lead, campana });
@@ -900,7 +900,9 @@ function construirMapaAdmin() {
             // Visita Guiada: solo si el lead sigue como VP Viva.
             if (status === STATUS.VP_VIVA) {
                 const fechaVisita = parsearFechaFlexible(lead[COLUMNAS.FECHA_VISITA_GUIADA]);
-                if (fechaVisita) agregar(fechaAClaveISO(fechaVisita), 'visitaGuiada', lead, campana);
+                if (fechaVisita && fechaVisita >= hoy) {
+                    agregar(fechaAClaveISO(fechaVisita), 'visitaGuiada', lead, campana);
+                }
             }
         });
     });
