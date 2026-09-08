@@ -114,6 +114,44 @@
                     </div>
 
                     <div class="cfg-detalle" id="cfgDetalle" style="display:none;"></div>
+
+                    <div class="cfg-detalle" id="cfgSupervisoresCard" style="margin-top:24px;">
+                        <h3 style="margin-bottom:4px;">Campañas por Supervisor</h3>
+                        <p style="color:#777;font-size:13px;margin-bottom:14px;">Activa o desactiva a qué campañas tiene acceso cada Supervisor.</p>
+                        <div class="colab-cfg-fila colab-cfg-head" style="grid-template-columns:200px 1fr;">
+                            <div>Supervisor</div><div>Campañas</div>
+                        </div>
+                        <div class="colab-cfg-scroll" id="cfgSupervisoresLista">
+                            <div class="loading">Cargando supervisores…</div>
+                        </div>
+                    </div>
+
+                    <div class="cfg-detalle" id="cfgUsuariosCard" style="margin-top:24px;">
+                        <h3 style="margin-bottom:16px;">Nuevo usuario</h3>
+                        <div class="cfg-form-row">
+                            <label class="cfg-campo">Usuario (login)<input type="text" id="cfgNuevoUsuario"></label>
+                            <label class="cfg-campo">Nombre completo<input type="text" id="cfgNuevoNombre"></label>
+                            <label class="cfg-campo">Contraseña<input type="password" id="cfgNuevoPassword"></label>
+                        </div>
+                        <div class="cfg-form-row">
+                            <label class="cfg-campo">Rol
+                                <select id="cfgNuevoRol" class="cfg-input" style="margin-bottom:0;">
+                                    <option value="ASESOR">Asesor</option>
+                                    <option value="SUPERVISOR">Supervisor</option>
+                                    <option value="ADMISION">Admisión</option>
+                                </select>
+                            </label>
+                            <label class="cfg-campo">Cargo<input type="text" id="cfgNuevoCargo"></label>
+                            <label class="cfg-campo">DNI<input type="text" id="cfgNuevoDni"></label>
+                            <label class="cfg-campo">Email<input type="text" id="cfgNuevoEmail"></label>
+                        </div>
+                        <div class="cfg-form-row">
+                            <label class="cfg-campo" style="flex-basis:100%;">Campañas
+                                <div class="multiselect" id="cfgNuevoUsuarioCampanas"></div>
+                            </label>
+                        </div>
+                        <button type="button" class="btn-save" id="cfgBtnCrearUsuario">Crear usuario</button>
+                    </div>
                 </div>
             </div>
         </div>

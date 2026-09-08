@@ -38,6 +38,7 @@ import {
   eliminarArchivoCampana,
   obtenerArchivoCampanaBase64,
 } from './routes/campanas';
+import { getSupervisoresConfig, crearUsuario } from './routes/usuarios';
 
 // Igual que getLeadsConAprobacion(body) en code.gs: mismo getLeads, pero
 // solo accesible para SUPERVISOR/ADMISION.
@@ -89,6 +90,8 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   subirArchivoCampana,
   eliminarArchivoCampana,
   obtenerArchivoCampanaBase64,
+  getSupervisoresConfig,
+  crearUsuario,
 };
 
 export default {

@@ -5,6 +5,7 @@
 import { API_URL, ROLES } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml } from '../core/utils.js';
 import { Sidebar, Toast } from '../core/components.js';
+import { createMultiSelect } from '../core/components.js';
 
 const TIPOS_ARCHIVO = [
     { tipo: 'lineamientos_5c', titulo: 'Lineamientos de Admisión (5 cuotas)' },
@@ -17,6 +18,8 @@ const TIPOS_ARCHIVO = [
 const state = {
     campanas: [],
     seleccionada: null,
+    supervisores: [],
+    nuevoUsuarioCampanas: []
 };
 
 let modoEmbebido = false;
@@ -43,7 +46,7 @@ window.initConfiguracionEmbebido = function () {
     initConfiguracion();
 };
 
-function initConfiguracion() {
+async function initConfiguracion() {
     const user = getCurrentUser();
     if (!user) {
         window.location.href = 'index.html';
@@ -68,7 +71,9 @@ function initConfiguracion() {
         new Sidebar({ active: 'configuracion' });
     }
 
-    cargarCampanas();
+    await cargarCampanas();
+    await cargarSupervisores();
+    renderNuevoUsuarioForm();
 }
 
 // ===== CARGA =====
@@ -276,4 +281,82 @@ async function eliminarArchivo(campana, tipo) {
         return;
     }
     await cargarCampanas();
+}
+
+// ===== SUPERVISORES: CAMPAÑAS =====
+async function cargarSupervisores() {
+    const cont = document.getElementById('cfgSupervisoresLista');
+    const result = await callAPI('getSupervisoresConfig');
+    if (!result.success) {
+        cont.innerHTML = `<p style="color:#d32f2f;font-size:13px;">${escapeHtml(result.error || 'No se pudo cargar')}</p>`;
+        return;
+    }
+    state.supervisores = result.data || [];
+    if (!state.supervisores.length) {
+        cont.innerHTML = '<p style="color:#888;font-size:13px;">Sin Supervisores registrados.</p>';
+        return;
+    }
+    cont.innerHTML = state.supervisores.map((u) => `
+        <div class="colab-cfg-fila" style="grid-template-columns:200px 1fr;">
+            <div class="colab-cfg-nombre" title="${escapeHtml(u.nombre)}">${escapeHtml(u.nombre)}</div>
+            <div class="multiselect" id="supCampanas-${escapeHtml(u.usuario)}"></div>
+        </div>
+    `).join('');
+
+    const codigosActivos = state.campanas.filter((c) => c.activa).map((c) => c.codigo);
+    state.supervisores.forEach((u) => {
+        createMultiSelect(`supCampanas-${u.usuario}`, codigosActivos, u.campanas || [], 'Sin campañas', null, { permitirTodos: true, mostrarValores: true });
+    });
+}
+
+window.addEventListener('multiselect-change', async (e) => {
+    if (e.detail.containerId.startsWith('supCampanas-')) {
+        const usuario = e.detail.containerId.replace('supCampanas-', '');
+        const result = await callAPI('actualizarCampanasAsesor', { usuario, campanas: e.detail.values });
+        if (!result.success) {
+            Toast?.show ? Toast.show(result.error || 'No se pudo actualizar', 'error') : alert(result.error);
+            return;
+        }
+        const u = state.supervisores.find((s) => s.usuario === usuario);
+        if (u) u.campanas = e.detail.values;
+        Toast?.show?.('Campañas actualizadas', 'ok');
+        return;
+    }
+    if (e.detail.containerId === 'cfgNuevoUsuarioCampanas') {
+        state.nuevoUsuarioCampanas = e.detail.values;
+    }
+});
+
+// ===== NUEVO USUARIO =====
+function renderNuevoUsuarioForm() {
+    const codigosActivos = state.campanas.filter((c) => c.activa).map((c) => c.codigo);
+    createMultiSelect('cfgNuevoUsuarioCampanas', codigosActivos, [], 'Sin campañas', null, { permitirTodos: true, mostrarValores: true });
+    document.getElementById('cfgBtnCrearUsuario').addEventListener('click', crearUsuarioSubmit);
+}
+
+async function crearUsuarioSubmit() {
+    const usuario = document.getElementById('cfgNuevoUsuario').value.trim();
+    const nombre = document.getElementById('cfgNuevoNombre').value.trim();
+    const password = document.getElementById('cfgNuevoPassword').value;
+    const rol = document.getElementById('cfgNuevoRol').value;
+    const cargo = document.getElementById('cfgNuevoCargo').value.trim();
+    const dni = document.getElementById('cfgNuevoDni').value.trim();
+    const email = document.getElementById('cfgNuevoEmail').value.trim();
+    const campanas = state.nuevoUsuarioCampanas || [];
+
+    if (!usuario || !nombre || !password) {
+        alert('Usuario, nombre y contraseña son obligatorios.');
+        return;
+    }
+
+    const result = await callAPI('crearUsuario', { usuario, nombre, password, rol, cargo, dni, email, campanas });
+    if (!result.success) {
+        alert(result.error || 'No se pudo crear el usuario.');
+        return;
+    }
+    Toast?.show?.('Usuario creado', 'ok');
+    ['cfgNuevoUsuario','cfgNuevoNombre','cfgNuevoPassword','cfgNuevoCargo','cfgNuevoDni','cfgNuevoEmail']
+        .forEach((id) => document.getElementById(id).value = '');
+    document.getElementById('cfgNuevoRol').value = 'ASESOR';
+    if (rol === 'SUPERVISOR') await cargarSupervisores(); // refresca la lista si creaste un supervisor
 }
