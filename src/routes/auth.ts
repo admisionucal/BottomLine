@@ -45,19 +45,17 @@ export async function login(client: Client, body: JsonBody, env: Env, ctx: Execu
   await limpiarIntentosFallidos(client, usuarioNorm);
 
   // Resolución de campañas: "todas" -> todas las que existan; si no, split por coma.
+  const camActivasRes = await client.query(
+    `select codigo from campanas where activa = true order by codigo`
+  );
+  const activas = new Set(camActivasRes.rows.map((r) => r.codigo));
+
   let campanas: string[] = [];
   const raw = String(user.campana || '');
   if (raw.toLowerCase() === 'todas') {
-    try {
-      const camResult = await client.query(
-        `select codigo from campanas where activa = true order by codigo`
-      );
-      campanas = camResult.rows.map((r) => r.codigo).filter(Boolean);
-    } catch (_e) {
-      campanas = [];
-    }
+    campanas = Array.from(activas).sort();
   } else {
-    campanas = raw.split(',').map((c) => c.trim()).filter(Boolean);
+    campanas = raw.split(',').map((c) => c.trim()).filter((c) => c && activas.has(c));
   }
 
   const emailUser = String(user.email || '').trim().toLowerCase();

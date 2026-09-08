@@ -9,19 +9,40 @@ export async function getLeads(client: Client, body: JsonBody) {
   if (!sesion) return jsonError(error!);
 
   const esAdmin = sesion.rol === 'SUPERVISOR' || sesion.rol === 'ADMISION';
+  const requiereRestriccionCampana = sesion.rol !== 'ADMISION'; // aplica a SUPERVISOR y ASESOR
   const campana = body.campana;
   if (!campana) return jsonError('Falta especificar la campaña.');
 
   const filtros = body.filtros || {};
 
   let nombreAsesor: string | null = null;
-  if (!esAdmin && sesion.email) {
-    const r = await client.query(`select nombre from usuarios where lower(email) = lower($1) limit 1`, [
-      sesion.email,
-    ]);
-    nombreAsesor = r.rows[0]?.nombre || null;
+  let usuarioRow: { nombre?: string; campana?: string } | null = null;
+  if (requiereRestriccionCampana && sesion.email) {
+    const r = await client.query(
+      `select nombre, campana from usuarios where lower(email) = lower($1) limit 1`,
+      [sesion.email]
+    );
+    usuarioRow = r.rows[0] || null;
+    nombreAsesor = usuarioRow?.nombre || null;
   }
 
+  // ----- Restricción por campaña activa (todos los roles excepto ADMISION) -----
+  if (requiereRestriccionCampana) {
+    const rawCampana = String(usuarioRow?.campana || '');
+    const tieneTodas = rawCampana.trim().toLowerCase() === 'todas';
+    const campanasAsignadas = rawCampana.split(',').map((c) => c.trim()).filter(Boolean);
+    const tieneAsignacion = tieneTodas || campanasAsignadas.includes(campana);
+
+    if (!tieneAsignacion) {
+      return jsonError('No tienes acceso a esta campaña.');
+    }
+
+    const campanaRes = await client.query(`select activa from campanas where codigo = $1`, [campana]);
+    if (campanaRes.rows[0]?.activa !== true) {
+      return jsonError('Esta campaña ya no está activa.');
+    }
+  }
+  
   const params: any[] = [campana];
   const condiciones: string[] = ['l.campana = $1'];
 

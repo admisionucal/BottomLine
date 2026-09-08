@@ -37,6 +37,12 @@ export async function actualizarLeadsBase(client: Client, body: JsonBody, env: E
   const filas = Array.isArray(body.filas) ? body.filas : [];
   if (!campana) return jsonError('Falta campaña.');
 
+  // La migración diaria solo corre para campañas activas.
+  const campanaRes = await client.query(`select activa from campanas where codigo = $1`, [campana]);
+  if (campanaRes.rows[0]?.activa !== true) {
+    return jsonError(`La campaña "${campana}" no está activa; no se migran leads.`);
+  }
+
   let procesados = 0;
   const idsDeEsteLote: string[] = [];
   let primerError: string | null = null;
