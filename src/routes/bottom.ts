@@ -41,9 +41,10 @@ export async function saveBottom(client: Client, body: JsonBody) {
   const campana = String(body.campana || '').trim();
   if (!idPrometeo || !campana) return jsonError('Falta id o campaña.');
 
+  const asesorVigente = await resolverAsesorVigente(client, idPrometeo, campana);
   const asesorEmail = esRolSupervisorOAdmision(sesion.rol)
-    ? String(body.asesorEmail || sesion.email).trim()
-    : sesion.email.trim();
+    ? String(body.asesorEmail || asesorVigente || sesion.email).trim().toLowerCase()
+    : sesion.email.trim().toLowerCase();
   if (!asesorEmail) return jsonError('Falta el email del asesor.');
 
   const data = body.data || {};
@@ -112,7 +113,6 @@ export async function saveBottom(client: Client, body: JsonBody) {
 
   const columnas: string[] = [];
   const valores: any[] = [];
-
   for (const campo of CAMPOS_BOTTOM_EDITABLES) {
     const claveFrontend = campo.toUpperCase();
     if (Object.prototype.hasOwnProperty.call(data, claveFrontend)) {
@@ -121,62 +121,70 @@ export async function saveBottom(client: Client, body: JsonBody) {
     }
   }
 
-  // ¿Se tocó algún campo de perfilamiento? Si sí, armamos el snapshot
-  // completo, leyendo primero los valores actuales para los campos que
-  // NO vinieron en este guardado.
   const tocaPerfil = CAMPOS_PERFIL.some((c) => Object.prototype.hasOwnProperty.call(data, c.toUpperCase()));
   let historialAppend: any = null;
 
-  if (tocaPerfil) {
-    // OJO: leads_bottom ahora tiene una fila POR ASESOR (id_prometeo, campana,
-    // asesor_email), así que hay que filtrar también por asesor_email o
-    // se podría leer (y pisar) el snapshot de otro asesor.
-    const actual = await client.query(
-      `select ${CAMPOS_PERFIL.join(', ')} from leads_bottom
-       where id_prometeo = $1 and campana = $2 and asesor_email = $3`,
-      [idPrometeo, campana, asesorEmail]
-    );
-    const filaActual = actual.rows[0] || {};
+  try {
+    await client.query('begin');
 
-    const snapshotNuevo: Record<string, any> = {};
-    for (const campo of CAMPOS_PERFIL) {
-      const claveFrontend = campo.toUpperCase();
-      snapshotNuevo[claveFrontend] = Object.prototype.hasOwnProperty.call(data, claveFrontend)
-        ? data[claveFrontend]
-        : filaActual[campo] || '';
+    await consolidarFilaBottom(client, idPrometeo, campana, asesorEmail);
+
+    if (tocaPerfil) {
+      const actual = await client.query(
+        `select ${CAMPOS_PERFIL.join(', ')} from leads_bottom
+         where id_prometeo = $1 and campana = $2 and lower(asesor_email) = $3`,
+        [idPrometeo, campana, asesorEmail]
+      );
+      const filaActual = actual.rows[0] || {};
+
+      const snapshotNuevo: Record<string, any> = {};
+      for (const campo of CAMPOS_PERFIL) {
+        const claveFrontend = campo.toUpperCase();
+        snapshotNuevo[claveFrontend] = Object.prototype.hasOwnProperty.call(data, claveFrontend)
+          ? data[claveFrontend]
+          : filaActual[campo] || '';
+      }
+
+      historialAppend = {
+        tipo: 'perfil_snapshot',
+        fecha: new Date().toISOString(),
+        usuario: sesion.nombre || sesion.email,
+        usuarioEmail: sesion.email,
+        datos: snapshotNuevo,
+      };
     }
 
-    historialAppend = {
-      tipo: 'perfil_snapshot',
-      fecha: new Date().toISOString(),
-      usuario: sesion.nombre || sesion.email,
-      usuarioEmail: sesion.email,
-      datos: snapshotNuevo,
-    };
-  }
+    if (columnas.length === 0 && !historialAppend) {
+      await client.query('rollback');
+      return jsonError('No hay campos para guardar.');
+    }
 
-  if (columnas.length === 0 && !historialAppend) return jsonError('No hay campos para guardar.');
+    const placeholders = columnas.map((_, i) => `$${i + 4}`);
+    const sets = columnas.map((c, i) => `${c} = $${i + 4}`);
 
-  const placeholders = columnas.map((_, i) => `$${i + 4}`);
-  const sets = columnas.map((c, i) => `${c} = $${i + 4}`);
+    if (historialAppend) {
+      columnas.push('comentarios_historial');
+      sets.push(
+        `comentarios_historial = coalesce(leads_bottom.comentarios_historial, '[]'::jsonb) || jsonb_build_array($${columnas.length + 3}::jsonb)`
+      );
+      placeholders.push(`jsonb_build_array($${columnas.length + 3}::jsonb)`);
+      valores.push(JSON.stringify(historialAppend));
+    }
 
-  if (historialAppend) {
-    columnas.push('comentarios_historial');
-    sets.push(
-      `comentarios_historial = coalesce(leads_bottom.comentarios_historial, '[]'::jsonb) || jsonb_build_array($${columnas.length + 3}::jsonb)`
+    await client.query(
+      `insert into leads_bottom (id_prometeo, campana, asesor_email, ${columnas.join(', ')}, fecha_ult_modificacion)
+       values ($1, $2, $3, ${placeholders.join(', ')}, now())
+       on conflict (id_prometeo, campana, asesor_email) do update set
+         ${sets.join(', ')},
+         actualizado_en = now(), fecha_ult_modificacion = now()`,
+      [idPrometeo, campana, asesorEmail, ...valores]
     );
-    placeholders.push(`jsonb_build_array($${columnas.length + 3}::jsonb)`);
-    valores.push(JSON.stringify(historialAppend));
-  }
 
-  await client.query(
-    `insert into leads_bottom (id_prometeo, campana, asesor_email, ${columnas.join(', ')}, fecha_ult_modificacion)
-     values ($1, $2, $3, ${placeholders.join(', ')}, now())
-     on conflict (id_prometeo, campana, asesor_email) do update set
-       ${sets.join(', ')},
-       actualizado_en = now(), fecha_ult_modificacion = now()`,
-    [idPrometeo, campana, asesorEmail, ...valores]
-  );
+    await client.query('commit');
+  } catch (e: any) {
+    await client.query('rollback');
+    return jsonError('Error al guardar: ' + (e?.message || String(e)));
+  }
 
   return jsonOk({ message: 'Guardado correctamente.' });
 }
@@ -190,13 +198,10 @@ export async function addComment(client: Client, body: JsonBody) {
   const texto = String(body.comentario || '').trim();
   if (!idPrometeo || !campana || !texto) return jsonError('Falta id, campaña o texto del comentario.');
 
-  // leads_bottom exige asesor_email (es parte de la llave primaria y es
-  // NOT NULL). Mismo criterio de resolución que saveBottom: un
-  // SUPERVISOR/ADMISION puede comentar en nombre de otro asesor si lo manda
-  // explícito; un ASESOR siempre comenta en su propia fila.
+  const asesorVigente = await resolverAsesorVigente(client, idPrometeo, campana);
   const asesorEmail = esRolSupervisorOAdmision(sesion.rol)
-    ? String(body.asesorEmail || sesion.email).trim()
-    : sesion.email.trim();
+    ? String(body.asesorEmail || asesorVigente || sesion.email).trim().toLowerCase()
+    : sesion.email.trim().toLowerCase();
   if (!asesorEmail) return jsonError('Falta el email del asesor.');
 
   const nuevoComentario = {
@@ -207,15 +212,119 @@ export async function addComment(client: Client, body: JsonBody) {
     texto,
   };
 
-  const result = await client.query(
-    `insert into leads_bottom (id_prometeo, campana, asesor_email, comentarios_historial)
-     values ($1, $2, $3, jsonb_build_array($4::jsonb))
-     on conflict (id_prometeo, campana, asesor_email) do update set
-       comentarios_historial = coalesce(leads_bottom.comentarios_historial, '[]'::jsonb) || jsonb_build_array($4::jsonb),
-       actualizado_en = now()
-     returning comentarios_historial`,
-    [idPrometeo, campana, asesorEmail, JSON.stringify(nuevoComentario)]
+  try {
+    await client.query('begin');
+
+    await consolidarFilaBottom(client, idPrometeo, campana, asesorEmail);
+
+    const result = await client.query(
+      `insert into leads_bottom (id_prometeo, campana, asesor_email, comentarios_historial)
+       values ($1, $2, $3, jsonb_build_array($4::jsonb))
+       on conflict (id_prometeo, campana, asesor_email) do update set
+         comentarios_historial = coalesce(leads_bottom.comentarios_historial, '[]'::jsonb) || jsonb_build_array($4::jsonb),
+         actualizado_en = now()
+       returning comentarios_historial`,
+      [idPrometeo, campana, asesorEmail, JSON.stringify(nuevoComentario)]
+    );
+
+    await client.query('commit');
+    return jsonOk({ data: { COMENTARIOS_HISTORIAL: JSON.stringify(result.rows[0].comentarios_historial) } });
+  } catch (e: any) {
+    await client.query('rollback');
+    return jsonError('Error al comentar: ' + (e?.message || String(e)));
+  }
+}
+
+// Igual que en unifyIds.ts: nunca truena si el JSON viene mal.
+function parsearHistorial(raw: any): any[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_e) {
+    return [];
+  }
+}
+
+// El asesor "vigente" de un lead: mismo criterio que usa el JOIN de getLeads.
+async function resolverAsesorVigente(client: Client, idPrometeo: string, campana: string): Promise<string | null> {
+  const r = await client.query(
+    `select u.email
+     from leads l
+     join usuarios u on lower(u.usuario) = lower(l.asesor) or lower(u.nombre) = lower(l.asesor)
+     where l.id_prometeo = $1 and l.campana = $2
+     limit 1`,
+    [idPrometeo, campana]
+  );
+  const email = r.rows[0]?.email;
+  return email ? String(email).trim().toLowerCase() : null;
+}
+
+// Garantiza que, antes de guardar, exista COMO MÁXIMO una fila de leads_bottom para este lead, y que sea la del asesor vigente.
+async function consolidarFilaBottom(client: Client, idPrometeo: string, campana: string, asesorVigente: string) {
+  const filas = await client.query(
+    `select * from leads_bottom where id_prometeo = $1 and campana = $2`,
+    [idPrometeo, campana]
+  );
+  if (filas.rows.length <= 1) return;
+
+  const yaTieneVigente = filas.rows.some((f: any) => String(f.asesor_email).toLowerCase() === asesorVigente);
+  let otras = filas.rows.filter((f: any) => String(f.asesor_email).toLowerCase() !== asesorVigente);
+  if (otras.length === 0) return;
+
+  if (!yaTieneVigente) {
+    // Renombra la primera huérfana en vez de crear una fila nueva.
+    const primera = otras[0];
+    await client.query(
+      `update leads_bottom set asesor_email = $1, actualizado_en = now()
+       where id_prometeo = $2 and campana = $3 and asesor_email = $4`,
+      [asesorVigente, idPrometeo, campana, primera.asesor_email]
+    );
+    otras = otras.slice(1);
+    if (otras.length === 0) return;
+  }
+
+  const destino = (
+    await client.query(
+      `select * from leads_bottom where id_prometeo = $1 and campana = $2 and lower(asesor_email) = $3`,
+      [idPrometeo, campana, asesorVigente]
+    )
+  ).rows[0];
+
+  // Fusiona historial y rellena solo los campos que el destino tenía vacíos.
+  let historialFinal = parsearHistorial(destino.comentarios_historial);
+  const relleno: Record<string, any> = {};
+
+  for (const fila of otras) {
+    historialFinal = historialFinal.concat(parsearHistorial(fila.comentarios_historial));
+    for (const campo of CAMPOS_BOTTOM_EDITABLES) {
+      const valorActual = Object.prototype.hasOwnProperty.call(relleno, campo) ? relleno[campo] : destino[campo];
+      const vacioActual = valorActual === null || valorActual === undefined || String(valorActual).trim() === '';
+      const valorOtra = fila[campo];
+      const otraTieneValor = valorOtra !== null && valorOtra !== undefined && String(valorOtra).trim() !== '';
+      if (vacioActual && otraTieneValor) relleno[campo] = valorOtra;
+    }
+  }
+  historialFinal.sort((a: any, b: any) => new Date(a.fecha || 0).getTime() - new Date(b.fecha || 0).getTime());
+
+  const params: any[] = [idPrometeo, campana, JSON.stringify(historialFinal)];
+  const camposRelleno = Object.keys(relleno);
+  const sets = camposRelleno.map((c) => {
+    params.push(relleno[c]);
+    return `${c} = $${params.length}`;
+  });
+  params.push(asesorVigente);
+  const asesorParamIdx = params.length;
+
+  await client.query(
+    `update leads_bottom set comentarios_historial = $3::jsonb${sets.length ? ', ' + sets.join(', ') : ''}, actualizado_en = now()
+     where id_prometeo = $1 and campana = $2 and lower(asesor_email) = $${asesorParamIdx}`,
+    params
   );
 
-  return jsonOk({ data: { COMENTARIOS_HISTORIAL: JSON.stringify(result.rows[0].comentarios_historial) } });
+  await client.query(
+    `delete from leads_bottom where id_prometeo = $1 and campana = $2 and lower(asesor_email) <> $3`,
+    [idPrometeo, campana, asesorVigente]
+  );
 }
