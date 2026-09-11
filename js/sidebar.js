@@ -51,7 +51,7 @@ function marcarSubitemActivo(el) {
 }
 
 function ocultarTodasLasVistas() {
-    ['view-bottomline', 'view-placeholder', 'view-calendario', 'view-asistencia', 'view-usuario', 'view-unificar', 'view-cc', 'view-configuracion', 'view-indicadores']
+    ['view-bottomline', 'view-placeholder', 'view-calendario', 'view-asistencia', 'view-usuario', 'view-unificar', 'view-cc', 'view-configuracion', 'view-indicadores', 'view-evaluaciones', 'view-resultados']
         .forEach(id => { 
             const el = document.getElementById(id); 
             if (el) el.style.display = 'none'; });
@@ -552,6 +552,184 @@ function asegurarScriptCC() {
     return __ccScriptPromise;
 }
 
+// ===== VISTA: EVALUACIONES =====
+let __evalModuloCargado = false;
+let __evalCargaEnCurso = null;
+
+function mostrarEvaluaciones() {
+    const viewUsuario = document.getElementById('view-usuario');
+    const viewBottomline = document.getElementById('view-bottomline');
+    const viewEval = document.getElementById('view-evaluaciones');
+
+    if (!viewUsuario && !viewBottomline) {
+        window.location.href = 'evaluaciones.html';
+        return;
+    }
+
+    ocultarTodasLasVistas();
+    if (viewEval) viewEval.style.display = 'block';
+
+    document.querySelectorAll('.nav-group-btn').forEach(b => b.classList.remove('active'));
+    const grupo = document.getElementById('navGroupUsuario');
+    if (grupo) grupo.querySelector('.nav-group-btn').classList.add('active');
+
+    if (__evalModuloCargado) {
+        if (typeof initEvaluacionesEmbebido === 'function') initEvaluacionesEmbebido();
+        return;
+    }
+    cargarVistaEvaluaciones();
+}
+
+function cargarVistaEvaluaciones() {
+    if (__evalCargaEnCurso) return __evalCargaEnCurso;
+
+    const contenedor = document.getElementById('view-evaluaciones');
+    if (!contenedor) {
+        window.location.href = 'evaluaciones.html';
+        return;
+    }
+
+    __evalCargaEnCurso = fetch('evaluaciones.html')
+        .then(resp => {
+            if (!resp.ok) throw new Error('HTTP ' + resp.status + ' al pedir evaluaciones.html');
+            return resp.text();
+        })
+        .then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const evalApp = doc.getElementById('evaluacionesApp');
+            if (!evalApp) throw new Error('evaluaciones.html no tiene el elemento #evaluacionesApp esperado');
+
+            if (!document.querySelector('style[data-eval-styles]')) {
+                doc.querySelectorAll('style').forEach(styleTag => {
+                    const clon = styleTag.cloneNode(true);
+                    clon.setAttribute('data-eval-styles', '');
+                    document.head.appendChild(clon);
+                });
+            }
+
+            contenedor.innerHTML = '';
+            contenedor.appendChild(evalApp.cloneNode(true));
+
+            return asegurarScriptEvaluaciones();
+        })
+        .then(() => {
+            __evalModuloCargado = true;
+            if (typeof initEvaluacionesEmbebido === 'function') return initEvaluacionesEmbebido();
+        })
+        .catch(err => {
+            console.error('cargarVistaEvaluaciones:', err);
+            contenedor.innerHTML = '<div class="loading" style="color:#d32f2f;">Error al cargar Evaluaciones: ' + err.message + '</div>';
+        })
+        .finally(() => { __evalCargaEnCurso = null; });
+
+    return __evalCargaEnCurso;
+}
+
+let __evalScriptPromise = null;
+function asegurarScriptEvaluaciones() {
+    if (typeof initEvaluacionesEmbebido === 'function') return Promise.resolve();
+    if (!__evalScriptPromise) {
+        __evalScriptPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.src = 'js/evaluaciones.js';
+            script.onload = resolve;
+            script.onerror = () => { __evalScriptPromise = null; reject(new Error('No se pudo cargar js/evaluaciones.js')); };
+            document.body.appendChild(script);
+        });
+    }
+    return __evalScriptPromise;
+}
+
+// ===== VISTA: RESULTADOS =====
+let __resModuloCargado = false;
+let __resCargaEnCurso = null;
+
+function mostrarResultados(codigoEvaluacion) {
+    const viewUsuario = document.getElementById('view-usuario');
+    const viewBottomline = document.getElementById('view-bottomline');
+    const viewRes = document.getElementById('view-resultados');
+
+    if (!viewUsuario && !viewBottomline) {
+        window.location.href = 'resultados.html' + (codigoEvaluacion ? ('?codigo=' + encodeURIComponent(codigoEvaluacion)) : '');
+        return;
+    }
+
+    ocultarTodasLasVistas();
+    if (viewRes) viewRes.style.display = 'block';
+
+    document.querySelectorAll('.nav-group-btn').forEach(b => b.classList.remove('active'));
+    const grupo = document.getElementById('navGroupUsuario');
+    if (grupo) grupo.querySelector('.nav-group-btn').classList.add('active');
+
+    if (__resModuloCargado) {
+        if (typeof initResultadosEmbebido === 'function') initResultadosEmbebido(codigoEvaluacion);
+        return;
+    }
+    cargarVistaResultados(codigoEvaluacion);
+}
+
+function cargarVistaResultados(codigoEvaluacion) {
+    if (__resCargaEnCurso) return __resCargaEnCurso;
+
+    const contenedor = document.getElementById('view-resultados');
+    if (!contenedor) {
+        window.location.href = 'resultados.html';
+        return;
+    }
+
+    __resCargaEnCurso = fetch('resultados.html')
+        .then(resp => {
+            if (!resp.ok) throw new Error('HTTP ' + resp.status + ' al pedir resultados.html');
+            return resp.text();
+        })
+        .then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const resApp = doc.getElementById('resultadosApp');
+            if (!resApp) throw new Error('resultados.html no tiene el elemento #resultadosApp esperado');
+
+            if (!document.querySelector('style[data-res-styles]')) {
+                doc.querySelectorAll('style').forEach(styleTag => {
+                    const clon = styleTag.cloneNode(true);
+                    clon.setAttribute('data-res-styles', '');
+                    document.head.appendChild(clon);
+                });
+            }
+
+            contenedor.innerHTML = '';
+            contenedor.appendChild(resApp.cloneNode(true));
+
+            return asegurarScriptResultados();
+        })
+        .then(() => {
+            __resModuloCargado = true;
+            if (typeof initResultadosEmbebido === 'function') return initResultadosEmbebido(codigoEvaluacion);
+        })
+        .catch(err => {
+            console.error('cargarVistaResultados:', err);
+            contenedor.innerHTML = '<div class="loading" style="color:#d32f2f;">Error al cargar Resultados: ' + err.message + '</div>';
+        })
+        .finally(() => { __resCargaEnCurso = null; });
+
+    return __resCargaEnCurso;
+}
+
+let __resScriptPromise = null;
+function asegurarScriptResultados() {
+    if (typeof initResultadosEmbebido === 'function') return Promise.resolve();
+    if (!__resScriptPromise) {
+        __resScriptPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.src = 'js/resultados.js';
+            script.onload = resolve;
+            script.onerror = () => { __resScriptPromise = null; reject(new Error('No se pudo cargar js/resultados.js')); };
+            document.body.appendChild(script);
+        });
+    }
+    return __resScriptPromise;
+}
+
 function mostrarConfiguracion() {
     const viewUsuario = document.getElementById('view-usuario');
     const viewBottomline = document.getElementById('view-bottomline');
@@ -657,3 +835,5 @@ window.mostrarCC = mostrarCC;
 window.logout = logout;
 window.irAMarcarAsistenciaDesdeUsuario = irAMarcarAsistenciaDesdeUsuario;
 window.mostrarConfiguracion = mostrarConfiguracion;
+window.mostrarEvaluaciones = mostrarEvaluaciones;
+window.mostrarResultados = mostrarResultados;

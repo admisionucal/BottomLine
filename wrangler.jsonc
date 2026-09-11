@@ -14,6 +14,9 @@
 			"id": "ad45b66fa51a443dae413625ff859a4b"
 		}
 	],
+	"ai": {
+		"binding": "AI"
+	},
 	"vars": {
 		"APPS_SCRIPT_URL": "https://script.google.com/macros/s/AKfycby9ev70hHVHWWpWE0mFqTllVYyug_vI9UZTbdhEGCnpwslbxBUjcHzPyaWoG3tvUUkAWg/exec",
 		"IMPORT_SECRET": "XdY8&gHRadm",

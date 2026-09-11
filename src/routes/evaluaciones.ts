@@ -1,0 +1,231 @@
+import type { Client } from 'pg';
+import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
+import { exigirSesion } from '../lib/session';
+
+// ================================================================
+// EVALUACIONES - "Usuarios > Evaluaciones" (resolver: ASESOR,
+// visualizar: SUPERVISOR/ADMISION) y "Usuarios > Resultados"
+// (SUPERVISOR/ADMISION).
+// ================================================================
+
+// ===== Listado para la pantalla "Evaluaciones" =====
+// ASESOR: ve cada evaluación activa con su propio estado (Pendiente/Completado).
+// SUPERVISOR/ADMISION: ve cada evaluación activa con el avance del equipo
+// (cuántos asesores de su campaña ya la completaron).
+export async function getEvaluaciones(client: Client, body: JsonBody) {
+  const { sesion, error } = await exigirSesion(client, body, null);
+  if (!sesion) return jsonError(error!);
+
+  const evaluaciones = await client.query(
+    `select id, codigo, titulo, descripcion, archivo, orden
+     from evaluaciones where activo = true order by orden, id`
+  );
+
+  if (sesion.rol === 'SUPERVISOR' || sesion.rol === 'ADMISION') {
+    const data = [];
+    for (const ev of evaluaciones.rows) {
+      const totalAsesores = await client.query(
+        `select count(*)::int as n from usuarios where upper(rol) = 'ASESOR' and activo = true`
+      );
+      const completados = await client.query(
+        `select count(*)::int as n from evaluacion_intentos where evaluacion_id = $1`,
+        [ev.id]
+      );
+      data.push({
+        ...ev,
+        totalAsesores: totalAsesores.rows[0].n,
+        completados: completados.rows[0].n,
+      });
+    }
+    return jsonOk({ data, rol: sesion.rol });
+  }
+
+  // ASESOR
+  const data = [];
+  for (const ev of evaluaciones.rows) {
+    const intento = await client.query(
+      `select puntaje_obtenido, puntaje_maximo, porcentaje, finalizado_en
+       from evaluacion_intentos where evaluacion_id = $1 and usuario = $2`,
+      [ev.id, sesion.usuario]
+    );
+    data.push({
+      ...ev,
+      estado: intento.rowCount ? 'Completado' : 'Pendiente',
+      resultado: intento.rowCount ? intento.rows[0] : null,
+    });
+  }
+  return jsonOk({ data, rol: sesion.rol });
+}
+
+// ===== Estado de una evaluación puntual, para el .html que la resuelve =====
+// Devuelve si el asesor ya tiene un intento guardado (para no dejarlo repetir
+// y mostrarle directamente su resultado, igual que hacía el localStorage).
+export async function getEstadoEvaluacion(client: Client, body: JsonBody) {
+  const { sesion, error } = await exigirSesion(client, body, null);
+  if (!sesion) return jsonError(error!);
+
+  const codigo = String(body.codigo || '').trim();
+  if (!codigo) return jsonError('Falta el código de la evaluación.');
+
+  const ev = await client.query(`select id, titulo from evaluaciones where codigo = $1 and activo = true`, [codigo]);
+  if (!ev.rowCount) return jsonError('La evaluación no existe o no está activa.');
+
+  const intento = await client.query(
+    `select puntaje_obtenido, puntaje_maximo, porcentaje, respuestas, detalle, finalizado_en, duracion_segundos, por_tiempo
+     from evaluacion_intentos where evaluacion_id = $1 and usuario = $2`,
+    [ev.rows[0].id, sesion.usuario]
+  );
+
+  return jsonOk({
+    evaluacion: ev.rows[0],
+    intento: intento.rowCount ? intento.rows[0] : null,
+  });
+}
+
+// ===== Guardar el intento (solo ASESOR, solo una vez) =====
+export async function guardarIntentoEvaluacion(client: Client, body: JsonBody) {
+  const { sesion, error } = await exigirSesion(client, body, ['ASESOR']);
+  if (!sesion) return jsonError(error!);
+
+  const codigo = String(body.codigo || '').trim();
+  if (!codigo) return jsonError('Falta el código de la evaluación.');
+
+  const ev = await client.query(`select id from evaluaciones where codigo = $1 and activo = true`, [codigo]);
+  if (!ev.rowCount) return jsonError('La evaluación no existe o no está activa.');
+  const evaluacionId = ev.rows[0].id;
+
+  const yaExiste = await client.query(
+    `select 1 from evaluacion_intentos where evaluacion_id = $1 and usuario = $2`,
+    [evaluacionId, sesion.usuario]
+  );
+  if (yaExiste.rowCount) return jsonError('Esta evaluación ya fue enviada. No se puede volver a resolver.');
+
+  const usuarioInfo = await client.query(`select campana from usuarios where usuario = $1`, [sesion.usuario]);
+  const campana = usuarioInfo.rows[0]?.campana || null;
+
+  const puntajeObtenido = Number(body.puntajeObtenido) || 0;
+  const puntajeMaximo = Number(body.puntajeMaximo) || 0;
+  const porcentaje = puntajeMaximo > 0 ? Math.round((puntajeObtenido / puntajeMaximo) * 10000) / 100 : 0;
+
+  await client.query(
+    `insert into evaluacion_intentos
+       (evaluacion_id, usuario, nombre, campana, puntaje_obtenido, puntaje_maximo, porcentaje,
+        respuestas, detalle, iniciado_en, finalizado_en, duracion_segundos, por_tiempo)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    [
+      evaluacionId, sesion.usuario, sesion.nombre, campana,
+      puntajeObtenido, puntajeMaximo, porcentaje,
+      JSON.stringify(body.respuestas || {}), JSON.stringify(body.detalle || null),
+      body.iniciadoEn ? new Date(body.iniciadoEn) : null,
+      body.finalizadoEn ? new Date(body.finalizadoEn) : new Date(),
+      body.duracionSegundos ? Number(body.duracionSegundos) : null,
+      !!body.porTiempo,
+    ]
+  );
+
+  return jsonOk({ guardado: true, porcentaje });
+}
+
+// ===== Pantalla "Resultados" (solo SUPERVISOR/ADMISION) =====
+export async function getResultadosEvaluacion(client: Client, body: JsonBody) {
+  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
+  if (!sesion) return jsonError(error!);
+
+  const codigo = String(body.codigo || '').trim();
+  if (!codigo) return jsonError('Falta el código de la evaluación.');
+
+  const ev = await client.query(`select id, titulo from evaluaciones where codigo = $1`, [codigo]);
+  if (!ev.rowCount) return jsonError('La evaluación no existe.');
+
+  // Todos los asesores activos, con su intento si lo tienen (left join para
+  // que se vea también a quienes aún no la resuelven -> "Pendiente").
+  const result = await client.query(
+    `select u.usuario, coalesce(u.nombre_aux, u.nombre) as nombre, u.campana,
+            i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje, i.finalizado_en, i.duracion_segundos, i.por_tiempo
+     from usuarios u
+     left join evaluacion_intentos i on i.evaluacion_id = $1 and i.usuario = u.usuario
+     where upper(u.rol) = 'ASESOR' and u.activo = true
+     order by nombre`,
+    [ev.rows[0].id]
+  );
+
+  const data = result.rows.map((r) => ({
+    usuario: r.usuario,
+    nombre: r.nombre,
+    campana: r.campana,
+    estado: r.finalizado_en ? 'Completado' : 'Pendiente',
+    puntajeObtenido: r.puntaje_obtenido,
+    puntajeMaximo: r.puntaje_maximo,
+    porcentaje: r.porcentaje,
+    finalizadoEn: r.finalizado_en,
+    duracionSegundos: r.duracion_segundos,
+    porTiempo: r.por_tiempo,
+  }));
+
+  return jsonOk({ evaluacion: ev.rows[0], data });
+}
+
+// ===== Detalle de un intento (respuesta por respuesta) para Resultados =====
+// ===== Calificación asistida por IA (solo ASESOR, y solo mientras resuelve) =====
+// El .html arma el prompt (usa la misma rúbrica que la calificación local) y
+// aquí lo corremos contra Cloudflare Workers AI (binding "AI" del Worker,
+// sin API key ni cuenta aparte — entra en el tier gratis de 10,000
+// Neurons/día). Si algo falla, el frontend cae solo a la calificación local.
+const MODELO_IA = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+
+export async function calificarConIA(client: Client, body: JsonBody, env: Env) {
+  const { sesion, error } = await exigirSesion(client, body, ['ASESOR']);
+  if (!sesion) return jsonError(error!);
+
+  const codigo = String(body.codigo || '').trim();
+  const prompt = String(body.prompt || '').trim();
+  if (!codigo || !prompt) return jsonError('Faltan datos para calificar.');
+  if (prompt.length > 20000) return jsonError('La respuesta a calificar es demasiado larga.');
+
+  const ev = await client.query(`select id from evaluaciones where codigo = $1 and activo = true`, [codigo]);
+  if (!ev.rowCount) return jsonError('La evaluación no existe o no está activa.');
+
+  if (!env.AI) return jsonError('Workers AI no está habilitado en este Worker.');
+
+  try {
+    const salida: any = await env.AI.run(MODELO_IA, {
+      messages: [
+        { role: 'system', content: 'Respondes ÚNICAMENTE con JSON válido, sin texto adicional ni bloques de código.' },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 1500,
+    });
+
+    const texto = String(salida?.response ?? '').trim();
+    const limpio = texto.replace(/^```json\s*|^```\s*|```\s*$/gm, '').trim();
+    const parsed = JSON.parse(limpio);
+    if (!Array.isArray(parsed)) return jsonError('La IA no devolvió el formato esperado.');
+
+    return jsonOk({ data: parsed });
+  } catch (err: any) {
+    return jsonError('No se pudo calificar con IA: ' + err.message);
+  }
+}
+
+export async function getDetalleIntentoEvaluacion(client: Client, body: JsonBody) {
+  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
+  if (!sesion) return jsonError(error!);
+
+  const codigo = String(body.codigo || '').trim();
+  const usuario = String(body.usuario || '').trim();
+  if (!codigo || !usuario) return jsonError('Faltan datos para obtener el detalle.');
+
+  const result = await client.query(
+    `select i.respuestas, i.detalle, i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje,
+            i.finalizado_en, i.duracion_segundos, i.por_tiempo,
+            coalesce(u.nombre_aux, u.nombre) as nombre
+     from evaluacion_intentos i
+     join evaluaciones e on e.id = i.evaluacion_id
+     join usuarios u on u.usuario = i.usuario
+     where e.codigo = $1 and i.usuario = $2`,
+    [codigo, usuario]
+  );
+  if (!result.rowCount) return jsonError('Este asesor todavía no resolvió la evaluación.');
+
+  return jsonOk({ data: result.rows[0] });
+}

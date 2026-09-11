@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RUMBO GAC - Evaluaciones</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="core/ui-kit.css">
+    <style>
+        .container { width: 95%; max-width: 1200px; margin: 0 auto; padding: 24px 0; }
+
+        .eval-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 18px;
+            margin-top: 18px;
+        }
+
+        .eval-card {
+            background: var(--color-bg-card);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--shadow-card);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .eval-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .eval-card-icon {
+            width: 44px; height: 44px; border-radius: 12px;
+            background: var(--color-primary-light); color: var(--color-primary);
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .eval-card-titulo { font-family: var(--font-family-heading); font-size: 16px; font-weight: 700; color: var(--color-text-primary); }
+        .eval-card-desc { font-size: 13px; color: var(--color-text-secondary); line-height: 1.4; flex: 1; }
+
+        .eval-pill {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            border-radius: 20px; padding: 4px 10px; white-space: nowrap;
+        }
+        .eval-pill.pendiente { background: var(--color-warning-bg); color: #B06A00; }
+        .eval-pill.completado { background: var(--color-success-bg); color: var(--color-success); }
+
+        .eval-card-progress { font-size: 12px; color: var(--color-text-secondary); }
+        .eval-card-progress b { color: var(--color-text-primary); }
+
+        .eval-card-footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .eval-card-score { font-size: 13px; font-weight: 700; color: var(--color-primary); }
+
+        .eval-empty { color: var(--color-text-muted); padding: 40px 0; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-area">
+            <div class="container">
+                <div id="evaluacionesApp">
+                    <h2 style="margin-bottom:4px;">Evaluaciones</h2>
+                    <p style="color:#777; font-size:13px;" id="evalSubtitulo">Cargando…</p>
+
+                    <div class="eval-grid" id="evalGrid">
+                        <div class="loading">Cargando evaluaciones…</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="core/utils.js"></script>
+    <script type="module" src="core/constants.js"></script>
+    <script type="module" src="core/components.js"></script>
+    <script type="module" src="js/sidebar.js"></script>
+    <script type="module" src="js/evaluaciones.js"></script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RUMBO GAC - Resultados</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="core/ui-kit.css">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        .container { width: 95%; max-width: 1300px; margin: 0 auto; padding: 24px 0; }
+
+        .res-toolbar {
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 12px; margin: 16px 0;
+        }
+        .res-select {
+            padding: 8px 12px; border: 1px solid var(--color-border);
+            border-radius: var(--radius); font-size: 13px; min-width: 260px;
+        }
+        .res-score { font-weight: 700; }
+        .res-score.sc-alta { color: var(--color-success); }
+        .res-score.sc-media { color: #B06A00; }
+        .res-score.sc-baja { color: var(--color-danger); }
+        .res-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            border-radius: 20px; padding: 3px 9px;
+        }
+        .res-badge.completado { background: var(--color-success-bg); color: var(--color-success); }
+        .res-badge.pendiente { background: var(--color-warning-bg); color: #B06A00; }
+        .res-link { color: var(--color-primary); font-weight: 600; cursor: pointer; text-decoration: none; }
+        .res-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-area">
+            <div class="container">
+                <div id="resultadosApp">
+                    <h2 style="margin-bottom:4px;">Resultados</h2>
+                    <p style="color:#777; font-size:13px;">Resultado por asesor de cada evaluación.</p>
+
+                    <div class="res-toolbar">
+                        <select class="res-select" id="resEvaluacionSelect"></select>
+                        <button type="button" class="btn-export" id="resBtnExportar">
+                            <span class="material-symbols-outlined" style="font-size:16px;">download</span> Exportar
+                        </button>
+                    </div>
+
+                    <div id="resTablaContainer">
+                        <div class="loading">Cargando resultados…</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="core/utils.js"></script>
+    <script type="module" src="core/constants.js"></script>
+    <script type="module" src="core/components.js"></script>
+    <script type="module" src="js/sidebar.js"></script>
+    <script type="module" src="js/resultados.js"></script>
+</body>
+</html>

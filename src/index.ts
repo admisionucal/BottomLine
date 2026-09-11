@@ -39,6 +39,13 @@ import {
   obtenerArchivoCampanaBase64,
 } from './routes/campanas';
 import { getSupervisoresConfig, crearUsuario } from './routes/usuarios';
+import {
+  getEvaluaciones,
+  getEstadoEvaluacion,
+  guardarIntentoEvaluacion,
+  getResultadosEvaluacion,
+  getDetalleIntentoEvaluacion,
+} from './routes/evaluaciones';
 
 // Igual que getLeadsConAprobacion(body) en code.gs: mismo getLeads, pero
 // solo accesible para SUPERVISOR/ADMISION.
@@ -92,6 +99,11 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   obtenerArchivoCampanaBase64,
   getSupervisoresConfig,
   crearUsuario,
+  getEvaluaciones,
+  getEstadoEvaluacion,
+  guardarIntentoEvaluacion,
+  getResultadosEvaluacion,
+  getDetalleIntentoEvaluacion,
 };
 
 export default {

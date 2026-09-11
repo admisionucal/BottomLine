@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{color-scheme:light}
+  body{margin:0}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+<title>RUMBO GAC - Evaluación de Marca UCAL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="core/ui-kit.css">
+<style>
+  /* Tema remapeado a los tokens del ui-kit del CRM (mismo look de Asistencia,
+     Condiciones Comerciales, Configuración, etc.) en vez de la paleta morada
+     original del archivo suelto. */
+  :root{
+    --ground:#F5F7FA; --surface:#FFFFFF; --surface-2:#F5F7FB; --surface-3:#E5EEFF;
+    --ink:#1A1D29; --ink-2:#6B7280; --ink-3:#8A8FA3;
+    --line:#E0E0E0; --line-strong:#C3C6D6;
+    --brand:#0040A1; --brand-2:#00337F; --brand-soft:#E5EEFF;
+    --teal:#2E7D32; --teal-soft:#EEF8F1;
+    --magenta:#FB923C; --magenta-soft:#FFF6E8;
+    --ok:#2E7D32; --ok-soft:#EEF8F1;
+    --warn:#B06A00; --warn-soft:#FFF6E8;
+    --bad:#D32F2F; --bad-soft:#FFF1F1;
+    --onbrand:#FFFFFF;
+    --sans:'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --cond:'Hanken Grotesk', var(--sans);
+    --mono: ui-monospace, Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground); color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.58; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px; margin:0 auto; padding:0 22px 80px}
+  h1,h2,h3,h4,h5,h6,button,label,th,.cond{font-family:var(--cond)}
+
+  /* ── topbar ── */
+  .topbar{position:sticky; top:0; z-index:20; background:var(--ground); border-bottom:1px solid var(--line)}
+  .topbar .in{max-width:880px; margin:0 auto; padding:11px 22px; display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+  .brand{font-family:var(--cond); font-weight:700; font-size:1rem; letter-spacing:-.01em; margin-right:auto; display:flex; align-items:center; gap:10px}
+  .mark{width:22px; height:22px; flex:none; border-radius:4px; background:var(--brand); display:grid; place-items:center; color:var(--onbrand); font-family:var(--cond); font-weight:700; font-size:11px; letter-spacing:.02em}
+  .brand small{font-family:var(--mono); font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3); font-weight:400}
+  .timer{font-family:var(--mono); font-size:.92rem; font-variant-numeric:tabular-nums; padding:4px 11px; border:1px solid var(--line-strong); background:var(--surface); border-radius:4px}
+  .timer.low{color:var(--warn); border-color:var(--warn); background:var(--warn-soft)}
+  .timer.crit{color:var(--bad); border-color:var(--bad); background:var(--bad-soft)}
+  .pbar{height:3px; background:var(--surface-3)}
+  .pbar i{display:block; height:100%; width:0; font-style:normal; background:linear-gradient(90deg,var(--brand),var(--magenta)); transition:width .25s ease}
+  @media (prefers-reduced-motion:reduce){ .pbar i{transition:none} }
+
+  /* ── generic ── */
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:28px 30px}
+  .eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--magenta); font-weight:500}
+  h1{font-weight:700; font-size:clamp(1.9rem,4.6vw,2.7rem); line-height:1.04; letter-spacing:-.02em; margin:12px 0 14px; text-wrap:balance}
+  p{margin:0 0 14px}
+  .muted{color:var(--ink-2)}
+  .btn{font-family:var(--cond); font-weight:600; font-size:1rem; padding:11px 24px; border:1px solid var(--brand); background:var(--brand); color:var(--onbrand); cursor:pointer; border-radius:6px}
+  .btn:hover{background:var(--brand-2); border-color:var(--brand-2)}
+  .btn:disabled{opacity:.4; cursor:not-allowed}
+  .btn.ghost{background:transparent; color:var(--ink); border-color:var(--line-strong)}
+  .btn.ghost:hover{background:var(--surface-2); border-color:var(--brand)}
+  :focus-visible{outline:2px solid var(--brand); outline-offset:2px}
+
+  .field{display:block; margin-bottom:16px}
+  .field span{display:block; font-family:var(--cond); font-weight:600; font-size:.93rem; margin-bottom:5px}
+  input[type=text], input[type=email], textarea{
+    width:100%; font-family:var(--sans); font-size:1rem; color:var(--ink); background:var(--surface);
+    border:1px solid var(--line-strong); border-radius:6px; padding:10px 12px; line-height:1.55;
+  }
+  textarea{min-height:150px; resize:vertical}
+  input:focus, textarea:focus{outline:2px solid var(--brand); outline-offset:0; border-color:var(--brand)}
+
+  .rules{border-left:3px solid var(--magenta); background:var(--magenta-soft); padding:14px 18px; margin:20px 0; border-radius:0 6px 6px 0}
+  .rules ul{margin:0; padding-left:19px} .rules li{margin-bottom:6px} .rules li:last-child{margin-bottom:0}
+
+  .meta{display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:8px; overflow:hidden; margin:22px 0}
+  .meta div{background:var(--surface); padding:12px 14px}
+  .meta dt{font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); margin-bottom:4px}
+  .meta dd{margin:0; font-family:var(--cond); font-weight:700; font-size:1.15rem; color:var(--brand)}
+
+  /* ── question nav ── */
+  .qnav{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:18px}
+  .qnav button{
+    font-family:var(--mono); font-size:12px; width:33px; height:33px; padding:0; cursor:pointer;
+    border:1px solid var(--line-strong); background:var(--surface); color:var(--ink-3); border-radius:6px;
+  }
+  .qnav button.done{background:var(--brand-soft); border-color:var(--brand); color:var(--brand); font-weight:600}
+  .qnav button.here{background:var(--brand); border-color:var(--brand); color:var(--onbrand); font-weight:600}
+
+  .qhead{display:flex; justify-content:space-between; gap:14px; align-items:baseline; border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:16px}
+  .qhead .n{font-family:var(--mono); font-size:12px; color:var(--brand); font-weight:600; letter-spacing:.05em}
+  .qhead .pts{font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.08em; text-transform:uppercase; white-space:nowrap}
+  .qprompt{font-family:var(--cond); font-weight:600; font-size:1.28rem; line-height:1.34; margin:0 0 14px; max-width:60ch; letter-spacing:-.01em}
+  .hint{font-family:var(--mono); font-size:11.5px; color:var(--ink-3); margin:-6px 0 16px; line-height:1.5}
+
+  /* ── V/F ── */
+  .tf{border:1px solid var(--line); border-radius:8px; margin-bottom:12px; background:var(--surface); overflow:hidden}
+  .tf .stmt{padding:13px 15px 11px; display:flex; gap:12px; align-items:flex-start; border-bottom:1px solid var(--line); background:var(--surface-2)}
+  .tf .stmt em{font-family:var(--mono); font-style:normal; font-size:11.5px; color:var(--ink-3); padding-top:3px; flex:none}
+  .tf .stmt p{margin:0; font-size:1rem; line-height:1.42; font-weight:500}
+  .tf .body{padding:12px 15px}
+  .choices{display:flex; gap:8px; margin-bottom:10px}
+  .choices label{
+    font-family:var(--cond); font-weight:600; font-size:.88rem; padding:6px 18px; cursor:pointer;
+    border:1px solid var(--line-strong); background:var(--surface); border-radius:6px; user-select:none;
+  }
+  .choices input{position:absolute; opacity:0; width:0; height:0}
+  .choices label:has(input:checked){background:var(--brand); border-color:var(--brand); color:var(--onbrand)}
+  .choices label:has(input:focus-visible){outline:2px solid var(--brand); outline-offset:2px}
+  .tf textarea{min-height:52px; font-size:.95rem}
+
+  .qfoot{display:flex; gap:10px; align-items:center; margin-top:24px; padding-top:18px; border-top:1px solid var(--line); flex-wrap:wrap}
+  .qfoot .spacer{margin-left:auto}
+  .saved{font-family:var(--mono); font-size:11px; color:var(--teal); letter-spacing:.05em}
+
+  /* ── resultados ── */
+  .verdict{padding:18px 22px; margin-bottom:20px; border:1px solid; border-radius:8px; display:flex; gap:14px; align-items:center; flex-wrap:wrap}
+  .verdict.pass{background:var(--teal-soft); border-color:var(--teal)}
+  .verdict.fail{background:var(--warn-soft); border-color:var(--warn)}
+  .verdict b{font-family:var(--cond); font-size:1.35rem; letter-spacing:-.01em}
+  .verdict.pass b{color:var(--teal)} .verdict.fail b{color:var(--warn)}
+  .verdict span{color:var(--ink-2); font-size:.95rem; flex:1 1 240px; min-width:0}
+
+  .scorebar{display:grid; grid-template-columns:repeat(auto-fit,minmax(116px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:8px; overflow:hidden; margin:0 0 20px}
+  .scorebar div{background:var(--surface); padding:14px 16px}
+  .scorebar dt{font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); margin-bottom:6px}
+  .scorebar dd{margin:0; font-family:var(--cond); font-weight:700; font-size:1.75rem; line-height:1; font-variant-numeric:tabular-nums; color:var(--brand)}
+  .scorebar dd small{font-size:.9rem; font-weight:500; color:var(--ink-3)}
+
+  .fb{border:1px solid var(--line); border-radius:8px; background:var(--surface); margin-bottom:14px; overflow:hidden}
+  .fb > header{display:flex; justify-content:space-between; gap:12px; align-items:baseline; padding:12px 16px; background:var(--surface-2); border-bottom:1px solid var(--line)}
+  .fb > header .t{font-family:var(--cond); font-weight:600; font-size:1rem; line-height:1.28}
+  .fb > header .s{font-family:var(--mono); font-size:12.5px; font-weight:600; white-space:nowrap; font-variant-numeric:tabular-nums}
+  .fb .in{padding:15px 16px}
+  .fb h6{font-family:var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); margin:0 0 6px; font-weight:600}
+  .fb .yours{font-size:.95rem; color:var(--ink-2); border-left:2px solid var(--line-strong); padding-left:12px; margin:0 0 16px; white-space:pre-wrap}
+  .fb ul{margin:0 0 16px; padding-left:19px; font-size:.95rem}
+  .fb li{margin-bottom:5px}
+  .fb ul.hit li::marker{color:var(--teal)}
+  .fb ul.miss li::marker{color:var(--magenta)}
+  .fb .model{background:var(--brand-soft); border-radius:6px; padding:13px 15px; font-size:.95rem; margin:0; line-height:1.55}
+  .sc-full{color:var(--teal)} .sc-part{color:var(--warn)} .sc-none{color:var(--bad)}
+  .tfrow{display:flex; gap:11px; align-items:flex-start; font-size:.94rem; padding:9px 0; border-bottom:1px solid var(--line)}
+  .tfrow:last-child{border-bottom:none}
+  .tfrow em{font-style:normal; font-family:var(--mono); font-size:11px; flex:none; width:74px; padding-top:2px; font-weight:600}
+  .ok-i{color:var(--teal)} .bad-i{color:var(--bad)}
+
+  .banner{border:1px solid var(--line-strong); border-radius:6px; padding:12px 16px; margin-bottom:22px; font-size:.93rem; color:var(--ink-2); font-family:var(--cond); background:var(--surface)}
+  .banner b{color:var(--ink)}
+  footer{margin-top:32px; padding-top:16px; border-top:1px solid var(--line); font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.04em}
+  [hidden]{display:none!important}
+  .spin{display:inline-block; width:11px; height:11px; border:2px solid var(--line-strong); border-top-color:var(--brand); border-radius:50%; animation:sp .7s linear infinite; vertical-align:-1px; margin-right:8px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){ .spin{animation:none} }
+  @media (max-width:560px){ .card{padding:20px 18px} .wrap{padding:0 14px 60px} }
+  .wrap{ max-width:880px; margin:0 auto; padding:24px 22px 80px; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <div class="main-area">
+<div class="topbar">
+  <div class="in">
+    <div class="brand"><span class="mark">E</span>Evaluación de Marca UCAL <small>Usuarios · Evaluaciones</small></div>
+    <div class="timer" id="timer" hidden>--:--</div>
+  </div>
+  <div class="pbar"><i id="pbar"></i></div>
+</div>
+
+<div class="wrap">
+
+<!-- ═══ INICIO ═══ -->
+<section id="scr-start">
+  <div class="card">
+    <div class="eyebrow">Evaluación de inducción · 2026</div>
+    <h1>Evaluación de Marca UCAL</h1>
+    <p class="muted">Esta evaluación mide qué tan bien puedes explicar la propuesta de valor de UCAL a un postulante o a un padre de familia. Al terminar recibes tu nota y tu retroalimentación de inmediato, pregunta por pregunta.</p>
+
+    <dl class="meta">
+      <div><dt>Preguntas</dt><dd>8</dd></div>
+      <div><dt>Puntaje total</dt><dd>20 pts</dd></div>
+      <div><dt>Nota mínima</dt><dd>14 pts</dd></div>
+      <div><dt>Tiempo</dt><dd>40 min</dd></div>
+    </dl>
+
+    <div class="rules">
+      <ul>
+        <li>Puedes avanzar y retroceder entre preguntas. Tus respuestas se guardan solas en este navegador.</li>
+        <li>El cronómetro corre desde que presionas <strong>Empezar</strong>. Al llegar a cero se envía lo que tengas escrito.</li>
+        <li>Una vez que envías, no puedes modificar tus respuestas.</li>
+        <li>Responde con tus palabras. La idea es saber cómo se lo explicarías tú a un postulante, no copiar el material.</li>
+      </ul>
+    </div>
+
+    <label class="field"><span>Nombre y apellido</span><input type="text" id="f-name" autocomplete="name" placeholder="Ej. Ali Alvarado"></label>
+    <label class="field"><span>Correo</span><input type="email" id="f-mail" autocomplete="email" placeholder="nombre@ucal.edu.pe"></label>
+    <label class="field"><span>Fecha de ingreso a UCAL</span><input type="text" id="f-date" placeholder="Ej. 08/09/2026"></label>
+
+    <p id="resume-note" class="muted" hidden style="font-size:.93rem"></p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap">
+      <button class="btn" id="btn-start">Empezar evaluación</button>
+      <button class="btn ghost" id="btn-clear" hidden>Descartar avance guardado</button>
+    </div>
+  </div>
+  <footer>Academia Comercial UCAL · Evaluación de marca · Uso interno</footer>
+</section>
+
+<!-- ═══ EVALUACIÓN ═══ -->
+<section id="scr-quiz" hidden>
+  <div class="qnav" id="qnav"></div>
+  <div class="card">
+    <div class="qhead">
+      <span class="n" id="q-n"></span>
+      <span class="pts" id="q-pts"></span>
+    </div>
+    <p class="qprompt" id="q-prompt"></p>
+    <p class="hint" id="q-hint"></p>
+    <div id="q-body"></div>
+    <div class="qfoot">
+      <button class="btn ghost" id="btn-prev">Anterior</button>
+      <button class="btn ghost" id="btn-next">Siguiente</button>
+      <span class="spacer"></span>
+      <span class="saved" id="saved-note"></span>
+      <button class="btn" id="btn-finish">Finalizar</button>
+    </div>
+  </div>
+  <footer>Tus respuestas se guardan automáticamente en este navegador.</footer>
+</section>
+
+<!-- ═══ CALIFICANDO ═══ -->
+<section id="scr-grading" hidden>
+  <div class="card">
+    <div class="eyebrow">Calificando</div>
+    <h1 style="font-size:1.65rem">Revisando tus respuestas</h1>
+    <p class="muted" id="grading-msg"><span class="spin"></span>Aplicando la rúbrica de evaluación…</p>
+    <p class="muted" style="font-size:.92rem">Esto toma menos de un minuto. No cierres la ventana.</p>
+  </div>
+</section>
+
+<!-- ═══ RESULTADOS ═══ -->
+<section id="scr-result" hidden>
+  <div class="eyebrow" id="r-who"></div>
+  <h1 style="font-size:2rem; margin-bottom:18px">Resultado de tu evaluación</h1>
+  <div class="verdict" id="r-verdict"></div>
+  <dl class="scorebar" id="r-score"></dl>
+  <div class="banner" id="r-mode"></div>
+  <h3 style="font-size:1.25rem; margin:26px 0 14px; letter-spacing:-.01em">Retroalimentación pregunta por pregunta</h3>
+  <div id="r-feedback"></div>
+  <div class="qfoot" style="border-top:1px solid var(--line-strong)">
+    <button class="btn" id="btn-copy">Copiar resultado</button>
+    <button class="btn ghost" id="btn-dl" hidden>Descargar resultado</button>
+    <span class="spacer"></span>
+    <span class="saved" id="copy-note"></span>
+  </div>
+  <footer>Envía este resultado a la responsable de capacitación. Academia Comercial UCAL · 2026</footer>
+</section>
+
+</div>
+  </div><!-- /main-area -->
+</div><!-- /app-shell -->
+
+<script type="module">
+  // Dibuja el sidebar del CRM cuando esta página se abre suelta (fuera del
+  // embebido de dashboard.html, que ya trae su propio sidebar).
+  import { Sidebar } from './core/components.js';
+  if (!document.querySelector('.sidebar-nav')) {
+      new Sidebar({ active: 'usuario', activeSubitem: 'navUsuarioEvaluaciones' });
+  }
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   RÚBRICA — estructura y puntaje del primer examen de marca (20 puntos).
+   Editar solo este bloque para recalibrar.
+   ══════════════════════════════════════════════════════════════════════ */
+const EVAL = {
+  totalPoints: 20,
+  passPoints: 14,
+  timeLimitMin: 40,
+  questions: [
+    {
+      id:"q1", type:"open", points:2,
+      prompt:"¿Por qué en UCAL somos los mejores en empleabilidad? ¿Qué ofrecemos nosotros que los demás no?",
+      hint:"Se esperan diferenciadores concretos, no generalidades.",
+      keys:[
+        {c:"Prácticas y proyectos reales con empresas desde el primer ciclo", p:0.75, t:["primer ciclo","desde el inicio","casos reales","caso real","proyectos reales","proyecto real","empresas reales","empresa real","practicas reales","prácticas reales","retos reales","reto real"]},
+        {c:"Metodología Acciona UCAL y formación por competencias en lugar de memorización", p:0.5, t:["acciona","competencia","por competencias","no memoriz","memorizacion","memorización","saber hacer","conoce","desarrolla","comunica"]},
+        {c:"Respaldo internacional que valida la empleabilidad: aval QS en Negocios y Psicología, reconocimientos WURI", p:0.5, t:["qs","wuri","internacional","ranking","aval","respaldo","reconocimiento"]},
+        {c:"Vínculo con el entorno empresarial: red de empresas, docentes que ejercen, portafolio profesional al egresar", p:0.25, t:["red de empresas","contacto con empresas","conexion","conexión","docente","portafolio","networking","bolsa de trabajo","entorno","egresar","graduar"]}
+      ],
+      model:"UCAL es la mejor opción en empleabilidad porque el estudiante trabaja sobre problemas reales de empresas reales desde el primer ciclo, a través de la metodología Acciona UCAL. No formamos por memorización sino por competencias: conocimiento, habilidades y actitudes. Eso está validado afuera: somos la única universidad peruana con aval QS para las mallas de Negocios y Psicología, y la universidad peruana con más reconocimientos en el ranking WURI 2026. Además el estudiante egresa con un portafolio de proyectos reales y con contacto directo con el entorno empresarial. Lo que ofrecemos y otros no: experiencia profesional acumulada antes de graduarse."
+    },
+    {
+      id:"q2", type:"open", points:2,
+      prompt:"Gracias a su modelo académico, UCAL es la solución (puente) para las necesidades de dos usuarios: estudiantes y ……. Comenta quién es el último y sustenta.",
+      hint:"Nombra al segundo usuario y explica por qué UCAL resuelve su necesidad. La sola palabra no alcanza.",
+      keys:[
+        {c:"Identifica al segundo usuario: las organizaciones o empresas (el entorno socioeconómico)", p:0.75, t:["organizacion","organización","empresa","empresas","sector empresarial","entorno socioeconomico","entorno socioeconómico","mercado laboral","industria","empleador"]},
+        {c:"Explica la necesidad de la organización: talento preparado, soluciones a problemas reales, profesionales con criterio y experiencia", p:0.75, t:["talento","necesita","necesidad","solucion","solución","problema","criterio","experiencia","preparado","competencia","contratar","perfil","profesional"]},
+        {c:"Explica el puente: los retos reales de las organizaciones son el material de aprendizaje del estudiante, y ambos lados ganan", p:0.5, t:["puente","ambos","dos lados","gana","conecta","conexion","conexión","vincula","reto","caso real","proyecto","win"]}
+      ],
+      model:"El segundo usuario son las organizaciones, es decir el entorno socioeconómico. Las empresas necesitan profesionales que lleguen con criterio, experiencia y capacidad de resolver problemas, no solo con teoría. UCAL funciona como puente porque lleva los retos reales de esas organizaciones al aula: el estudiante aprende resolviendo un problema que la empresa efectivamente tiene. Así el estudiante gana experiencia profesional antes de egresar y la organización gana soluciones y acceso a talento ya formado en su realidad. Ese vínculo con el entorno es uno de los dos pilares del modelo educativo UCAL, junto con la creatividad."
+    },
+    {
+      id:"q3", type:"tf", points:3, perItem:0.5,
+      prompt:"Verdadero o falso. Marca V o F y justifica tu respuesta en una línea.",
+      hint:"0.5 puntos por cada afirmación correctamente marcada. La justificación se comenta pero no resta puntaje.",
+      items:[
+        {s:"UCAL prioriza la memorización en su sistema de evaluación.", a:"F", why:"Falso. UCAL forma por competencias: conocimiento, habilidades y actitudes. La evaluación mide la capacidad de actuar sobre la realidad, no de repetir información. La distinción del modelo es entre «saber la receta» y «saber cocinar»."},
+        {s:"Los estudiantes de UCAL resuelven casos reales desde el primer ciclo.", a:"V", why:"Verdadero. Es el eje de Acciona UCAL: el estudiante se conecta con retos reales de empresas desde el primer ciclo, no al final de la carrera."},
+        {s:"Las mallas curriculares de UCAL son rígidas y no se actualizan.", a:"F", why:"Falso. Las carreras fueron rediseñadas integrando inteligencia artificial, ecosistemas virtuales y competencias futuras, y el rediseño se validó con expertos de la industria. Ese trabajo nos dio el puesto 24 mundial en Curricular Innovation for Future Readiness: primeros en Perú y top 3 en Latinoamérica."},
+        {s:"En UCAL se llevan cursos de carrera a partir del tercer ciclo.", a:"F", why:"Falso. Los cursos de carrera se llevan desde el primer ciclo. Es uno de los argumentos más fuertes frente a universidades tradicionales, donde los primeros ciclos son de estudios generales."},
+        {s:"Nuestras mallas de Arquitectura cuentan con el respaldo de QS.", a:"F", why:"Falso. El aval QS (Industry Alignment Framework) corresponde a las mallas de Negocios y Psicología, y somos la única universidad peruana que lo tiene en esas áreas. Arquitectura no está incluida."},
+        {s:"UCAL busca una enseñanza únicamente teórica.", a:"F", why:"Falso. El modelo se aleja de la acumulación de teoría y se centra en la capacidad de actuar sobre la realidad. La teoría existe, pero es el punto de partida de un proyecto real, no el objetivo final."}
+      ]
+    },
+    {
+      id:"q4", type:"open", points:3,
+      prompt:"Describe tres elementos del entorno UCAL que ayudan a fomentar la creatividad y el pensamiento crítico en sus estudiantes.",
+      hint:"Se piden tres elementos, y cada uno debe explicarse en una línea. Enumerar palabras sueltas sin explicarlas no suma el puntaje completo.",
+      keys:[
+        {c:"Proyectos y retos reales de empresas como material de aprendizaje: el ancla a la realidad", p:1, t:["proyecto","caso real","reto","empresa","realidad","entorno socioeconomico","entorno socioeconómico","acciona","practica","práctica","empleabilidad"]},
+        {c:"El docente como facilitador o guía, y el estudiante como protagonista que experimenta y reflexiona sobre sus errores", p:1, t:["docente","facilitador","guia","guía","protagonista","error","reflexion","reflexión","acompaña","mentor","profesional en ejercicio","docente unico","docente único"]},
+        {c:"Infraestructura, laboratorios, talleres y tecnología aplicada (IA, ecosistemas virtuales, herramientas digitales)", p:1, t:["laboratorio","taller","infraestructura","tecnolog","inteligencia artificial","herramienta","estudio","equipos","software","campus","digital"]}
+      ],
+      model:"Tres elementos del entorno UCAL: (1) Los proyectos con empresas reales, que anclan el aprendizaje a problemas que todavía no tienen respuesta en internet y obligan al estudiante a proponer, no a repetir. (2) El rol del docente como facilitador y no como autoridad que dicta: el estudiante es el protagonista, experimenta, recibe feedback y reflexiona sobre sus propios errores. (3) La infraestructura y la tecnología —laboratorios, talleres, herramientas digitales, inteligencia artificial y ecosistemas virtuales integrados a la experiencia académica— que le permiten producir y probar ideas, no solo estudiarlas. A esto se suma que en UCAL conviven carreras creativas y de negocio, lo que expone al estudiante a miradas distintas sobre un mismo problema."
+    },
+    {
+      id:"q5", type:"open", points:4,
+      prompt:"Simula una breve explicación (máximo 6 líneas) que le darías a un postulante indeciso sobre por qué elegir UCAL frente a otras universidades tradicionales. Incluye 2 elementos diferenciadores clave.",
+      hint:"Es un speech de venta: debe sonar como se lo dirías al postulante e incluir al menos dos diferenciadores concretos.",
+      keys:[
+        {c:"Primer diferenciador concreto y correcto (práctica desde el primer ciclo, Acciona UCAL, cursos de carrera desde el inicio)", p:1.25, t:["primer ciclo","desde el inicio","acciona","caso real","proyecto real","empresa real","practica","práctica","curso de carrera"]},
+        {c:"Segundo diferenciador concreto y correcto (aval QS, reconocimientos WURI, mallas rediseñadas, docentes que ejercen)", p:1.25, t:["qs","wuri","ranking","internacional","reconocimiento","malla","rediseñ","docente","harvard","oxford","mit"]},
+        {c:"Contraste explícito con la universidad tradicional", p:0.75, t:["tradicional","otras universidades","a diferencia","mientras que","en cambio","teoria","teoría","memoriz","estudios generales","otra universidad"]},
+        {c:"Tono de asesor: se dirige al postulante y conecta con lo que a él le importa (su futuro, su empleabilidad)", p:0.75, t:[" tu "," tú "," te "," tus ","futuro","vas a","podras","podrás","imagina","quieres","piensa","contigo","tienes"]}
+      ],
+      model:"«Te cuento la diferencia en concreto. En una universidad tradicional los primeros ciclos son estudios generales y la práctica llega al final; en UCAL llevas cursos de tu carrera desde el primer ciclo y trabajas sobre proyectos reales de empresas reales con la metodología Acciona UCAL. Eso significa que cuando egreses no llegas con teoría: llegas con un portafolio y con experiencia. Y no es solo nuestra palabra: somos la única universidad peruana con aval QS en las mallas de Negocios y Psicología, y la universidad peruana con más reconocimientos en el ranking mundial de innovación WURI 2026. Si lo que te preocupa es salir y encontrar trabajo, esa es exactamente la diferencia que vas a sentir.»"
+    },
+    {
+      id:"q6", type:"open", points:1,
+      prompt:"¿Cómo explicarías el reconocimiento WURI a un padre de familia?",
+      hint:"Debe entenderlo alguien que nunca escuchó la sigla. Explica qué es y por qué le conviene a su hijo.",
+      keys:[
+        {c:"Explica qué es WURI en lenguaje simple: ranking mundial que mide innovación educativa, no reputación ni investigación", p:0.5, t:["ranking","mundial","internacional","innovacion","innovación","world university","mide","evalua","evalúa","reconoce"]},
+        {c:"Da un dato de respaldo y aterriza el beneficio para el hijo (única peruana, más reconocimientos del Perú 2026, siete categorías, junto a Harvard u Oxford)", p:0.5, t:["unica","única","peruana","siete","7 ","harvard","oxford","mit","primera","top","latinoamerica","latinoamérica","hijo","preparado","futuro","trabajo","empleabilidad"]}
+      ],
+      model:"«WURI es un ranking mundial que no premia a la universidad más antigua ni a la que más publica, sino a la que mejor está innovando en la forma de enseñar y de preparar a sus estudiantes para el trabajo real. UCAL fue la primera universidad peruana en entrar, y este 2026 es la universidad peruana con más reconocimientos: siete categorías dentro del top 100 mundial, junto a universidades como Harvard y Oxford. Para su hijo eso significa que va a estudiar en una universidad cuyo modelo ya fue evaluado y reconocido afuera por preparar profesionales para lo que el mercado pide hoy.»"
+    },
+    {
+      id:"q7", type:"open", points:1,
+      prompt:"¿Cómo explicarías el reconocimiento QS a un padre de familia?",
+      hint:"Explica qué mide QS y en qué carreras lo tenemos. Confundir QS con WURI cuesta el puntaje.",
+      keys:[
+        {c:"Explica qué es QS: organización internacional que evalúa la calidad de la educación superior y mide qué tan alineada está la formación con lo que exige el mercado laboral", p:0.5, t:["qs","internacional","calidad","mercado laboral","alineada","alineado","evalua","evalúa","mide","empleabilidad","competencia","industry","estandar","estándar"]},
+        {c:"Precisa el alcance y el beneficio: únicas mallas de Negocios y Psicología en el Perú con aval QS, lo que confirma que forma profesionales para el mundo real", p:0.5, t:["negocio","psicologia","psicología","unica","única","unicas","únicas","peru","perú","malla","aval","respaldo","hijo","mundo real","trabajo"]}
+      ],
+      model:"«QS es una organización internacional que evalúa la calidad de la educación superior y, sobre todo, mide qué tan alineada está la formación de una universidad con las competencias que hoy pide el mercado laboral. UCAL tiene el aval QS a través de su Industry Alignment Framework, y somos la única universidad peruana cuyas mallas de Negocios y Psicología cuentan con ese respaldo. Para su hijo significa que el plan de estudios que va a llevar fue revisado con estándares internacionales y está alineado con lo que las empresas están buscando cuando contratan.»"
+    },
+    {
+      id:"q8", type:"open", points:4,
+      prompt:"Explica cuáles son los beneficios del programa ACCIONA UCAL.",
+      hint:"Acciona UCAL es la metodología del modelo educativo. Menciona sus fases y qué gana el estudiante.",
+      keys:[
+        {c:"Reconoce que Acciona UCAL es la metodología del modelo educativo y describe su ciclo: Conoce, Desarrolla, Comunica", p:1.25, t:["conoce","desarrolla","comunica","fase","ciclo","metodolog","tres etapas","3 etapas","modelo educativo"]},
+        {c:"Beneficio: experiencia profesional real antes de egresar, resolviendo retos de empresas desde el primer ciclo", p:1.25, t:["experiencia","antes de egresar","antes de graduar","primer ciclo","empresa","reto","caso real","proyecto real","practica","práctica","real"]},
+        {c:"Beneficio: desarrolla criterio, competencias y capacidad de sustentar sus propuestas, en lugar de rendir exámenes tradicionales", p:0.75, t:["criterio","competencia","defiende","defensa","sustenta","presenta","capacidad de respuesta","adapta","examen","feedback","habilidad","actitud","pensamiento critico","pensamiento crítico","argumenta"]},
+        {c:"Resultado: portafolio de proyectos y conexión directa con el entorno empresarial", p:0.75, t:["portafolio","conexion","conexión","red","contacto","entorno","empleabilidad","networking","empleador","bolsa"]}
+      ],
+      model:"Acciona UCAL es la metodología con la que aprende el estudiante y tiene tres fases: Conoce, donde se familiariza con la teoría y con el desafío; Desarrolla, donde experimenta, ajusta y recibe feedback; y Comunica, donde presenta y defiende su propuesta frente al entorno. Los beneficios: el estudiante acumula experiencia profesional real desde el primer ciclo resolviendo retos de empresas, en lugar de rendir exámenes tradicionales; desarrolla criterio y capacidad de respuesta frente a problemas que no tienen una respuesta hecha; aprende a sustentar y defender su trabajo, que es exactamente lo que se le va a pedir en una empresa; y egresa con un portafolio de proyectos reales y con conexión directa con el entorno empresarial."
+    }
+  ]
+};
+
+/* ══════════════════════════════════════════════════════════════════════ */
+const KEY = "ucal_eval_marca_v2";
+const $ = id => document.getElementById(id);
+let S = { name:"", mail:"", date:"", startedAt:null, expiresAt:null, answers:{}, idx:0, submitted:false, result:null };
+let tick = null, saveTimer = null;
+
+// ── Integración con RUMBO GAC (sesión, código de evaluación, API) ──
+const API_URL = "/api";
+const CODIGO_EVAL = new URLSearchParams(window.location.search).get("codigo") || "marca_ucal_1";
+
+function getSesion(){
+  try{ return JSON.parse(sessionStorage.getItem("bl_user")); }catch(e){ return null; }
+}
+
+async function callAPI(action, data = {}){
+  const sesion = getSesion();
+  const payload = { action, sessionToken: sesion ? (sesion.token || "") : "", ...data };
+  try{
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(payload)
+    });
+    return JSON.parse(await response.text());
+  }catch(error){
+    return { success: false, error: error.message };
+  }
+}
+
+function load(){ try{ const r = localStorage.getItem(KEY); if(r) return JSON.parse(r); }catch(e){} return null; }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function clearSaved(){ try{ localStorage.removeItem(KEY); }catch(e){} }
+function norm(s){ return (" "+String(s||"")+" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," "); }
+function words(s){ return norm(s).trim().split(" ").filter(Boolean).length; }
+function showScreen(w){ ["scr-start","scr-quiz","scr-grading","scr-result"].forEach(id=>{ $(id).hidden = (id!==w); }); window.scrollTo({top:0}); }
+
+function bloquearPorRol(mensaje){
+  $("scr-start").innerHTML = `
+    <div class="card">
+      <div class="eyebrow">Acceso restringido</div>
+      <h1 style="font-size:1.7rem">No puedes resolver esta evaluación</h1>
+      <p class="muted">${mensaje}</p>
+      <button type="button" class="btn" onclick="window.location.href='evaluaciones.html'">Volver a Evaluaciones</button>
+    </div>`;
+}
+
+(function initStart(){
+  const prev = load();
+  if(prev && prev.name && !prev.submitted && prev.expiresAt && Date.now() < prev.expiresAt){
+    $("f-name").value = prev.name; $("f-mail").value = prev.mail||""; $("f-date").value = prev.date||"";
+    const mins = Math.max(0, Math.round((prev.expiresAt - Date.now())/60000));
+    $("resume-note").hidden = false;
+    $("resume-note").textContent = "Tienes una evaluación en curso a nombre de " + prev.name + ", con " + mins + " minuto(s) restantes. Al presionar Empezar continúas donde la dejaste.";
+    $("btn-clear").hidden = false;
+  } else if (prev && prev.submitted && prev.result){
+    $("f-name").value = prev.name;
+    $("resume-note").hidden = false;
+    $("resume-note").textContent = "Ya rendiste esta evaluación. Presiona Empezar para volver a ver tu resultado.";
+    $("btn-clear").hidden = false;
+  }
+})();
+
+// ── Verificación con el servidor: rol permitido y si ya existe un intento
+// guardado (la fuente de verdad para "ya resuelto" es el backend, no el
+// localStorage — este último solo sirve para no perder el avance a medio
+// llenar si se recarga la página). ──
+(async function verificarConServidor(){
+  const sesion = getSesion();
+  if (!sesion){
+    window.location.href = "index.html";
+    return;
+  }
+
+  if (sesion.rol !== "ASESOR"){
+    bloquearPorRol("Esta evaluación se resuelve solo desde el perfil Asesor. Para ver los resultados del equipo, ve a Usuarios → Resultados.");
+    return;
+  }
+
+  // Precarga nombre/correo desde la sesión; el asesor ya no los escribe a mano.
+  if ($("f-name")) { $("f-name").value = sesion.nombre || ""; $("f-name").readOnly = true; }
+  if ($("f-mail") && sesion.email) { $("f-mail").value = sesion.email; $("f-mail").readOnly = true; }
+
+  const estado = await callAPI("getEstadoEvaluacion", { codigo: CODIGO_EVAL });
+  if (!estado.success){
+    $("resume-note").hidden = false;
+    $("resume-note").textContent = "No se pudo confirmar el estado con el servidor: " + (estado.error || "intenta de nuevo.");
+    return;
+  }
+
+  if (estado.intento && estado.intento.detalle){
+    // Ya la resolvió: se muestra directo el resultado guardado en el
+    // servidor (mismo shape que genera finalize(), así que renderResult
+    // lo puede pintar sin cambios).
+    S.name = sesion.nombre || "";
+    S.mail = sesion.email || "";
+    renderResult(estado.intento.detalle);
+    showScreen("scr-result");
+  }
+})();
+
+$("btn-clear").onclick = () => { clearSaved(); location.reload(); };
+
+
+$("btn-start").onclick = () => {
+  const prev = load();
+  if(prev && prev.submitted && prev.result){ S = prev; renderResult(S.result); showScreen("scr-result"); return; }
+  const name = $("f-name").value.trim();
+  if(!name){ $("f-name").focus(); $("f-name").style.borderColor = "var(--bad)"; return; }
+  if(prev && prev.name && !prev.submitted && prev.expiresAt && Date.now() < prev.expiresAt){
+    S = prev; S.name = name; S.mail = $("f-mail").value.trim(); S.date = $("f-date").value.trim();
+  } else {
+    S = { name, mail:$("f-mail").value.trim(), date:$("f-date").value.trim(),
+          startedAt: Date.now(), expiresAt: Date.now() + EVAL.timeLimitMin*60000,
+          answers:{}, idx:0, submitted:false, result:null };
+  }
+  save(); showScreen("scr-quiz"); $("timer").hidden=false; renderNav(); renderQuestion(); runTimer();
+};
+
+function isAnswered(q){
+  const a = S.answers[q.id]; if(!a) return false;
+  if(q.type==="tf") return q.items.every((_,i)=> a["c"+i]);
+  return String(a.text||"").trim().length > 15;
+}
+
+function renderNav(){
+  const nav = $("qnav"); nav.innerHTML = "";
+  EVAL.questions.forEach((q,i)=>{
+    const b = document.createElement("button");
+    b.type="button"; b.textContent = String(i+1);
+    b.className = (i===S.idx ? "here" : (isAnswered(q) ? "done" : ""));
+    b.setAttribute("aria-label","Ir a la pregunta "+(i+1));
+    b.onclick = ()=>{ S.idx=i; save(); renderNav(); renderQuestion(); };
+    nav.appendChild(b);
+  });
+  $("pbar").style.width = Math.round(EVAL.questions.filter(isAnswered).length/EVAL.questions.length*100)+"%";
+}
+
+function flagSaved(){ $("saved-note").textContent="Guardado"; clearTimeout(saveTimer); saveTimer=setTimeout(()=>{$("saved-note").textContent="";},1600); }
+
+function renderQuestion(){
+  const q = EVAL.questions[S.idx];
+  $("q-n").textContent = "Pregunta " + (S.idx+1) + " de " + EVAL.questions.length;
+  $("q-pts").textContent = q.points + (q.points===1?" punto":" puntos");
+  $("q-prompt").textContent = q.prompt;
+  $("q-hint").textContent = q.hint || "";
+  const body = $("q-body"); body.innerHTML = "";
+  if(!S.answers[q.id]) S.answers[q.id] = {};
+  const a = S.answers[q.id];
+
+  if(q.type === "tf"){
+    q.items.forEach((it,i)=>{
+      const wrap=document.createElement("div"); wrap.className="tf";
+      const st=document.createElement("div"); st.className="stmt";
+      const em=document.createElement("em"); em.textContent=(i+1)+".";
+      const p=document.createElement("p"); p.textContent=it.s;
+      st.append(em,p); wrap.appendChild(st);
+      const bd=document.createElement("div"); bd.className="body";
+      const ch=document.createElement("div"); ch.className="choices";
+      ["V","F"].forEach(v=>{
+        const lb=document.createElement("label");
+        const rd=document.createElement("input");
+        rd.type="radio"; rd.name=q.id+"_"+i; rd.value=v; rd.checked=(a["c"+i]===v);
+        rd.onchange=()=>{ a["c"+i]=v; save(); renderNav(); flagSaved(); };
+        lb.append(rd, document.createTextNode(v==="V"?"Verdadero":"Falso"));
+        ch.appendChild(lb);
+      });
+      const ta=document.createElement("textarea");
+      ta.placeholder="Justifica en una línea…"; ta.value=a["j"+i]||"";
+      ta.setAttribute("aria-label","Justificación de la afirmación "+(i+1));
+      ta.oninput=()=>{ a["j"+i]=ta.value; save(); flagSaved(); };
+      bd.append(ch,ta); wrap.appendChild(bd); body.appendChild(wrap);
+    });
+  } else {
+    const ta=document.createElement("textarea");
+    ta.placeholder="Escribe tu respuesta…"; ta.value=a.text||"";
+    ta.setAttribute("aria-label","Respuesta a la pregunta "+(S.idx+1));
+    const wc=document.createElement("p"); wc.className="hint"; wc.style.margin="8px 0 0";
+    wc.textContent = words(ta.value)+" palabras";
+    ta.oninput=()=>{ a.text=ta.value; save(); renderNav(); flagSaved(); wc.textContent=words(ta.value)+" palabras"; };
+    body.append(ta,wc);
+    setTimeout(()=>ta.focus(),30);
+  }
+  $("btn-prev").disabled = (S.idx===0);
+  $("btn-next").disabled = (S.idx===EVAL.questions.length-1);
+}
+
+$("btn-prev").onclick=()=>{ if(S.idx>0){ S.idx--; save(); renderNav(); renderQuestion(); window.scrollTo({top:0,behavior:"smooth"}); } };
+$("btn-next").onclick=()=>{ if(S.idx<EVAL.questions.length-1){ S.idx++; save(); renderNav(); renderQuestion(); window.scrollTo({top:0,behavior:"smooth"}); } };
+
+$("btn-finish").onclick=()=>{
+  const pend = EVAL.questions.filter(q=>!isAnswered(q)).length;
+  const msg = pend
+    ? "Tienes " + pend + " pregunta(s) sin responder o con respuestas muy cortas. Si envías ahora, se califican como están.\n\n¿Enviar de todas formas?"
+    : "Vas a enviar tu evaluación. Después de esto no podrás modificar tus respuestas.\n\n¿Enviar?";
+  if(window.confirm(msg)) submit(false);
+};
+
+function runTimer(){
+  clearInterval(tick);
+  const paint=()=>{
+    const left = Math.max(0, S.expiresAt - Date.now());
+    const m=Math.floor(left/60000), s=Math.floor((left%60000)/1000);
+    const el=$("timer");
+    el.textContent = String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+    el.className = "timer" + (left<=60000 ? " crit" : (left<=300000 ? " low" : ""));
+    if(left<=0){ clearInterval(tick); submit(true); }
+  };
+  paint(); tick=setInterval(paint,1000);
+}
+
+/* ── calificación ── */
+async function submit(byTimeout){
+  clearInterval(tick); $("timer").hidden=true;
+  S.submitted=true; S.finishedAt=Date.now(); S.byTimeout=!!byTimeout; save();
+  showScreen("scr-grading");
+  let result = gradeLocal();
+  try{
+    $("grading-msg").innerHTML = '<span class="spin"></span>Revisando tus respuestas abiertas contra la rúbrica…';
+    const ai = await gradeWithClaude();
+    if(ai) result = mergeAI(result, ai);
+  }catch(e){}
+  S.result=result; save();
+
+  // Se guarda en el servidor: es la fuente de verdad que ven Supervisor y
+  // Admisión en "Resultados", y lo que bloquea un segundo intento.
+  try{
+    const guardado = await callAPI("guardarIntentoEvaluacion", {
+      codigo: CODIGO_EVAL,
+      puntajeObtenido: result.earned,
+      puntajeMaximo: result.total,
+      respuestas: S.answers,
+      detalle: result,
+      iniciadoEn: new Date(S.startedAt).toISOString(),
+      finalizadoEn: new Date(S.finishedAt).toISOString(),
+      duracionSegundos: result.seconds,
+      porTiempo: !!result.byTimeout,
+    });
+    if (!guardado.success){
+      console.error("No se pudo guardar el resultado en el servidor:", guardado.error);
+    }
+  }catch(e){
+    console.error("No se pudo guardar el resultado en el servidor:", e);
+  }
+
+  renderResult(result); showScreen("scr-result");
+}
+
+function gradeLocal(){
+  const per=[];
+  EVAL.questions.forEach(q=>{
+    const a = S.answers[q.id] || {};
+    if(q.type==="tf"){
+      const items = q.items.map((it,i)=>({
+        stmt:it.s, expected:it.a, given:a["c"+i]||"—",
+        ok:a["c"+i]===it.a, justification:(a["j"+i]||"").trim(), why:it.why
+      }));
+      per.push({ id:q.id, type:"tf", points:q.points, earned: items.filter(x=>x.ok).length*q.perItem, items, source:"local" });
+    } else {
+      const txt=a.text||"", n=norm(txt), tooShort = words(txt)<8;
+      const hit=[], miss=[]; let pts=0;
+      q.keys.forEach(k=>{
+        const found = !tooShort && k.t.some(t=> n.indexOf(norm(t).replace(/^ | $/g,"")) !== -1);
+        if(found){ pts+=k.p; hit.push(k.c); } else miss.push(k.c);
+      });
+      pts = Math.min(q.points, Math.round(pts*4)/4);
+      per.push({ id:q.id, type:"open", points:q.points, earned:pts, answer:txt, hit, miss, source:"local" });
+    }
+  });
+  return finalize(per,"local");
+}
+
+function finalize(per, mode){
+  const earned = Math.round(per.reduce((s,x)=>s+x.earned,0)*4)/4;
+  const tf = per.find(x=>x.type==="tf");
+  return {
+    per, mode, earned, total:EVAL.totalPoints,
+    pct: Math.round(earned/EVAL.totalPoints*1000)/10,
+    passed: earned >= EVAL.passPoints,
+    tfRight: tf ? tf.items.filter(i=>i.ok).length : 0,
+    tfTotal: tf ? tf.items.length : 0,
+    seconds: Math.round(((S.finishedAt||Date.now()) - S.startedAt)/1000),
+    name:S.name, mail:S.mail, date:S.date, byTimeout:S.byTimeout
+  };
+}
+
+async function gradeWithClaude(){
+  const open = EVAL.questions.filter(q=>q.type==="open");
+  const parts = open.map(q=>{
+    const a = (S.answers[q.id]||{}).text || "(sin respuesta)";
+    const rub = q.keys.map(k=>"    - ["+k.p+" pts] "+k.c).join("\n");
+    return "PREGUNTA "+q.id+" (máximo "+q.points+" puntos)\n  Enunciado: "+q.prompt
+      +"\n  Criterios de la rúbrica:\n"+rub
+      +"\n  Respuesta del evaluado:\n  \"\"\"\n"+String(a).slice(0,1800)+"\n  \"\"\"";
+  }).join("\n\n");
+
+  const prompt =
+"Eres el corrector de la evaluación de inducción de marca para asesores comerciales de UCAL (Universidad de Ciencias y Artes de América Latina, Perú). "
++"Califica cada respuesta abierta aplicando ESTRICTAMENTE los criterios de la rúbrica. Reglas:\n"
++"- Otorga los puntos de un criterio solo si la respuesta lo evidencia realmente. No otorgues puntos por lo que el evaluado 'probablemente' quiso decir.\n"
++"- Se admite crédito parcial en cuartos de punto (0, 0.25, 0.5, 0.75, 1...).\n"
++"- Una respuesta vaga, genérica, o que solo enumera palabras sueltas sin explicarlas, recibe crédito parcial bajo.\n"
++"- Confundir QS con WURI, o atribuir el aval QS a carreras distintas de Negocios y Psicología, es un error de contenido y no recibe los puntos del criterio.\n"
++"- Errores de ortografía o de tildes NO restan puntos. Se evalúa el contenido comercial.\n"
++"- Escribe en español peruano neutro, dirigiéndote al evaluado de tú, en tono de capacitador: directo, concreto y útil.\n\n"
++"EVALUACIÓN:\n\n"+parts+"\n\n"
++"Responde ÚNICAMENTE con un arreglo JSON, un objeto por pregunta, con esta forma exacta:\n"
++'[{"id":"q1","earned":1.25,"hit":["lo que sí cubrió, en una frase"],"miss":["lo que faltó, en una frase"],"advice":"Dos o tres frases diciéndole qué debió responder para obtener el puntaje completo."}]\n'
++"El campo earned nunca puede superar el máximo de la pregunta.";
+
+  try{
+    const resp = await callAPI("calificarConIA", { codigo: CODIGO_EVAL, prompt });
+    if(!resp.success){ console.warn("Calificación IA no disponible:", resp.error); return null; }
+    return Array.isArray(resp.data) ? resp.data : null;
+  }catch(e){ return null; }
+}
+
+function mergeAI(local, ai){
+  const byId={}; ai.forEach(r=>{ if(r&&r.id) byId[String(r.id)]=r; });
+  const per = local.per.map(item=>{
+    if(item.type!=="open") return item;
+    const r = byId[item.id];
+    if(!r || typeof r.earned!=="number" || isNaN(r.earned)) return item;
+    const q = EVAL.questions.find(x=>x.id===item.id);
+    const earned = Math.max(0, Math.min(q.points, Math.round(Number(r.earned)*4)/4));
+    return { ...item, earned, source:"ai",
+      hit: Array.isArray(r.hit)&&r.hit.length ? r.hit.map(String) : item.hit,
+      miss: Array.isArray(r.miss)&&r.miss.length ? r.miss.map(String) : item.miss,
+      advice: typeof r.advice==="string" ? r.advice : "" };
+  });
+  return finalize(per,"ai");
+}
+
+/* ── resultados ── */
+function fmtTime(sec){ const m=Math.floor(sec/60), s=sec%60; return m+" min "+String(s).padStart(2,"0")+" s"; }
+function scoreClass(e,p){ return e>=p ? "sc-full" : (e>0 ? "sc-part" : "sc-none"); }
+
+function renderResult(r){
+  $("r-who").textContent = (r.name||"—") + (r.mail ? " · "+r.mail : "") + " · " + new Date().toLocaleDateString("es-PE");
+
+  const v=$("r-verdict"); v.className="verdict "+(r.passed?"pass":"fail"); v.innerHTML="";
+  const b=document.createElement("b"); b.textContent = r.passed ? "Aprobado" : "No aprobado";
+  const sp=document.createElement("span");
+  sp.textContent = r.passed
+    ? "Superaste el mínimo de "+EVAL.passPoints+" puntos. Revisa igual la retroalimentación: hay puntos que puedes afinar antes de tu primera llamada."
+    : "El mínimo para aprobar es "+EVAL.passPoints+" de "+EVAL.totalPoints+" puntos. Revisa la retroalimentación y coordina el refuerzo con la responsable de capacitación.";
+  v.append(b,sp);
+  if(r.byTimeout){ const t=document.createElement("span"); t.style.flex="1 1 100%"; t.textContent="Se envió automáticamente al agotarse el tiempo."; v.append(t); }
+
+  const sb=$("r-score"); sb.innerHTML="";
+  [["Puntaje", r.earned+"<small> / "+r.total+"</small>"],
+   ["Porcentaje", r.pct+"<small>%</small>"],
+   ["V/F correctas", r.tfRight+"<small> / "+r.tfTotal+"</small>"],
+   ["Tiempo usado", "<span style='font-size:1.05rem'>"+fmtTime(r.seconds)+"</span>"]
+  ].forEach(([k,val])=>{
+    const d=document.createElement("div");
+    const dt=document.createElement("dt"); dt.textContent=k;
+    const dd=document.createElement("dd"); dd.innerHTML=val;
+    d.append(dt,dd); sb.appendChild(d);
+  });
+
+  $("r-mode").innerHTML = r.mode==="ai"
+    ? "<b>Calificación asistida por IA.</b> Las preguntas abiertas fueron evaluadas contra la rúbrica de la evaluación. El puntaje queda sujeto a revisión de la responsable de capacitación."
+    : "<b>Calificación automática preliminar.</b> Las preguntas abiertas se midieron contra los conceptos que exige la rúbrica. El puntaje final lo confirma la responsable de capacitación.";
+
+  const fb=$("r-feedback"); fb.innerHTML="";
+  EVAL.questions.forEach((q,i)=>{
+    const res = r.per.find(x=>x.id===q.id);
+    const card=document.createElement("div"); card.className="fb";
+    const hd=document.createElement("header");
+    const t=document.createElement("span"); t.className="t"; t.textContent=(i+1)+". "+q.prompt;
+    const s=document.createElement("span"); s.className="s "+scoreClass(res.earned,q.points);
+    s.textContent = res.earned+" / "+q.points;
+    hd.append(t,s); card.appendChild(hd);
+    const inn=document.createElement("div"); inn.className="in";
+
+    if(q.type==="tf"){
+      res.items.forEach(it=>{
+        const row=document.createElement("div"); row.className="tfrow";
+        const em=document.createElement("em"); em.className = it.ok ? "ok-i" : "bad-i";
+        em.textContent = it.ok ? "✓ "+it.given : "✗ "+it.given+" → "+it.expected;
+        const box=document.createElement("div");
+        const p1=document.createElement("p"); p1.style.margin="0 0 4px"; p1.style.fontWeight="500"; p1.textContent=it.stmt;
+        const p2=document.createElement("p"); p2.style.margin="0"; p2.style.color="var(--ink-2)"; p2.style.fontSize=".92rem"; p2.textContent=it.why;
+        box.append(p1,p2); row.append(em,box); inn.appendChild(row);
+      });
+    } else {
+      const h1=document.createElement("h6"); h1.textContent="Tu respuesta";
+      const yr=document.createElement("p"); yr.className="yours";
+      yr.textContent = (res.answer||"").trim() || "(no respondiste esta pregunta)";
+      inn.append(h1,yr);
+      if(res.hit && res.hit.length){
+        const h=document.createElement("h6"); h.textContent="Lo que cubriste bien";
+        const ul=document.createElement("ul"); ul.className="hit";
+        res.hit.forEach(x=>{ const li=document.createElement("li"); li.textContent=x; ul.appendChild(li); });
+        inn.append(h,ul);
+      }
+      if(res.miss && res.miss.length){
+        const h=document.createElement("h6"); h.textContent="Lo que faltó";
+        const ul=document.createElement("ul"); ul.className="miss";
+        res.miss.forEach(x=>{ const li=document.createElement("li"); li.textContent=x; ul.appendChild(li); });
+        inn.append(h,ul);
+      }
+      if(res.advice){
+        const h=document.createElement("h6"); h.textContent="Cómo mejorar";
+        const p=document.createElement("p"); p.style.fontSize=".95rem"; p.style.margin="0 0 16px"; p.textContent=res.advice;
+        inn.append(h,p);
+      }
+      const h2=document.createElement("h6"); h2.textContent="Respuesta modelo";
+      const md=document.createElement("div"); md.className="model"; md.textContent=q.model;
+      inn.append(h2,md);
+    }
+    card.appendChild(inn); fb.appendChild(card);
+  });
+}
+
+function resultText(){
+  const r=S.result; if(!r) return "";
+  const L=[];
+  L.push("EVALUACIÓN DE MARCA UCAL 2026 — RESULTADO");
+  L.push("Evaluado: "+(r.name||"—"));
+  if(r.mail) L.push("Correo: "+r.mail);
+  if(r.date) L.push("Fecha de ingreso: "+r.date);
+  L.push("Fecha de rendición: "+new Date().toLocaleString("es-PE"));
+  L.push("Tiempo utilizado: "+fmtTime(r.seconds)+(r.byTimeout?" (envío automático por tiempo)":""));
+  L.push("Puntaje: "+r.earned+" / "+r.total+"  ("+r.pct+"%)");
+  L.push("Estado: "+(r.passed?"APROBADO":"NO APROBADO")+"   ·   Mínimo: "+EVAL.passPoints);
+  L.push("Modo de calificación: "+(r.mode==="ai"?"asistida por IA sobre la rúbrica":"automática preliminar sobre la rúbrica"));
+  L.push("");
+  EVAL.questions.forEach((q,i)=>{
+    const res=r.per.find(x=>x.id===q.id);
+    L.push("──────────────────────────────────────────");
+    L.push((i+1)+". "+q.prompt);
+    L.push("Puntaje: "+res.earned+" / "+q.points);
+    if(q.type==="tf"){
+      res.items.forEach((it,j)=>{
+        L.push("   "+(j+1)+") "+(it.ok?"CORRECTO":"INCORRECTO")+"  respondió "+it.given+", correcta "+it.expected);
+        L.push("      "+it.stmt);
+        if(it.justification) L.push("      Justificó: "+it.justification);
+      });
+    } else {
+      L.push("Respuesta: "+((res.answer||"").trim()||"(sin respuesta)"));
+      if(res.hit && res.hit.length) L.push("Cubrió: "+res.hit.join(" | "));
+      if(res.miss && res.miss.length) L.push("Faltó: "+res.miss.join(" | "));
+      if(res.advice) L.push("Cómo mejorar: "+res.advice);
+    }
+    L.push("");
+  });
+  return L.join("\n");
+}
+
+$("btn-copy").onclick = async ()=>{
+  try{ await navigator.clipboard.writeText(resultText()); $("copy-note").textContent="Resultado copiado. Pégalo en un correo o en WhatsApp."; }
+  catch(e){ $("copy-note").textContent="No se pudo copiar automáticamente. Usa el botón de descarga."; }
+  setTimeout(()=>{ $("copy-note").textContent=""; },5000);
+};
+
+(function(){
+  const btn=$("btn-dl"); btn.hidden=false;
+  btn.onclick = ()=>{
+    try{
+      const nm=(S.name||"evaluado").replace(/[^\w\s-]/g,"").trim().replace(/\s+/g,"_");
+      const blob = new Blob([resultText()], { type:"text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "Evaluacion_Marca_UCAL_"+nm+".txt";
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      $("copy-note").textContent="Archivo generado.";
+    }catch(e){ $("copy-note").textContent="No se pudo generar el archivo."; }
+    setTimeout(()=>{ $("copy-note").textContent=""; },5000);
+  };
+})();
+</script>
+</body>
+</html>
