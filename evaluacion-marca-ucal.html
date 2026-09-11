@@ -32,7 +32,7 @@
     --onbrand:#FFFFFF;
     --sans:'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     --cond:'Hanken Grotesk', var(--sans);
-    --mono: ui-monospace, Menlo, Consolas, monospace;
+    --mono: var(--sans);
   }
   *{box-sizing:border-box}
   body{background:var(--ground); color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.58; -webkit-font-smoothing:antialiased}
@@ -42,15 +42,9 @@
   /* ── topbar ── */
   .topbar{position:sticky; top:0; z-index:20; background:var(--ground); border-bottom:1px solid var(--line)}
   .topbar .in{max-width:880px; margin:0 auto; padding:11px 22px; display:flex; align-items:center; gap:14px; flex-wrap:wrap}
-  .brand{font-family:var(--cond); font-weight:700; font-size:1rem; letter-spacing:-.01em; margin-right:auto; display:flex; align-items:center; gap:10px}
-  .mark{width:22px; height:22px; flex:none; border-radius:4px; background:var(--brand); display:grid; place-items:center; color:var(--onbrand); font-family:var(--cond); font-weight:700; font-size:11px; letter-spacing:.02em}
-  .brand small{font-family:var(--mono); font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3); font-weight:400}
   .timer{font-family:var(--mono); font-size:.92rem; font-variant-numeric:tabular-nums; padding:4px 11px; border:1px solid var(--line-strong); background:var(--surface); border-radius:4px}
   .timer.low{color:var(--warn); border-color:var(--warn); background:var(--warn-soft)}
   .timer.crit{color:var(--bad); border-color:var(--bad); background:var(--bad-soft)}
-  .pbar{height:3px; background:var(--surface-3)}
-  .pbar i{display:block; height:100%; width:0; font-style:normal; background:linear-gradient(90deg,var(--brand),var(--magenta)); transition:width .25s ease}
-  @media (prefers-reduced-motion:reduce){ .pbar i{transition:none} }
 
   /* ── generic ── */
   .card{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:28px 30px}
@@ -168,10 +162,9 @@
   <div class="main-area">
 <div class="topbar">
   <div class="in">
-    <div class="brand"><span class="mark">E</span>Evaluación de Marca UCAL <small>Usuarios · Evaluaciones</small></div>
-    <div class="timer" id="timer" hidden>--:--</div>
+    <span style="margin-right:auto"></span>
+    <div class="timer" id="timer" hidden><span class="material-symbols-outlined" style="font-size:16px; vertical-align:-3px;">schedule</span> --:--</div>
   </div>
-  <div class="pbar"><i id="pbar"></i></div>
 </div>
 
 <div class="wrap">
@@ -256,6 +249,7 @@
   <div class="qfoot" style="border-top:1px solid var(--line-strong)">
     <button class="btn" id="btn-copy">Copiar resultado</button>
     <button class="btn ghost" id="btn-dl" hidden>Descargar resultado</button>
+    <button class="btn ghost" type="button" onclick="window.mostrarEvaluaciones ? mostrarEvaluaciones() : (window.location.href='evaluaciones.html')">Volver a Evaluaciones</button>
     <span class="spacer"></span>
     <span class="saved" id="copy-note"></span>
   </div>
@@ -513,7 +507,6 @@ function renderNav(){
     b.onclick = ()=>{ S.idx=i; save(); renderNav(); renderQuestion(); };
     nav.appendChild(b);
   });
-  $("pbar").style.width = Math.round(EVAL.questions.filter(isAnswered).length/EVAL.questions.length*100)+"%";
 }
 
 function flagSaved(){ $("saved-note").textContent="Guardado"; clearTimeout(saveTimer); saveTimer=setTimeout(()=>{$("saved-note").textContent="";},1600); }
