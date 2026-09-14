@@ -1,8 +1,10 @@
 // ================================================================
 // EVALUACIONES - "Usuarios > Evaluaciones"
-// ASESOR: resuelve sus evaluaciones pendientes.
+// ASESOR: resuelve sus evaluaciones asignadas.
 // SUPERVISOR / ADMISION: visualiza el avance del equipo (solo lectura;
-// el detalle fino vive en "Usuarios > Resultados").
+// el detalle fino vive en "Usuarios > Resultados"). ADMISION además
+// puede editar la ventana de fechas y a qué asesores está asignada
+// cada evaluación.
 // ================================================================
 
 import { API_URL, ROLES } from '../core/constants.js';
@@ -10,6 +12,10 @@ import { getCurrentUser, getSessionToken, escapeHtml, formatearFecha } from '../
 import { Sidebar } from '../core/components.js';
 
 let modoEmbebido = false;
+
+// Cache de asesores activos (usuario/nombre/campaña) para no repetir la
+// llamada cada vez que se abre el editor de asignación de una tarjeta.
+let __asesoresCache = null;
 
 async function callAPI(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
@@ -67,12 +73,14 @@ async function cargarEvaluaciones(user, esAdmin) {
 
     const data = result.data || [];
     if (!data.length) {
-        grid.innerHTML = '<div class="eval-empty">No hay evaluaciones disponibles por ahora.</div>';
+        grid.innerHTML = esAdmin
+            ? '<div class="eval-empty">No hay evaluaciones registradas.</div>'
+            : '<div class="eval-empty">No tienes evaluaciones asignadas por ahora.</div>';
         return;
     }
 
-    const puedeEditarVentana = user.rol === ROLES.ADMISION;
-    grid.innerHTML = data.map((ev) => esAdmin ? renderCardAdmin(ev, puedeEditarVentana) : renderCardAsesor(ev)).join('');
+    const puedeEditar = user.rol === ROLES.ADMISION;
+    grid.innerHTML = data.map((ev) => esAdmin ? renderCardAdmin(ev, puedeEditar) : renderCardAsesor(ev)).join('');
 }
 
 function renderCardAsesor(ev) {
@@ -110,10 +118,14 @@ function renderCardAsesor(ev) {
     `;
 }
 
-function renderCardAdmin(ev, puedeEditarVentana) {
+function renderCardAdmin(ev, puedeEditar) {
     const pct = ev.totalAsesores > 0 ? Math.round((ev.completados / ev.totalAsesores) * 100) : 0;
-    const editorVentana = puedeEditarVentana ? `
+
+    const editorVentana = puedeEditar ? `
         <button type="button" class="btn-link" onclick="window.editarVentana && window.editarVentana('${escapeHtml(ev.codigo)}')">Editar</button>
+    ` : '';
+    const editorAsignacion = puedeEditar ? `
+        <button type="button" class="btn-link" onclick="window.editarAsignacion && window.editarAsignacion('${escapeHtml(ev.codigo)}')">Editar</button>
     ` : '';
 
     return `
@@ -124,6 +136,12 @@ function renderCardAdmin(ev, puedeEditarVentana) {
             <div class="eval-card-titulo">${escapeHtml(ev.titulo)}</div>
             <div class="eval-card-desc">${escapeHtml(ev.descripcion || '')}</div>
             <div class="eval-card-progress"><b>${ev.completados}</b> de <b>${ev.totalAsesores}</b> asesores completaron (${pct}%)</div>
+
+            <div class="eval-card-asignacion" id="asignacionView-${ev.codigo}">
+                <span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px;">group</span>
+                ${escapeHtml(renderAsignacionTexto(ev))} ${editorAsignacion}
+            </div>
+            <div class="eval-card-asignacion-edit" id="asignacionEdit-${ev.codigo}" style="display:none;"></div>
 
             <div class="eval-card-ventana" id="ventanaView-${ev.codigo}">
                 <span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px;">event</span>
@@ -145,6 +163,8 @@ function renderCardAdmin(ev, puedeEditarVentana) {
         </div>
     `;
 }
+
+// ===== Ventana de disponibilidad (fechas) =====
 
 window.editarVentana = (codigo) => {
     document.getElementById(`ventanaView-${codigo}`).style.display = 'none';
@@ -193,3 +213,108 @@ function renderVentanaTexto(ev) {
     const hasta = ev.activoHasta ? formatearFechaHora(ev.activoHasta) : '—';
     return `Activo: ${desde} → ${hasta}`;
 }
+
+// ===== Asignación a asesores concretos =====
+
+function renderAsignacionTexto(ev) {
+    if (ev.asignadoATodos) return 'Asignada a todos los asesores';
+    return `Asignada a ${ev.totalAsignados} asesor${ev.totalAsignados === 1 ? '' : 'es'}`;
+}
+
+async function obtenerAsesoresCache() {
+    if (__asesoresCache) return __asesoresCache;
+    const result = await callAPI('getAsistenciaEmpleados');
+    __asesoresCache = result.success
+        ? (result.data || []).filter((u) => u.activo !== false)
+        : [];
+    return __asesoresCache;
+}
+
+window.editarAsignacion = async (codigo) => {
+    const view = document.getElementById(`asignacionView-${codigo}`);
+    const edit = document.getElementById(`asignacionEdit-${codigo}`);
+    view.style.display = 'none';
+    edit.style.display = 'flex';
+    edit.innerHTML = '<div class="loading">Cargando asesores…</div>';
+
+    const [asesores, asignResult] = await Promise.all([
+        obtenerAsesoresCache(),
+        callAPI('getAsignacionesEvaluacion', { codigo }),
+    ]);
+
+    if (!asignResult.success) {
+        edit.innerHTML = `<div class="eval-asig-empty">Error: ${escapeHtml(asignResult.error || 'No se pudo cargar la asignación.')}</div>`;
+        return;
+    }
+
+    const asignadosActuales = new Set(asignResult.usuarios || []);
+    const asignadoATodos = asignadosActuales.size === 0;
+
+    if (!asesores.length) {
+        edit.innerHTML = '<div class="eval-asig-empty">No hay asesores activos para asignar.</div>';
+        return;
+    }
+
+    edit.innerHTML = `
+        <label class="eval-asig-todos">
+            <input type="checkbox" id="asigTodos-${codigo}" ${asignadoATodos ? 'checked' : ''}>
+            Asignar a todos los asesores
+        </label>
+        <input type="text" class="eval-asig-filtro" id="asigFiltro-${codigo}" placeholder="Buscar asesor por nombre…">
+        <div class="eval-asig-lista ${asignadoATodos ? 'disabled' : ''}" id="asigLista-${codigo}">
+            ${asesores.map((a) => `
+                <label class="eval-asig-item" data-nombre="${escapeHtml((a.nombre || a.usuario).toLowerCase())}">
+                    <input type="checkbox" class="asig-check-${codigo}" value="${escapeHtml(a.usuario)}" ${asignadosActuales.has(a.usuario) ? 'checked' : ''}>
+                    ${escapeHtml(a.nombre || a.usuario)}
+                    ${a.campaña ? `<span class="campana-tag">${escapeHtml(a.campaña)}</span>` : ''}
+                </label>
+            `).join('')}
+        </div>
+        <div style="display:flex; gap:8px; margin-top:4px;">
+            <button type="button" class="btn-primary" onclick="window.guardarAsignacion && window.guardarAsignacion('${escapeHtml(codigo)}')">Guardar</button>
+            <button type="button" class="btn-export" onclick="window.cancelarAsignacion && window.cancelarAsignacion('${escapeHtml(codigo)}')">Cancelar</button>
+        </div>
+    `;
+
+    const chkTodos = document.getElementById(`asigTodos-${codigo}`);
+    const lista = document.getElementById(`asigLista-${codigo}`);
+    chkTodos.addEventListener('change', () => {
+        lista.classList.toggle('disabled', chkTodos.checked);
+    });
+
+    const filtro = document.getElementById(`asigFiltro-${codigo}`);
+    filtro.addEventListener('input', () => {
+        const q = filtro.value.trim().toLowerCase();
+        lista.querySelectorAll('.eval-asig-item').forEach((item) => {
+            item.style.display = !q || item.dataset.nombre.includes(q) ? 'flex' : 'none';
+        });
+    });
+};
+
+window.cancelarAsignacion = (codigo) => {
+    document.getElementById(`asignacionEdit-${codigo}`).style.display = 'none';
+    document.getElementById(`asignacionView-${codigo}`).style.display = 'flex';
+};
+
+window.guardarAsignacion = async (codigo) => {
+    const chkTodos = document.getElementById(`asigTodos-${codigo}`);
+    const asignarATodos = chkTodos && chkTodos.checked;
+
+    const usuarios = asignarATodos
+        ? []
+        : Array.from(document.querySelectorAll(`.asig-check-${codigo}:checked`)).map((chk) => chk.value);
+
+    if (!asignarATodos && usuarios.length === 0) {
+        if (!confirm('No seleccionaste ningún asesor. Si guardas así, esta evaluación quedará sin nadie asignado (no la verá ningún asesor). ¿Continuar?')) {
+            return;
+        }
+    }
+
+    const result = await callAPI('guardarAsignacionesEvaluacion', { codigo, usuarios });
+    if (!result.success) {
+        alert(result.error || 'No se pudo guardar la asignación.');
+        return;
+    }
+
+    await cargarEvaluaciones(getCurrentUser(), true);
+};

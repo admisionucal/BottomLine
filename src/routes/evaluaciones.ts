@@ -5,10 +5,35 @@ import { exigirSesion } from '../lib/session';
 // ================================================================
 // EVALUACIONES
 // ================================================================
+//
+// Una evaluación puede estar "asignada a todos" (comportamiento de
+// siempre: cualquier ASESOR activo la ve y puede resolverla) o
+// "asignada a algunos" (solo los usuarios que aparecen en
+// evaluacion_asignaciones para esa evaluación).
+//
+// Regla: si evaluacion_asignaciones NO tiene ninguna fila para una
+// evaluación, se trata como "para todos" (compatibilidad con las
+// evaluaciones creadas antes de este cambio). En cuanto tiene 1+ filas,
+// queda restringida a esos usuarios exactos.
+
+// Fragmento SQL reutilizable: "esta evaluación (e.id) está abierta para
+// este usuario ($1)", ya sea porque no tiene restricción o porque está
+// explícitamente asignado.
+const SQL_ASIGNADA_A = (evaluacionIdExpr: string, usuarioParam: string) => `(
+  not exists (select 1 from evaluacion_asignaciones ea where ea.evaluacion_id = ${evaluacionIdExpr})
+  or exists (
+    select 1 from evaluacion_asignaciones ea
+    where ea.evaluacion_id = ${evaluacionIdExpr} and ea.usuario = ${usuarioParam}
+  )
+)`;
 
 // ===== Listado para la pantalla "Evaluaciones" =====
-// ASESOR: ve cada evaluación activa con su propio estado (Pendiente/Completado).
-// SUPERVISOR/ADMISION: ve cada evaluación activa con el avance del equipo (cuántos asesores de su campaña ya la completaron).
+// ASESOR: ve solo las evaluaciones activas que le corresponden (sin
+// restricción, o asignadas explícitamente a él) con su propio estado
+// (Pendiente/Completado).
+// SUPERVISOR/ADMISION: ve TODAS las evaluaciones activas (asignadas o
+// no), con el avance del equipo calculado solo sobre los asesores a
+// quienes realmente les toca resolverla.
 export async function getEvaluaciones(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, null);
   if (!sesion) return jsonError(error!);
@@ -19,18 +44,22 @@ export async function getEvaluaciones(client: Client, body: JsonBody) {
     `select e.id, e.codigo, e.titulo, e.descripcion, e.archivo, e.orden,
             e.activo_desde as "activoDesde", e.activo_hasta as "activoHasta",
             i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje, i.finalizado_en,
+            (select count(*) from evaluacion_asignaciones ea where ea.evaluacion_id = e.id) as "totalAsignados",
             (select count(*) from usuarios u
-              where upper(u.rol) = 'ASESOR' and u.activo = true) as "totalAsesores",
+              where upper(u.rol) = 'ASESOR' and u.activo = true
+                and ${SQL_ASIGNADA_A('e.id', 'u.usuario')}) as "totalAsesores",
             (select count(*) from evaluacion_intentos i2
               join usuarios u2 on u2.usuario = i2.usuario
               where i2.evaluacion_id = e.id
-                and upper(u2.rol) = 'ASESOR' and u2.activo = true) as "completados"
+                and upper(u2.rol) = 'ASESOR' and u2.activo = true
+                and ${SQL_ASIGNADA_A('e.id', 'u2.usuario')}) as "completados"
      from evaluaciones e
      left join evaluacion_intentos i
        on i.evaluacion_id = e.id and i.usuario = $1
      where e.activo = true
+       and ($2::boolean = true or ${SQL_ASIGNADA_A('e.id', '$1')})
      order by e.orden, e.id`,
-    [sesion.usuario]
+    [sesion.usuario, esAdmin]
   );
 
   const data = result.rows.map((ev) => {
@@ -67,6 +96,8 @@ export async function getEvaluaciones(client: Client, body: JsonBody) {
         ? {
             totalAsesores: Number(ev.totalAsesores) || 0,
             completados: Number(ev.completados) || 0,
+            totalAsignados: Number(ev.totalAsignados) || 0,
+            asignadoATodos: Number(ev.totalAsignados) === 0,
           }
         : {}),
     };
@@ -95,10 +126,24 @@ export async function getEstadoEvaluacion(client: Client, body: JsonBody) {
     return jsonError('La evaluación no existe o no está activa.');
   }
 
+  const evaluacionId = ev.rows[0].id;
+
+  // La asignación solo restringe a los ASESOR (Supervisor/Admisión entran
+  // aquí normalmente para revisar, no para resolver).
+  if (sesion.rol === 'ASESOR') {
+    const asignada = await client.query(
+      `select ${SQL_ASIGNADA_A('$1', '$2')} as "leToca"`,
+      [evaluacionId, sesion.usuario]
+    );
+    if (!asignada.rows[0].leToca) {
+      return jsonError('Esta evaluación no está asignada a tu usuario.');
+    }
+  }
+
   const intento = await client.query(
     `select puntaje_obtenido, puntaje_maximo, porcentaje, respuestas, detalle, finalizado_en, duracion_segundos, por_tiempo
     from evaluacion_intentos where evaluacion_id = $1 and usuario = $2`,
-    [ev.rows[0].id, sesion.usuario]
+    [evaluacionId, sesion.usuario]
   );
 
   if (!intento.rowCount) {
@@ -151,6 +196,17 @@ export async function guardarIntentoEvaluacion(client: Client, body: JsonBody) {
   }
   const evaluacionId = ev.rows[0].id;
 
+  // Defensa en el servidor: aunque el .html ya no debería dejar llegar
+  // hasta acá a alguien no asignado (getEstadoEvaluacion lo bloquea antes),
+  // se revalida igual por si el envío llega sin pasar por esa pantalla.
+  const asignada = await client.query(
+    `select ${SQL_ASIGNADA_A('$1', '$2')} as "leToca"`,
+    [evaluacionId, sesion.usuario]
+  );
+  if (!asignada.rows[0].leToca) {
+    return jsonError('Esta evaluación no está asignada a tu usuario.');
+  }
+
   const yaExiste = await client.query(
     `select 1 from evaluacion_intentos where evaluacion_id = $1 and usuario = $2`,
     [evaluacionId, sesion.usuario]
@@ -194,14 +250,17 @@ export async function getResultadosEvaluacion(client: Client, body: JsonBody) {
   const ev = await client.query(`select id, titulo from evaluaciones where codigo = $1`, [codigo]);
   if (!ev.rowCount) return jsonError('La evaluación no existe.');
 
-  // Todos los asesores activos, con su intento si lo tienen (left join para
-  // que se vea también a quienes aún no la resuelven -> "Pendiente").
+  // Solo se listan los asesores a quienes de verdad les toca esta
+  // evaluación (sin restricción -> todos; con asignación -> solo esos).
+  // Left join contra evaluacion_intentos para que se vea también a
+  // quienes aún no la resuelven -> "Pendiente".
   const result = await client.query(
     `select u.usuario, coalesce(u.nombre_aux, u.nombre) as nombre, u.campana,
             i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje, i.finalizado_en, i.duracion_segundos, i.por_tiempo
      from usuarios u
      left join evaluacion_intentos i on i.evaluacion_id = $1 and i.usuario = u.usuario
      where upper(u.rol) = 'ASESOR' and u.activo = true
+       and ${SQL_ASIGNADA_A('$1', 'u.usuario')}
      order by nombre`,
     [ev.rows[0].id]
   );
@@ -223,6 +282,88 @@ export async function getResultadosEvaluacion(client: Client, body: JsonBody) {
 }
 
 // ===== Detalle de un intento (respuesta por respuesta) para Resultados =====
+export async function getDetalleIntentoEvaluacion(client: Client, body: JsonBody) {
+  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
+  if (!sesion) return jsonError(error!);
+
+  const codigo = String(body.codigo || '').trim();
+  const usuario = String(body.usuario || '').trim();
+  if (!codigo || !usuario) return jsonError('Faltan datos para obtener el detalle.');
+
+  const result = await client.query(
+    `select i.respuestas, i.detalle, i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje,
+            i.finalizado_en, i.duracion_segundos, i.por_tiempo,
+            coalesce(u.nombre_aux, u.nombre) as nombre
+     from evaluacion_intentos i
+     join evaluaciones e on e.id = i.evaluacion_id
+     join usuarios u on u.usuario = i.usuario
+     where e.codigo = $1 and i.usuario = $2`,
+    [codigo, usuario]
+  );
+  if (!result.rowCount) return jsonError('Este asesor todavía no resolvió la evaluación.');
+
+  return jsonOk({ data: result.rows[0] });
+}
+
+// ===== Asignación de la evaluación a asesores concretos =====
+
+// Lectura (SUPERVISOR/ADMISION, para pintar el editor con lo ya guardado).
+export async function getAsignacionesEvaluacion(client: Client, body: JsonBody) {
+  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
+  if (!sesion) return jsonError(error!);
+
+  const codigo = String(body.codigo || '').trim();
+  if (!codigo) return jsonError('Falta el código de la evaluación.');
+
+  const ev = await client.query(`select id from evaluaciones where codigo = $1`, [codigo]);
+  if (!ev.rowCount) return jsonError('La evaluación no existe.');
+
+  const result = await client.query(
+    `select usuario from evaluacion_asignaciones where evaluacion_id = $1 order by usuario`,
+    [ev.rows[0].id]
+  );
+
+  return jsonOk({ usuarios: result.rows.map((r) => r.usuario) });
+}
+
+// Escritura: reemplaza por completo la lista de asignados (solo ADMISION,
+// mismo criterio de permisos que guardarVentanaEvaluacion). Mandar un
+// arreglo vacío significa "sin restricción" -> vuelve a quedar para todos.
+export async function guardarAsignacionesEvaluacion(client: Client, body: JsonBody) {
+  const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
+  if (!sesion) return jsonError(error!);
+
+  const codigo = String(body.codigo || '').trim();
+  if (!codigo) return jsonError('Falta el código de la evaluación.');
+
+  const ev = await client.query(`select id from evaluaciones where codigo = $1`, [codigo]);
+  if (!ev.rowCount) return jsonError('La evaluación no existe.');
+  const evaluacionId = ev.rows[0].id;
+
+  const usuarios = Array.isArray(body.usuarios)
+    ? Array.from(new Set(body.usuarios.map((u: any) => String(u).trim()).filter(Boolean)))
+    : [];
+
+  try {
+    await client.query('begin');
+    await client.query(`delete from evaluacion_asignaciones where evaluacion_id = $1`, [evaluacionId]);
+    for (const usuario of usuarios) {
+      await client.query(
+        `insert into evaluacion_asignaciones (evaluacion_id, usuario, asignado_por)
+         values ($1, $2, $3)
+         on conflict (evaluacion_id, usuario) do nothing`,
+        [evaluacionId, usuario, sesion.email || sesion.usuario]
+      );
+    }
+    await client.query('commit');
+  } catch (e: any) {
+    await client.query('rollback');
+    return jsonError('Error al guardar la asignación: ' + (e?.message || String(e)));
+  }
+
+  return jsonOk({ asignados: usuarios.length, asignadoATodos: usuarios.length === 0 });
+}
+
 // ===== Calificación asistida por IA (solo ASESOR, y solo mientras resuelve) =====
 // El .html arma el prompt (usa la misma rúbrica que la calificación local) y
 // aquí lo corremos contra Cloudflare Workers AI (binding "AI" del Worker,
@@ -262,29 +403,6 @@ export async function calificarConIA(client: Client, body: JsonBody, env: Env) {
   } catch (err: any) {
     return jsonError('No se pudo calificar con IA: ' + err.message);
   }
-}
-
-export async function getDetalleIntentoEvaluacion(client: Client, body: JsonBody) {
-  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
-  if (!sesion) return jsonError(error!);
-
-  const codigo = String(body.codigo || '').trim();
-  const usuario = String(body.usuario || '').trim();
-  if (!codigo || !usuario) return jsonError('Faltan datos para obtener el detalle.');
-
-  const result = await client.query(
-    `select i.respuestas, i.detalle, i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje,
-            i.finalizado_en, i.duracion_segundos, i.por_tiempo,
-            coalesce(u.nombre_aux, u.nombre) as nombre
-     from evaluacion_intentos i
-     join evaluaciones e on e.id = i.evaluacion_id
-     join usuarios u on u.usuario = i.usuario
-     where e.codigo = $1 and i.usuario = $2`,
-    [codigo, usuario]
-  );
-  if (!result.rowCount) return jsonError('Este asesor todavía no resolvió la evaluación.');
-
-  return jsonOk({ data: result.rows[0] });
 }
 
 // ===== Ventana de disponibilidad =====

@@ -109,6 +109,20 @@ async function cargarResultados(codigo) {
     state.filas = result.data || [];
     cont.innerHTML = '<div id="resTabla"></div>';
 
+    // `getEvaluaciones` (usado para poblar el <select>) ya trae, para
+    // SUPERVISOR/ADMISION, si la evaluación está asignada a todos o solo
+    // a algunos asesores — se reutiliza acá en vez de pedirlo de nuevo.
+    const evalActual = state.evaluaciones.find((e) => e.codigo === codigo);
+    const infoEl = document.getElementById('resAsignacionInfo');
+    if (infoEl && evalActual) {
+        const texto = evalActual.asignadoATodos
+            ? 'Asignada a todos los asesores.'
+            : `Asignada a ${evalActual.totalAsignados} asesor${evalActual.totalAsignados === 1 ? '' : 'es'} (por eso la tabla solo muestra a esos).`;
+        infoEl.innerHTML = `<span class="material-symbols-outlined" style="font-size:14px;">group</span> ${escapeHtml(texto)}`;
+    } else if (infoEl) {
+        infoEl.textContent = '';
+    }
+
     const headers = ['Asesor', 'Campaña', 'Estado', 'Puntaje', 'Fecha', 'Duración'];
     const rows = state.filas.map((f) => {
         const badgeClass = f.estado === 'Completado' ? 'completado' : 'pendiente';
