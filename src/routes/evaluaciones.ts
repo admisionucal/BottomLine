@@ -3,23 +3,28 @@ import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 import { exigirSesion } from '../lib/session';
 
 // ================================================================
-// EVALUACIONES - "Usuarios > Evaluaciones" (resolver: ASESOR,
-// visualizar: SUPERVISOR/ADMISION) y "Usuarios > Resultados"
-// (SUPERVISOR/ADMISION).
+// EVALUACIONES
 // ================================================================
 
 // ===== Listado para la pantalla "Evaluaciones" =====
 // ASESOR: ve cada evaluación activa con su propio estado (Pendiente/Completado).
-// SUPERVISOR/ADMISION: ve cada evaluación activa con el avance del equipo
-// (cuántos asesores de su campaña ya la completaron).
+// SUPERVISOR/ADMISION: ve cada evaluación activa con el avance del equipo (cuántos asesores de su campaña ya la completaron).
 export async function getEvaluaciones(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, null);
   if (!sesion) return jsonError(error!);
 
+  const esAdmin = sesion.rol === 'SUPERVISOR' || sesion.rol === 'ADMISION';
+
   const result = await client.query(
     `select e.id, e.codigo, e.titulo, e.descripcion, e.archivo, e.orden,
             e.activo_desde as "activoDesde", e.activo_hasta as "activoHasta",
-            i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje, i.finalizado_en
+            i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje, i.finalizado_en,
+            (select count(*) from usuarios u
+              where upper(u.rol) = 'ASESOR' and u.activo = true) as "totalAsesores",
+            (select count(*) from evaluacion_intentos i2
+              join usuarios u2 on u2.usuario = i2.usuario
+              where i2.evaluacion_id = e.id
+                and upper(u2.rol) = 'ASESOR' and u2.activo = true) as "completados"
      from evaluaciones e
      left join evaluacion_intentos i
        on i.evaluacion_id = e.id and i.usuario = $1
@@ -58,6 +63,12 @@ export async function getEvaluaciones(client: Client, body: JsonBody) {
             finalizado_en: ev.finalizado_en,
           }
         : null,
+      ...(esAdmin
+        ? {
+            totalAsesores: Number(ev.totalAsesores) || 0,
+            completados: Number(ev.completados) || 0,
+          }
+        : {}),
     };
   });
 
