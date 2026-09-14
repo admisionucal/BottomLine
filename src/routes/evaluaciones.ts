@@ -16,21 +16,20 @@ export async function getEvaluaciones(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, null);
   if (!sesion) return jsonError(error!);
 
-  const evaluaciones = await client.query(
-    `select id, codigo, titulo, descripcion, archivo, orden, activo_desde as "activoDesde", activo_hasta as "activoHasta"
-    from evaluaciones where activo = true order by orden, id`
+  const result = await client.query(
+    `select e.id, e.codigo, e.titulo, e.descripcion, e.archivo, e.orden,
+            e.activo_desde as "activoDesde", e.activo_hasta as "activoHasta",
+            i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje, i.finalizado_en
+     from evaluaciones e
+     left join evaluacion_intentos i
+       on i.evaluacion_id = e.id and i.usuario = $1
+     where e.activo = true
+     order by e.orden, e.id`,
+    [sesion.usuario]
   );
 
-  // ASESOR
-  const data = [];
-  for (const ev of evaluaciones.rows) {
-    const intento = await client.query(
-      `select puntaje_obtenido, puntaje_maximo, porcentaje, finalizado_en
-      from evaluacion_intentos where evaluacion_id = $1 and usuario = $2`,
-      [ev.id, sesion.usuario]
-    );
-
-    const completado = !!intento.rowCount;
+  const data = result.rows.map((ev) => {
+    const completado = ev.finalizado_en !== null;
     let estado = 'Pendiente';
 
     if (completado) {
@@ -41,12 +40,26 @@ export async function getEvaluaciones(client: Client, body: JsonBody) {
       else if (v === 'cerrada') estado = 'Cerrada';
     }
 
-    data.push({
-      ...ev,
+    return {
+      id: ev.id,
+      codigo: ev.codigo,
+      titulo: ev.titulo,
+      descripcion: ev.descripcion,
+      archivo: ev.archivo,
+      orden: ev.orden,
+      activoDesde: ev.activoDesde,
+      activoHasta: ev.activoHasta,
       estado,
-      resultado: completado ? intento.rows[0] : null,
-    });
-  }
+      resultado: completado
+        ? {
+            puntaje_obtenido: ev.puntaje_obtenido,
+            puntaje_maximo: ev.puntaje_maximo,
+            porcentaje: ev.porcentaje,
+            finalizado_en: ev.finalizado_en,
+          }
+        : null,
+    };
+  });
 
   return jsonOk({ data, rol: sesion.rol });
 }
@@ -273,6 +286,18 @@ function estadoVentana(activoDesde: Date | null, activoHasta: Date | null): Esta
   return 'disponible';
 }
 
+function parseFechaLima(valor: unknown): Date | null {
+  if (!valor) return null;
+  const str = String(valor).trim();
+  if (!str) return null;
+
+  const tieneOffset = /Z$|[+-]\d{2}:\d{2}$/.test(str);
+  const fecha = new Date(tieneOffset ? str : `${str}-05:00`);
+
+  if (isNaN(fecha.getTime())) return null;
+  return fecha;
+}
+
 // ===== Configurar ventana de disponibilidad (solo ADMISION) =====
 export async function guardarVentanaEvaluacion(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
@@ -281,8 +306,15 @@ export async function guardarVentanaEvaluacion(client: Client, body: JsonBody) {
   const codigo = String(body.codigo || '').trim();
   if (!codigo) return jsonError('Falta el código de la evaluación.');
 
-  const activoDesde = body.activoDesde ? new Date(body.activoDesde) : null;
-  const activoHasta = body.activoHasta ? new Date(body.activoHasta) : null;
+  if (body.activoDesde && !parseFechaLima(body.activoDesde)) {
+    return jsonError('La fecha de inicio no es válida.');
+  }
+  if (body.activoHasta && !parseFechaLima(body.activoHasta)) {
+    return jsonError('La fecha de cierre no es válida.');
+  }
+
+  const activoDesde = parseFechaLima(body.activoDesde);
+  const activoHasta = parseFechaLima(body.activoHasta);
 
   if (activoDesde && activoHasta && activoDesde >= activoHasta) {
     return jsonError('"Activo desde" debe ser anterior a "Activo hasta".');

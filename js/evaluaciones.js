@@ -59,9 +59,6 @@ async function cargarEvaluaciones(user, esAdmin) {
     const grid = document.getElementById('evalGrid');
     grid.innerHTML = '<div class="loading">Cargando evaluaciones…</div>';
 
-    const puedeEditarVentana = user.rol === ROLES.ADMISION;
-    grid.innerHTML = data.map((ev) => esAdmin ? renderCardAdmin(ev, puedeEditarVentana) : renderCardAsesor(ev)).join('');
-
     const result = await callAPI('getEvaluaciones');
     if (!result.success) {
         grid.innerHTML = `<div class="loading">Error: ${escapeHtml(result.error || 'No se pudo cargar')}</div>`;
@@ -74,7 +71,8 @@ async function cargarEvaluaciones(user, esAdmin) {
         return;
     }
 
-    grid.innerHTML = data.map((ev) => esAdmin ? renderCardAdmin(ev) : renderCardAsesor(ev)).join('');
+    const puedeEditarVentana = user.rol === ROLES.ADMISION;
+    grid.innerHTML = data.map((ev) => esAdmin ? renderCardAdmin(ev, puedeEditarVentana) : renderCardAsesor(ev)).join('');
 }
 
 function renderCardAsesor(ev) {
@@ -184,6 +182,7 @@ function formatearFechaHora(iso) {
 function toDatetimeLocalValue(iso) {
     if (!iso) return '';
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
     const pad = (n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
