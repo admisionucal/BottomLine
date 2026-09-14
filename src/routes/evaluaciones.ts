@@ -29,8 +29,10 @@ export async function getEvaluaciones(client: Client, body: JsonBody) {
       from evaluacion_intentos where evaluacion_id = $1 and usuario = $2`,
       [ev.id, sesion.usuario]
     );
+
     const completado = !!intento.rowCount;
     let estado = 'Pendiente';
+
     if (completado) {
       estado = 'Completado';
     } else {
@@ -38,25 +40,14 @@ export async function getEvaluaciones(client: Client, body: JsonBody) {
       if (v === 'no_iniciada') estado = 'No disponible aún';
       else if (v === 'cerrada') estado = 'Cerrada';
     }
-    data.push({ ...ev, estado, resultado: completado ? intento.rows[0] : null });
-  }
-  return jsonOk({ data, rol: sesion.rol });
-  }
 
-  // ASESOR
-  const data = [];
-  for (const ev of evaluaciones.rows) {
-    const intento = await client.query(
-      `select puntaje_obtenido, puntaje_maximo, porcentaje, finalizado_en
-       from evaluacion_intentos where evaluacion_id = $1 and usuario = $2`,
-      [ev.id, sesion.usuario]
-    );
     data.push({
       ...ev,
-      estado: intento.rowCount ? 'Completado' : 'Pendiente',
-      resultado: intento.rowCount ? intento.rows[0] : null,
+      estado,
+      resultado: completado ? intento.rows[0] : null,
     });
   }
+
   return jsonOk({ data, rol: sesion.rol });
 }
 
@@ -75,7 +66,10 @@ export async function getEstadoEvaluacion(client: Client, body: JsonBody) {
     from evaluaciones where codigo = $1 and activo = true`,
     [codigo]
   );
-  if (!ev.rowCount) return jsonError('La evaluación no existe o no está activa.');
+
+  if (!ev.rowCount) {
+    return jsonError('La evaluación no existe o no está activa.');
+  }
 
   const intento = await client.query(
     `select puntaje_obtenido, puntaje_maximo, porcentaje, respuestas, detalle, finalizado_en, duracion_segundos, por_tiempo
@@ -84,12 +78,25 @@ export async function getEstadoEvaluacion(client: Client, body: JsonBody) {
   );
 
   if (!intento.rowCount) {
-    const v = estadoVentana(ev.rows[0].activoDesde, ev.rows[0].activoHasta);
+    const v = estadoVentana(
+      ev.rows[0].activoDesde,
+      ev.rows[0].activoHasta
+    );
+
     if (v === 'no_iniciada') {
-      return jsonError(`Esta evaluación estará disponible a partir del ${new Date(ev.rows[0].activoDesde).toLocaleString('es-PE')}.`);
+      return jsonError(
+        `Esta evaluación estará disponible a partir del ${new Date(
+          ev.rows[0].activoDesde
+        ).toLocaleString('es-PE')}.`
+      );
     }
+
     if (v === 'cerrada') {
-      return jsonError(`Esta evaluación cerró el ${new Date(ev.rows[0].activoHasta).toLocaleString('es-PE')}.`);
+      return jsonError(
+        `Esta evaluación cerró el ${new Date(
+          ev.rows[0].activoHasta
+        ).toLocaleString('es-PE')}.`
+      );
     }
   }
 
