@@ -79,7 +79,7 @@ async function cargarEvaluaciones(user, esAdmin) {
         return;
     }
 
-    const puedeEditar = user.rol === ROLES.ADMISION;
+    const puedeEditar = user.rol === ROLES.ADMISION || user.rol === ROLES.SUPERVISOR;
     grid.innerHTML = data.map((ev) => esAdmin ? renderCardAdmin(ev, puedeEditar) : renderCardAsesor(ev)).join('');
 }
 
