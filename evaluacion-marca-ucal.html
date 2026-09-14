@@ -624,7 +624,7 @@ function gradeLocal(){
         stmt:it.s, expected:it.a, given:a["c"+i]||"—",
         ok:a["c"+i]===it.a, justification:(a["j"+i]||"").trim(), why:it.why
       }));
-      per.push({ id:q.id, type:"tf", points:q.points, earned: items.filter(x=>x.ok).length*q.perItem, items, source:"local" });
+      per.push({ id:q.id, type:"tf", points:q.points, earned: items.filter(x=>x.ok).length*q.perItem, items, source:"local", prompt:q.prompt });
     } else {
       const txt=a.text||"", n=norm(txt), tooShort = words(txt)<8;
       const hit=[], miss=[]; let pts=0;
@@ -633,7 +633,7 @@ function gradeLocal(){
         if(found){ pts+=k.p; hit.push(k.c); } else miss.push(k.c);
       });
       pts = Math.min(q.points, Math.round(pts*4)/4);
-      per.push({ id:q.id, type:"open", points:q.points, earned:pts, answer:txt, hit, miss, source:"local" });
+      per.push({ id:q.id, type:"open", points:q.points, earned:pts, answer:txt, hit, miss, source:"local", prompt:q.prompt });
     }
   });
   return finalize(per,"local");

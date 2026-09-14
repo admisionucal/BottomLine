@@ -34,6 +34,25 @@
         .res-badge.pendiente { background: var(--color-warning-bg); color: #B06A00; }
         .res-link { color: var(--color-primary); font-weight: 600; cursor: pointer; text-decoration: none; }
         .res-link:hover { text-decoration: underline; }
+
+        /* ----- Modal de detalle de intento (Pregunta + Respuesta + Nota + Consejo) ----- */
+        .det-preg-row { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid #eee; }
+        .det-preg-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .det-preg-label { font-weight: 700; color: #1a1a1a; margin-bottom: 8px; font-size: 14px; line-height: 1.4; }
+        .det-preg-nota {
+            display: inline-flex; align-items: center; font-size: 11px; font-weight: 700;
+            text-transform: uppercase; border-radius: 20px; padding: 3px 10px; margin-left: 10px;
+            vertical-align: middle; white-space: nowrap;
+        }
+        .det-preg-nota.full { background: var(--color-success-bg); color: var(--color-success); }
+        .det-preg-nota.part { background: var(--color-warning-bg); color: #B06A00; }
+        .det-preg-nota.none { background: #ffcdd2; color: #b71c1c; }
+        .det-preg-respuesta {
+            background: #f8f9fc; border-radius: 8px; padding: 10px 14px; font-size: 13px;
+            color: #333; margin-bottom: 8px; white-space: pre-wrap;
+        }
+        .det-preg-consejo { font-size: 13px; color: #555; line-height: 1.45; }
+        .det-preg-consejo b { color: var(--color-primary); }
     </style>
 </head>
 <body>
@@ -56,6 +75,18 @@
 
                     <div id="resTablaContainer">
                         <div class="loading">Cargando resultados…</div>
+                    </div>
+                </div>
+
+                <!-- Modal de detalle del intento: Pregunta + Respuesta + Nota + Consejo -->
+                <div class="modal-overlay" id="resDetalleModal">
+                    <div class="modal-box modal-box-detalle">
+                        <button class="modal-close-x" id="resDetalleModalClose">
+                            <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span>
+                        </button>
+                        <h4 id="resDetalleTitulo" style="margin-bottom:2px;"></h4>
+                        <p id="resDetalleSub" style="color:#777; font-size:13px; margin-bottom:16px;"></p>
+                        <div id="resDetalleContenido"><div class="loading">Cargando detalle…</div></div>
                     </div>
                 </div>
             </div>

@@ -65,6 +65,8 @@ async function initResultados(codigoInicial) {
         cargarResultados(e.target.value);
     });
     document.getElementById('resBtnExportar').addEventListener('click', exportarExcel);
+
+    inicializarModalDetalle();
 }
 
 async function cargarEvaluacionesDisponibles(codigoInicial) {
@@ -127,18 +129,123 @@ async function cargarResultados(codigo) {
     renderTable('resTabla', headers, rows);
 }
 
+// ================================================================
+// MODAL DE DETALLE: Pregunta + Respuesta + Nota + Consejo
+// ================================================================
+
+let __resDetalleListenersAtados = false;
+
+function inicializarModalDetalle() {
+    if (__resDetalleListenersAtados) return;
+    const modal = document.getElementById('resDetalleModal');
+    const btnClose = document.getElementById('resDetalleModalClose');
+    if (!modal || !btnClose) return;
+
+    btnClose.addEventListener('click', cerrarModalDetalle);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) cerrarModalDetalle();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('show')) cerrarModalDetalle();
+    });
+
+    __resDetalleListenersAtados = true;
+}
+
+function abrirModalDetalle() {
+    const modal = document.getElementById('resDetalleModal');
+    if (modal) modal.classList.add('show');
+}
+
+function cerrarModalDetalle() {
+    const modal = document.getElementById('resDetalleModal');
+    if (modal) modal.classList.remove('show');
+}
+
 window.__verDetalleResultado = async function (usuario) {
+    inicializarModalDetalle();
+    abrirModalDetalle();
+
+    const titulo = document.getElementById('resDetalleTitulo');
+    const sub = document.getElementById('resDetalleSub');
+    const cont = document.getElementById('resDetalleContenido');
+
+    titulo.textContent = 'Cargando…';
+    sub.textContent = '';
+    cont.innerHTML = '<div class="loading">Cargando detalle…</div>';
+
     const result = await callAPI('getDetalleIntentoEvaluacion', { codigo: state.codigoActual, usuario });
     if (!result.success) {
-        alert(result.error || 'No se pudo cargar el detalle.');
+        titulo.textContent = 'Error';
+        cont.innerHTML = `<div class="loading">${escapeHtml(result.error || 'No se pudo cargar el detalle.')}</div>`;
         return;
     }
-    // El detalle (respuestas + desglose por pregunta) viaja completo en
-    // result.data; aquí se deja un hook simple para no acoplar el modal
-    // de detalle a esta vista. Ajusta a un modal propio si lo necesitas.
-    console.log('Detalle de la evaluación:', result.data);
-    alert(`${result.data.nombre}: ${Number(result.data.porcentaje).toFixed(0)}% (${result.data.puntaje_obtenido}/${result.data.puntaje_maximo})`);
+
+    const data = result.data;
+    titulo.textContent = data.nombre || usuario;
+    sub.textContent = `${Number(data.porcentaje).toFixed(0)}% (${data.puntaje_obtenido}/${data.puntaje_maximo})`
+        + (data.finalizado_en ? ` · ${formatearFecha(data.finalizado_en)}` : '');
+
+    const filas = construirFilasDetalle(data.detalle);
+    if (!filas.length) {
+        cont.innerHTML = '<div class="loading">No hay desglose por pregunta disponible para este intento.</div>';
+        return;
+    }
+
+    cont.innerHTML = filas.map((f) => `
+        <div class="det-preg-row">
+            <div class="det-preg-label">${escapeHtml(f.pregunta)}<span class="det-preg-nota ${f.notaClass}">${escapeHtml(f.nota)}</span></div>
+            <div class="det-preg-respuesta">${escapeHtml(f.respuesta)}</div>
+            ${f.consejo ? `<div class="det-preg-consejo"><b>Consejo:</b> ${escapeHtml(f.consejo)}</div>` : ''}
+        </div>
+    `).join('');
 };
+
+// Normaliza el jsonb `detalle` (guardado por evaluacion-marca-ucal.html,
+// ver EVAL.questions / gradeLocal / mergeAI) a filas simples de
+// Pregunta + Respuesta + Nota + Consejo para pintarlas en el modal.
+//
+// - Preguntas abiertas (type: "open"): una fila por pregunta.
+// - Verdadero/Falso (type: "tf"): una fila por cada afirmación del grupo,
+//   porque cada una tiene su propia respuesta/nota/justificación.
+function construirFilasDetalle(detalle) {
+    if (!detalle || !Array.isArray(detalle.per)) return [];
+    const filas = [];
+
+    detalle.per.forEach((item, idx) => {
+        if (item.type === 'tf') {
+            (item.items || []).forEach((sub, i) => {
+                const marcado = sub.given === 'V' ? 'Verdadero' : sub.given === 'F' ? 'Falso' : 'Sin responder';
+                filas.push({
+                    pregunta: sub.stmt || `Afirmación ${i + 1}`,
+                    respuesta: `Marcó: ${marcado}` + (sub.justification ? ` — "${sub.justification}"` : ''),
+                    nota: sub.ok ? 'Correcto' : 'Incorrecto',
+                    notaClass: sub.ok ? 'full' : 'none',
+                    consejo: sub.why || '',
+                });
+            });
+        } else {
+            const earned = Number(item.earned ?? 0);
+            const points = Number(item.points ?? 0);
+            const notaClass = points > 0 && earned >= points ? 'full' : (earned > 0 ? 'part' : 'none');
+            const consejoPartes = [];
+            if (item.advice) consejoPartes.push(item.advice);
+            if (item.miss && item.miss.length) consejoPartes.push('Le faltó: ' + item.miss.join('; ') + '.');
+
+            filas.push({
+                // `prompt` viaja en el detalle desde evaluacion-marca-ucal.html;
+                // si el intento es viejo y no lo tiene, se usa un rótulo genérico.
+                pregunta: item.prompt || `Pregunta ${idx + 1}`,
+                respuesta: (item.answer || '').trim() || '(no respondió esta pregunta)',
+                nota: `${earned} / ${points}`,
+                notaClass,
+                consejo: consejoPartes.join(' '),
+            });
+        }
+    });
+
+    return filas;
+}
 
 function exportarExcel() {
     if (!state.filas.length || typeof XLSX === 'undefined') return;
