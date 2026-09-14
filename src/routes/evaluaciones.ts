@@ -330,7 +330,7 @@ export async function getAsignacionesEvaluacion(client: Client, body: JsonBody) 
 // mismo criterio de permisos que guardarVentanaEvaluacion). Mandar un
 // arreglo vacío significa "sin restricción" -> vuelve a quedar para todos.
 export async function guardarAsignacionesEvaluacion(client: Client, body: JsonBody) {
-  const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
+  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
 
   const codigo = String(body.codigo || '').trim();
@@ -429,7 +429,7 @@ function parseFechaLima(valor: unknown): Date | null {
 
 // ===== Configurar ventana de disponibilidad (solo ADMISION) =====
 export async function guardarVentanaEvaluacion(client: Client, body: JsonBody) {
-  const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
+  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
 
   const codigo = String(body.codigo || '').trim();

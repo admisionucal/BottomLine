@@ -117,7 +117,7 @@ async function cargarResultados(codigo) {
     if (infoEl && evalActual) {
         const texto = evalActual.asignadoATodos
             ? 'Asignada a todos los asesores.'
-            : `Asignada a ${evalActual.totalAsignados} asesor${evalActual.totalAsignados === 1 ? '' : 'es'} (por eso la tabla solo muestra a esos).`;
+            : `Asignada a ${evalActual.totalAsignados} asesor${evalActual.totalAsignados === 1 ? '' : 'es'}.`;
         infoEl.innerHTML = `<span class="material-symbols-outlined" style="font-size:14px;">group</span> ${escapeHtml(texto)}`;
     } else if (infoEl) {
         infoEl.textContent = '';
