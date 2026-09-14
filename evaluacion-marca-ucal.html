@@ -453,7 +453,8 @@ function bloquearPorRol(mensaje){
   const estado = await callAPI("getEstadoEvaluacion", { codigo: CODIGO_EVAL });
   if (!estado.success){
     $("resume-note").hidden = false;
-    $("resume-note").textContent = "No se pudo confirmar el estado con el servidor: " + (estado.error || "intenta de nuevo.");
+    $("resume-note").textContent = estado.error || "No se pudo confirmar el estado con el servidor.";
+    $("btn-start").disabled = true;
     return;
   }
 

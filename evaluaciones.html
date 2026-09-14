@@ -11,14 +11,12 @@
     <link rel="stylesheet" href="core/ui-kit.css">
     <style>
         .container { width: 95%; max-width: 1200px; margin: 0 auto; padding: 24px 0; }
-
         .eval-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 18px;
             margin-top: 18px;
         }
-
         .eval-card {
             background: var(--color-bg-card);
             border: 1px solid var(--color-border);
@@ -29,7 +27,6 @@
             flex-direction: column;
             gap: 12px;
         }
-
         .eval-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
         .eval-card-icon {
             width: 44px; height: 44px; border-radius: 12px;
@@ -38,7 +35,6 @@
         }
         .eval-card-titulo { font-family: var(--font-family-heading); font-size: 16px; font-weight: 700; color: var(--color-text-primary); }
         .eval-card-desc { font-size: 13px; color: var(--color-text-secondary); line-height: 1.4; flex: 1; }
-
         .eval-pill {
             display: inline-flex; align-items: center; gap: 5px;
             font-size: 11px; font-weight: 700; text-transform: uppercase;
@@ -46,14 +42,16 @@
         }
         .eval-pill.pendiente { background: var(--color-warning-bg); color: #B06A00; }
         .eval-pill.completado { background: var(--color-success-bg); color: var(--color-success); }
-
         .eval-card-progress { font-size: 12px; color: var(--color-text-secondary); }
         .eval-card-progress b { color: var(--color-text-primary); }
-
         .eval-card-footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         .eval-card-score { font-size: 13px; font-weight: 700; color: var(--color-primary); }
-
         .eval-empty { color: var(--color-text-muted); padding: 40px 0; text-align: center; }
+        .eval-card-ventana { font-size: 12px; color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+        .eval-card-ventana-edit { display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+        .eval-card-ventana-edit input { padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 6px; font-size: 12px; }
+        .btn-link { background: none; border: none; color: var(--color-primary); font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; }
+        .eval-pill.bloqueado { background: #F1F1F1; color: #777; }
     </style>
 </head>
 <body>

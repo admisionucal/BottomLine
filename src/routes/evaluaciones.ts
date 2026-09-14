@@ -17,27 +17,30 @@ export async function getEvaluaciones(client: Client, body: JsonBody) {
   if (!sesion) return jsonError(error!);
 
   const evaluaciones = await client.query(
-    `select id, codigo, titulo, descripcion, archivo, orden
-     from evaluaciones where activo = true order by orden, id`
+    `select id, codigo, titulo, descripcion, archivo, orden, activo_desde as "activoDesde", activo_hasta as "activoHasta"
+    from evaluaciones where activo = true order by orden, id`
   );
 
-  if (sesion.rol === 'SUPERVISOR' || sesion.rol === 'ADMISION') {
-    const data = [];
-    for (const ev of evaluaciones.rows) {
-      const totalAsesores = await client.query(
-        `select count(*)::int as n from usuarios where upper(rol) = 'ASESOR' and activo = true`
-      );
-      const completados = await client.query(
-        `select count(*)::int as n from evaluacion_intentos where evaluacion_id = $1`,
-        [ev.id]
-      );
-      data.push({
-        ...ev,
-        totalAsesores: totalAsesores.rows[0].n,
-        completados: completados.rows[0].n,
-      });
+  // ASESOR
+  const data = [];
+  for (const ev of evaluaciones.rows) {
+    const intento = await client.query(
+      `select puntaje_obtenido, puntaje_maximo, porcentaje, finalizado_en
+      from evaluacion_intentos where evaluacion_id = $1 and usuario = $2`,
+      [ev.id, sesion.usuario]
+    );
+    const completado = !!intento.rowCount;
+    let estado = 'Pendiente';
+    if (completado) {
+      estado = 'Completado';
+    } else {
+      const v = estadoVentana(ev.activoDesde, ev.activoHasta);
+      if (v === 'no_iniciada') estado = 'No disponible aún';
+      else if (v === 'cerrada') estado = 'Cerrada';
     }
-    return jsonOk({ data, rol: sesion.rol });
+    data.push({ ...ev, estado, resultado: completado ? intento.rows[0] : null });
+  }
+  return jsonOk({ data, rol: sesion.rol });
   }
 
   // ASESOR
@@ -67,14 +70,28 @@ export async function getEstadoEvaluacion(client: Client, body: JsonBody) {
   const codigo = String(body.codigo || '').trim();
   if (!codigo) return jsonError('Falta el código de la evaluación.');
 
-  const ev = await client.query(`select id, titulo from evaluaciones where codigo = $1 and activo = true`, [codigo]);
+  const ev = await client.query(
+    `select id, titulo, activo_desde as "activoDesde", activo_hasta as "activoHasta"
+    from evaluaciones where codigo = $1 and activo = true`,
+    [codigo]
+  );
   if (!ev.rowCount) return jsonError('La evaluación no existe o no está activa.');
 
   const intento = await client.query(
     `select puntaje_obtenido, puntaje_maximo, porcentaje, respuestas, detalle, finalizado_en, duracion_segundos, por_tiempo
-     from evaluacion_intentos where evaluacion_id = $1 and usuario = $2`,
+    from evaluacion_intentos where evaluacion_id = $1 and usuario = $2`,
     [ev.rows[0].id, sesion.usuario]
   );
+
+  if (!intento.rowCount) {
+    const v = estadoVentana(ev.rows[0].activoDesde, ev.rows[0].activoHasta);
+    if (v === 'no_iniciada') {
+      return jsonError(`Esta evaluación estará disponible a partir del ${new Date(ev.rows[0].activoDesde).toLocaleString('es-PE')}.`);
+    }
+    if (v === 'cerrada') {
+      return jsonError(`Esta evaluación cerró el ${new Date(ev.rows[0].activoHasta).toLocaleString('es-PE')}.`);
+    }
+  }
 
   return jsonOk({
     evaluacion: ev.rows[0],
@@ -90,8 +107,17 @@ export async function guardarIntentoEvaluacion(client: Client, body: JsonBody) {
   const codigo = String(body.codigo || '').trim();
   if (!codigo) return jsonError('Falta el código de la evaluación.');
 
-  const ev = await client.query(`select id from evaluaciones where codigo = $1 and activo = true`, [codigo]);
+  const ev = await client.query(
+    `select id, activo_desde as "activoDesde", activo_hasta as "activoHasta"
+    from evaluaciones where codigo = $1 and activo = true`,
+    [codigo]
+  );
   if (!ev.rowCount) return jsonError('La evaluación no existe o no está activa.');
+
+  const v = estadoVentana(ev.rows[0].activoDesde, ev.rows[0].activoHasta);
+  if (v !== 'disponible') {
+    return jsonError('Esta evaluación no está disponible en este momento (fuera de la ventana de fechas configurada).');
+  }
   const evaluacionId = ev.rows[0].id;
 
   const yaExiste = await client.query(
@@ -228,4 +254,38 @@ export async function getDetalleIntentoEvaluacion(client: Client, body: JsonBody
   if (!result.rowCount) return jsonError('Este asesor todavía no resolvió la evaluación.');
 
   return jsonOk({ data: result.rows[0] });
+}
+
+// ===== Ventana de disponibilidad =====
+type EstadoVentana = 'disponible' | 'no_iniciada' | 'cerrada';
+
+function estadoVentana(activoDesde: Date | null, activoHasta: Date | null): EstadoVentana {
+  const ahora = new Date();
+  if (activoDesde && ahora < activoDesde) return 'no_iniciada';
+  if (activoHasta && ahora > activoHasta) return 'cerrada';
+  return 'disponible';
+}
+
+// ===== Configurar ventana de disponibilidad (solo ADMISION) =====
+export async function guardarVentanaEvaluacion(client: Client, body: JsonBody) {
+  const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
+  if (!sesion) return jsonError(error!);
+
+  const codigo = String(body.codigo || '').trim();
+  if (!codigo) return jsonError('Falta el código de la evaluación.');
+
+  const activoDesde = body.activoDesde ? new Date(body.activoDesde) : null;
+  const activoHasta = body.activoHasta ? new Date(body.activoHasta) : null;
+
+  if (activoDesde && activoHasta && activoDesde >= activoHasta) {
+    return jsonError('"Activo desde" debe ser anterior a "Activo hasta".');
+  }
+
+  const result = await client.query(
+    `update evaluaciones set activo_desde = $2, activo_hasta = $3 where codigo = $1`,
+    [codigo, activoDesde, activoHasta]
+  );
+  if (!result.rowCount) return jsonError('La evaluación no existe.');
+
+  return jsonOk();
 }

@@ -45,6 +45,7 @@ import {
   guardarIntentoEvaluacion,
   getResultadosEvaluacion,
   getDetalleIntentoEvaluacion,
+  guardarVentanaEvaluacion,
 } from './routes/evaluaciones';
 
 // Igual que getLeadsConAprobacion(body) en code.gs: mismo getLeads, pero
@@ -104,6 +105,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   guardarIntentoEvaluacion,
   getResultadosEvaluacion,
   getDetalleIntentoEvaluacion,
+  guardarVentanaEvaluacion,
 };
 
 export default {
