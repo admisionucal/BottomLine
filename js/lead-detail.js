@@ -210,20 +210,18 @@ async function cargarLead() {
 
     // Intentar caché
     const cachedSelected = cacheGet(CACHE_KEYS.LEAD_SELECTED(state.idPrometeo, state.campana));
-    const cachedDetail = cacheGet(CACHE_KEYS.LEAD_DETAIL(state.idPrometeo, state.campana, user.email));
 
-    // ASESOR: usar caché si existe
-    if (!esRolSupervisorOAdmision(user.rol) && cachedSelected) {
+    if (cachedSelected) {
         state.lead = cachedSelected;
-        state.historialAsesores = null;
+        state.historialAsesores = esRolSupervisorOAdmision(user.rol) ? state.historialAsesores : null;
         renderAll();
         cargarSolicitudPendiente();
         cargarSolicitudCC();
         if (esLeadNoOrdinario(state.lead)) actualizarCatalogoProcedencia().then(() => renderVista1());
-        return;
     }
 
-    // SUPERVISOR o sin caché: cargar del backend
+    // Siempre se pide el dato fresco al backend (para todos los roles),
+    // y ese resultado es el que manda al final.
     try {
         const result = await callAPI('getLeadDetail', {
             id: state.idPrometeo,
@@ -257,13 +255,15 @@ async function cargarLead() {
             cargarSolicitudPendiente();
             cargarSolicitudCC();
             if (esLeadNoOrdinario(state.lead)) actualizarCatalogoProcedencia().then(() => renderVista1());
-        } else {
+        } else if (!cachedSelected) {
             alert('Error al cargar datos del lead: ' + (result?.error || 'No encontrado'));
             window.location.href = 'dashboard.html?view=bottomline';
         }
     } catch (e) {
-        alert('Error de conexión: ' + e.message);
-        window.location.href = 'dashboard.html?view=bottomline';
+        if (!cachedSelected) {
+            alert('Error de conexión: ' + e.message);
+            window.location.href = 'dashboard.html?view=bottomline';
+        }
     }
 }
 
