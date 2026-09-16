@@ -44,7 +44,7 @@ const state = {
     solicitudes: [],
     solicitudesFiltradas: [],
     terminoBusqueda: '',
-    filtros: { carrera: [], asesor: [], estado: [], campana: [] },
+    filtros: { carrera: [], asesor: [], estado: ['PENDIENTE'], campana: [] },
     currentPage: 1,
     pageSize: 11,
     pagesPerBlock: 20,
