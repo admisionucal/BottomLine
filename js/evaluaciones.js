@@ -150,6 +150,7 @@ function renderCardAdmin(ev, puedeEditar) {
             <div class="eval-card-ventana-edit" id="ventanaEdit-${ev.codigo}" style="display:none;">
                 <label>Activo desde<br><input type="datetime-local" id="desde-${ev.codigo}" value="${toDatetimeLocalValue(ev.activoDesde)}"></label>
                 <label>Activo hasta<br><input type="datetime-local" id="hasta-${ev.codigo}" value="${toDatetimeLocalValue(ev.activoHasta)}"></label>
+                <label>Duración (minutos)<br><input type="number" min="1" max="480" step="1" id="duracion-${ev.codigo}" value="${ev.duracionMinutos ?? 40}"></label>
                 <div style="display:flex; gap:8px; margin-top:8px;">
                     <button type="button" class="btn-primary" onclick="window.guardarVentana && window.guardarVentana('${escapeHtml(ev.codigo)}')">Guardar</button>
                     <button type="button" class="btn-export" onclick="window.cancelarVentana && window.cancelarVentana('${escapeHtml(ev.codigo)}')">Cancelar</button>
@@ -177,10 +178,18 @@ window.cancelarVentana = (codigo) => {
 window.guardarVentana = async (codigo) => {
     const desde = document.getElementById(`desde-${codigo}`).value;
     const hasta = document.getElementById(`hasta-${codigo}`).value;
+    const duracionMinutos = parseInt(document.getElementById(`duracion-${codigo}`).value, 10);
+
+    if (!Number.isInteger(duracionMinutos) || duracionMinutos < 1) {
+        alert('Ingresa una duración válida en minutos.');
+        return;
+    }
+
     const result = await callAPI('guardarVentanaEvaluacion', {
         codigo,
         activoDesde: desde || null,
         activoHasta: hasta || null,
+        duracionMinutos,
     });
     if (!result.success) {
         alert(result.error || 'No se pudo guardar la ventana de disponibilidad.');
@@ -208,15 +217,17 @@ function toDatetimeLocalValue(iso) {
 }
 
 function renderVentanaTexto(ev) {
-    if (!ev.activoDesde && !ev.activoHasta) return 'Sin restricción de fechas';
+    const duracion = `${ev.duracionMinutos ?? 40} min`;
+    if (!ev.activoDesde && !ev.activoHasta) return `Sin restricción de fechas · Duración: ${duracion}`;
     const desde = ev.activoDesde ? formatearFechaHora(ev.activoDesde) : '—';
     const hasta = ev.activoHasta ? formatearFechaHora(ev.activoHasta) : '—';
-    return `Activo: ${desde} → ${hasta}`;
+    return `Activo: ${desde} → ${hasta} · Duración: ${duracion}`;
 }
 
 // ===== Asignación a asesores concretos =====
 
 function renderAsignacionTexto(ev) {
+    if (ev.asignadoANadie) return 'No asignada a nadie';
     if (ev.asignadoATodos) return 'Asignada a todos los asesores';
     return `Asignada a ${ev.totalAsignados} asesor${ev.totalAsignados === 1 ? '' : 'es'}`;
 }
@@ -241,27 +252,27 @@ window.editarAsignacion = async (codigo) => {
         obtenerAsesoresCache(),
         callAPI('getAsignacionesEvaluacion', { codigo }),
     ]);
-
     if (!asignResult.success) {
         edit.innerHTML = `<div class="eval-asig-empty">Error: ${escapeHtml(asignResult.error || 'No se pudo cargar la asignación.')}</div>`;
         return;
     }
-
-    const asignadosActuales = new Set(asignResult.usuarios || []);
-    const asignadoATodos = asignadosActuales.size === 0;
-
     if (!asesores.length) {
         edit.innerHTML = '<div class="eval-asig-empty">No hay asesores activos para asignar.</div>';
         return;
     }
 
+    const asignadosActuales = new Set(asignResult.usuarios || []);
+    const asignadoANadie = !!asignResult.asignadoANadie;
+    const modoInicial = asignadoANadie ? 'nadie' : (asignadosActuales.size === 0 ? 'todos' : 'especificos');
+
     edit.innerHTML = `
-        <label class="eval-asig-todos">
-            <input type="checkbox" id="asigTodos-${codigo}" ${asignadoATodos ? 'checked' : ''}>
-            Asignar a todos los asesores
-        </label>
+        <div class="eval-asig-modo">
+            <label><input type="radio" name="asigModo-${codigo}" value="todos" ${modoInicial === 'todos' ? 'checked' : ''}> Todos los asesores</label>
+            <label><input type="radio" name="asigModo-${codigo}" value="nadie" ${modoInicial === 'nadie' ? 'checked' : ''}> Nadie</label>
+            <label><input type="radio" name="asigModo-${codigo}" value="especificos" ${modoInicial === 'especificos' ? 'checked' : ''}> Asesores específicos</label>
+        </div>
         <input type="text" class="eval-asig-filtro" id="asigFiltro-${codigo}" placeholder="Buscar asesor por nombre…">
-        <div class="eval-asig-lista ${asignadoATodos ? 'disabled' : ''}" id="asigLista-${codigo}">
+        <div class="eval-asig-lista ${modoInicial !== 'especificos' ? 'disabled' : ''}" id="asigLista-${codigo}">
             ${asesores.map((a) => `
                 <label class="eval-asig-item" data-nombre="${escapeHtml((a.nombre || a.usuario).toLowerCase())}">
                     <input type="checkbox" class="asig-check-${codigo}" value="${escapeHtml(a.usuario)}" ${asignadosActuales.has(a.usuario) ? 'checked' : ''}>
@@ -276,10 +287,12 @@ window.editarAsignacion = async (codigo) => {
         </div>
     `;
 
-    const chkTodos = document.getElementById(`asigTodos-${codigo}`);
     const lista = document.getElementById(`asigLista-${codigo}`);
-    chkTodos.addEventListener('change', () => {
-        lista.classList.toggle('disabled', chkTodos.checked);
+    document.querySelectorAll(`input[name="asigModo-${codigo}"]`).forEach((radio) => {
+        radio.addEventListener('change', () => {
+            const modo = document.querySelector(`input[name="asigModo-${codigo}"]:checked`).value;
+            lista.classList.toggle('disabled', modo !== 'especificos');
+        });
     });
 
     const filtro = document.getElementById(`asigFiltro-${codigo}`);
@@ -291,30 +304,31 @@ window.editarAsignacion = async (codigo) => {
     });
 };
 
-window.cancelarAsignacion = (codigo) => {
-    document.getElementById(`asignacionEdit-${codigo}`).style.display = 'none';
-    document.getElementById(`asignacionView-${codigo}`).style.display = 'flex';
-};
-
 window.guardarAsignacion = async (codigo) => {
-    const chkTodos = document.getElementById(`asigTodos-${codigo}`);
-    const asignarATodos = chkTodos && chkTodos.checked;
+    const modo = document.querySelector(`input[name="asigModo-${codigo}"]:checked`)?.value || 'todos';
 
-    const usuarios = asignarATodos
-        ? []
-        : Array.from(document.querySelectorAll(`.asig-check-${codigo}:checked`)).map((chk) => chk.value);
-
-    if (!asignarATodos && usuarios.length === 0) {
-        if (!confirm('No seleccionaste ningún asesor. Si guardas así, esta evaluación quedará sin nadie asignado (no la verá ningún asesor). ¿Continuar?')) {
-            return;
-        }
+    if (modo === 'nadie' && !confirm('Ningún asesor podrá ver ni resolver esta evaluación mientras esté en este modo. ¿Continuar?')) {
+        return;
     }
 
-    const result = await callAPI('guardarAsignacionesEvaluacion', { codigo, usuarios });
+    const usuarios = modo === 'especificos'
+        ? Array.from(document.querySelectorAll(`.asig-check-${codigo}:checked`)).map((chk) => chk.value)
+        : [];
+
+    if (modo === 'especificos' && usuarios.length === 0) {
+        alert('Selecciona al menos un asesor, o elige "Todos" o "Nadie".');
+        return;
+    }
+
+    const result = await callAPI('guardarAsignacionesEvaluacion', { codigo, usuarios, asignadoANadie: modo === 'nadie' });
     if (!result.success) {
         alert(result.error || 'No se pudo guardar la asignación.');
         return;
     }
-
     await cargarEvaluaciones(getCurrentUser(), true);
+};
+
+window.cancelarAsignacion = (codigo) => {
+    document.getElementById(`asignacionEdit-${codigo}`).style.display = 'none';
+    document.getElementById(`asignacionView-${codigo}`).style.display = 'flex';
 };

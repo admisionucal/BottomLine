@@ -959,7 +959,9 @@ function obtenerBoletaVirtualFija(carrera, caso, modalidad) {
         'comunicacionymarketingdigital': 690,
         'disenodigitaldeinteriores': 690,
         'disenograficopublicitario': 690,
-        'disenograficoymarketingdigital': 690
+        'disenograficoymarketingdigital': 690,
+        'contabilidad': 690,
+        'ingenieriadesistemas': 690,
     };
     if (preciosEspeciales690[carreraNorm] !== undefined) return 690;
     if (carreraNorm === 'disenograficopublicitario' && caso === 2) return 690;

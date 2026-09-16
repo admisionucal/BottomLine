@@ -372,6 +372,7 @@ const EVAL = {
 const KEY = "ucal_eval_marca_v2";
 const $ = id => document.getElementById(id);
 let S = { name:"", mail:"", date:"", startedAt:null, expiresAt:null, answers:{}, idx:0, submitted:false, result:null };
+let DURACION_MIN = EVAL.timeLimitMin; 
 let tick = null, saveTimer = null;
 
 // ── Integración con RUMBO GAC (sesión, código de evaluación, API) ──
@@ -458,6 +459,10 @@ function bloquearPorRol(mensaje){
     return;
   }
 
+  if (estado.evaluacion && Number(estado.evaluacion.duracionMinutos) > 0) {
+    DURACION_MIN = Number(estado.evaluacion.duracionMinutos);
+  }
+
   if (estado.intento && estado.intento.detalle){
     // Ya la resolvió: se muestra directo el resultado guardado en el
     // servidor (mismo shape que genera finalize(), así que renderResult
@@ -481,7 +486,7 @@ $("btn-start").onclick = () => {
     S = prev; S.name = name; S.mail = $("f-mail").value.trim(); S.date = $("f-date").value.trim();
   } else {
     S = { name, mail:$("f-mail").value.trim(), date:$("f-date").value.trim(),
-          startedAt: Date.now(), expiresAt: Date.now() + EVAL.timeLimitMin*60000,
+          startedAt: Date.now(), expiresAt: Date.now() + DURACION_MIN*60000,
           answers:{}, idx:0, submitted:false, result:null };
   }
   save(); showScreen("scr-quiz"); $("timer").hidden=false; renderNav(); renderQuestion(); runTimer();

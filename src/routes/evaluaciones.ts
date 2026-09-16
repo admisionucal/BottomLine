@@ -19,11 +19,14 @@ import { exigirSesion } from '../lib/session';
 // Fragmento SQL reutilizable: "esta evaluación (e.id) está abierta para
 // este usuario ($1)", ya sea porque no tiene restricción o porque está
 // explícitamente asignado.
-const SQL_ASIGNADA_A = (evaluacionIdExpr: string, usuarioParam: string) => `(
-  not exists (select 1 from evaluacion_asignaciones ea where ea.evaluacion_id = ${evaluacionIdExpr})
-  or exists (
-    select 1 from evaluacion_asignaciones ea
-    where ea.evaluacion_id = ${evaluacionIdExpr} and ea.usuario = ${usuarioParam}
+const SQL_ASIGNADA_A = (evalAlias: string, evaluacionIdExpr: string, usuarioParam: string) => `(
+  not ${evalAlias}.asignado_a_nadie
+  and (
+    not exists (select 1 from evaluacion_asignaciones ea where ea.evaluacion_id = ${evaluacionIdExpr})
+    or exists (
+      select 1 from evaluacion_asignaciones ea
+      where ea.evaluacion_id = ${evaluacionIdExpr} and ea.usuario = ${usuarioParam}
+    )
   )
 )`;
 
@@ -42,23 +45,24 @@ export async function getEvaluaciones(client: Client, body: JsonBody) {
 
   const result = await client.query(
     `select e.id, e.codigo, e.titulo, e.descripcion, e.archivo, e.orden,
-            e.activo_desde as "activoDesde", e.activo_hasta as "activoHasta",
-            i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje, i.finalizado_en,
-            (select count(*) from evaluacion_asignaciones ea where ea.evaluacion_id = e.id) as "totalAsignados",
-            (select count(*) from usuarios u
-              where upper(u.rol) = 'ASESOR' and u.activo = true
-                and ${SQL_ASIGNADA_A('e.id', 'u.usuario')}) as "totalAsesores",
-            (select count(*) from evaluacion_intentos i2
-              join usuarios u2 on u2.usuario = i2.usuario
-              where i2.evaluacion_id = e.id
-                and upper(u2.rol) = 'ASESOR' and u2.activo = true
-                and ${SQL_ASIGNADA_A('e.id', 'u2.usuario')}) as "completados"
-     from evaluaciones e
-     left join evaluacion_intentos i
-       on i.evaluacion_id = e.id and i.usuario = $1
-     where e.activo = true
-       and ($2::boolean = true or ${SQL_ASIGNADA_A('e.id', '$1')})
-     order by e.orden, e.id`,
+          e.activo_desde as "activoDesde", e.activo_hasta as "activoHasta",
+          e.duracion_minutos as "duracionMinutos",
+          e.asignado_a_nadie as "asignadoANadie",
+          i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje, i.finalizado_en,
+          (select count(*) from evaluacion_asignaciones ea where ea.evaluacion_id = e.id) as "totalAsignados",
+          (select count(*) from usuarios u
+            where upper(u.rol) = 'ASESOR' and u.activo = true
+              and ${SQL_ASIGNADA_A('e', 'e.id', 'u.usuario')}) as "totalAsesores",
+          (select count(*) from evaluacion_intentos i2
+            join usuarios u2 on u2.usuario = i2.usuario
+            where i2.evaluacion_id = e.id
+              and upper(u2.rol) = 'ASESOR' and u2.activo = true
+              and ${SQL_ASIGNADA_A('e', 'e.id', 'u2.usuario')}) as "completados"
+    from evaluaciones e
+    left join evaluacion_intentos i on i.evaluacion_id = e.id and i.usuario = $1
+    where e.activo = true
+      and ($2::boolean = true or ${SQL_ASIGNADA_A('e', 'e.id', '$1')})
+    order by e.orden, e.id`,
     [sesion.usuario, esAdmin]
   );
 
@@ -83,6 +87,7 @@ export async function getEvaluaciones(client: Client, body: JsonBody) {
       orden: ev.orden,
       activoDesde: ev.activoDesde,
       activoHasta: ev.activoHasta,
+      duracionMinutos: ev.duracionMinutos,
       estado,
       resultado: completado
         ? {
@@ -97,7 +102,8 @@ export async function getEvaluaciones(client: Client, body: JsonBody) {
             totalAsesores: Number(ev.totalAsesores) || 0,
             completados: Number(ev.completados) || 0,
             totalAsignados: Number(ev.totalAsignados) || 0,
-            asignadoATodos: Number(ev.totalAsignados) === 0,
+            asignadoATodos: Number(ev.totalAsignados) === 0 && !ev.asignadoANadie,
+            asignadoANadie: !!ev.asignadoANadie,
           }
         : {}),
     };
@@ -117,7 +123,8 @@ export async function getEstadoEvaluacion(client: Client, body: JsonBody) {
   if (!codigo) return jsonError('Falta el código de la evaluación.');
 
   const ev = await client.query(
-    `select id, titulo, activo_desde as "activoDesde", activo_hasta as "activoHasta"
+    `select id, titulo, activo_desde as "activoDesde", activo_hasta as "activoHasta",
+            duracion_minutos as "duracionMinutos"
     from evaluaciones where codigo = $1 and activo = true`,
     [codigo]
   );
@@ -132,7 +139,7 @@ export async function getEstadoEvaluacion(client: Client, body: JsonBody) {
   // aquí normalmente para revisar, no para resolver).
   if (sesion.rol === 'ASESOR') {
     const asignada = await client.query(
-      `select ${SQL_ASIGNADA_A('$1', '$2')} as "leToca"`,
+      `select ${SQL_ASIGNADA_A('e', '$1', '$2')} as "leToca" from evaluaciones e where e.id = $1`,
       [evaluacionId, sesion.usuario]
     );
     if (!asignada.rows[0].leToca) {
@@ -200,7 +207,7 @@ export async function guardarIntentoEvaluacion(client: Client, body: JsonBody) {
   // hasta acá a alguien no asignado (getEstadoEvaluacion lo bloquea antes),
   // se revalida igual por si el envío llega sin pasar por esa pantalla.
   const asignada = await client.query(
-    `select ${SQL_ASIGNADA_A('$1', '$2')} as "leToca"`,
+    `select ${SQL_ASIGNADA_A('e', '$1', '$2')} as "leToca" from evaluaciones e where e.id = $1`,
     [evaluacionId, sesion.usuario]
   );
   if (!asignada.rows[0].leToca) {
@@ -257,11 +264,12 @@ export async function getResultadosEvaluacion(client: Client, body: JsonBody) {
   const result = await client.query(
     `select u.usuario, coalesce(u.nombre_aux, u.nombre) as nombre, u.campana,
             i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje, i.finalizado_en, i.duracion_segundos, i.por_tiempo
-     from usuarios u
-     left join evaluacion_intentos i on i.evaluacion_id = $1 and i.usuario = u.usuario
-     where upper(u.rol) = 'ASESOR' and u.activo = true
-       and ${SQL_ASIGNADA_A('$1', 'u.usuario')}
-     order by nombre`,
+    from usuarios u
+    cross join evaluaciones e
+    left join evaluacion_intentos i on i.evaluacion_id = $1 and i.usuario = u.usuario
+    where e.id = $1 and upper(u.rol) = 'ASESOR' and u.activo = true
+      and ${SQL_ASIGNADA_A('e', '$1', 'u.usuario')}
+    order by nombre`,
     [ev.rows[0].id]
   );
 
@@ -315,7 +323,7 @@ export async function getAsignacionesEvaluacion(client: Client, body: JsonBody) 
   const codigo = String(body.codigo || '').trim();
   if (!codigo) return jsonError('Falta el código de la evaluación.');
 
-  const ev = await client.query(`select id from evaluaciones where codigo = $1`, [codigo]);
+  const ev = await client.query(`select id, asignado_a_nadie from evaluaciones where codigo = $1`, [codigo]);
   if (!ev.rowCount) return jsonError('La evaluación no existe.');
 
   const result = await client.query(
@@ -323,7 +331,7 @@ export async function getAsignacionesEvaluacion(client: Client, body: JsonBody) 
     [ev.rows[0].id]
   );
 
-  return jsonOk({ usuarios: result.rows.map((r) => r.usuario) });
+  return jsonOk({ usuarios: result.rows.map((r) => r.usuario), asignadoANadie: ev.rows[0].asignado_a_nadie });
 }
 
 // Escritura: reemplaza por completo la lista de asignados (solo ADMISION,
@@ -340,12 +348,16 @@ export async function guardarAsignacionesEvaluacion(client: Client, body: JsonBo
   if (!ev.rowCount) return jsonError('La evaluación no existe.');
   const evaluacionId = ev.rows[0].id;
 
-  const usuarios = Array.isArray(body.usuarios)
-    ? Array.from(new Set(body.usuarios.map((u: any) => String(u).trim()).filter(Boolean)))
-    : [];
+  const asignadoANadie = !!body.asignadoANadie;
+  const usuarios = asignadoANadie
+    ? []
+    : Array.isArray(body.usuarios)
+      ? Array.from(new Set(body.usuarios.map((u: any) => String(u).trim()).filter(Boolean)))
+      : [];
 
   try {
     await client.query('begin');
+    await client.query(`update evaluaciones set asignado_a_nadie = $2 where id = $1`, [evaluacionId, asignadoANadie]);
     await client.query(`delete from evaluacion_asignaciones where evaluacion_id = $1`, [evaluacionId]);
     for (const usuario of usuarios) {
       await client.query(
@@ -361,7 +373,11 @@ export async function guardarAsignacionesEvaluacion(client: Client, body: JsonBo
     return jsonError('Error al guardar la asignación: ' + (e?.message || String(e)));
   }
 
-  return jsonOk({ asignados: usuarios.length, asignadoATodos: usuarios.length === 0 });
+  return jsonOk({
+    asignados: usuarios.length,
+    asignadoATodos: !asignadoANadie && usuarios.length === 0,
+    asignadoANadie,
+  });
 }
 
 // ===== Calificación asistida por IA (solo ASESOR, y solo mientras resuelve) =====
@@ -444,14 +460,18 @@ export async function guardarVentanaEvaluacion(client: Client, body: JsonBody) {
 
   const activoDesde = parseFechaLima(body.activoDesde);
   const activoHasta = parseFechaLima(body.activoHasta);
-
   if (activoDesde && activoHasta && activoDesde >= activoHasta) {
     return jsonError('"Activo desde" debe ser anterior a "Activo hasta".');
   }
 
+  const duracionMinutos = Number(body.duracionMinutos);
+  if (!Number.isInteger(duracionMinutos) || duracionMinutos < 1 || duracionMinutos > 480) {
+    return jsonError('La duración debe ser un número entero de minutos, entre 1 y 480.');
+  }
+
   const result = await client.query(
-    `update evaluaciones set activo_desde = $2, activo_hasta = $3 where codigo = $1`,
-    [codigo, activoDesde, activoHasta]
+    `update evaluaciones set activo_desde = $2, activo_hasta = $3, duracion_minutos = $4 where codigo = $1`,
+    [codigo, activoDesde, activoHasta, duracionMinutos]
   );
   if (!result.rowCount) return jsonError('La evaluación no existe.');
 

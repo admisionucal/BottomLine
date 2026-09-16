@@ -49,3 +49,6 @@ values (
     1
 )
 on conflict (codigo) do nothing;
+
+alter table evaluaciones add column if not exists asignado_a_nadie boolean not null default false;
+alter table evaluaciones add column if not exists duracion_minutos integer not null default 40;

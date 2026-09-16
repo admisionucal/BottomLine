@@ -78,6 +78,20 @@ function categoriasVisiblesParaRol(esAdmin) {
     return esAdmin ? CATEGORIAS_POR_ROL.admin : CATEGORIAS_POR_ROL.asesor;
 }
 
+function calcularColumnasBoleta(lead) {
+    const total = lead['BOLETA_FINAL'] ?? lead['BOLETA FINAL'];
+    if (total === undefined || total === null || total === '') {
+        return { boleta: '-', boletaConMatricula: '-' };
+    }
+    const totalNum = parseFloat(total) || 0;
+    const matriculaNum = parseFloat(lead['MATRICULA_FINAL']) || 0;
+    const admisionNum = parseFloat(lead['ADMISION_FINAL']) || 0;
+    return {
+        boleta: (totalNum - matriculaNum - admisionNum).toFixed(2),
+        boletaConMatricula: totalNum.toFixed(2),
+    };
+}
+
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', async () => {
     const user = getCurrentUser();
@@ -1185,7 +1199,7 @@ function abrirDetalleDia(claveDia) {
         const carrera = lead['CARRERA'] || lead['PROGRAMA'] || '-';
         const modalidadIngreso = lead['MODALIDAD INGRESO'] || '-';
         const modalidad = lead['MODALIDAD'] || '-';
-        const boletaFinal = lead['BOLETA_FINAL'] || lead['BOLETA FINAL'] || '-';
+        const { boleta, boletaConMatricula } = calcularColumnasBoleta(lead);
         const asesor = lead[COLUMNAS.ASESOR_ULTIMO_CONTACTO] || '-';
         const cat = CATEGORIAS_CALENDARIO[categoria];
         filas += `
@@ -1196,12 +1210,13 @@ function abrirDetalleDia(claveDia) {
                 <td>${escapeHtml(carrera)}</td>
                 <td>${escapeHtml(modalidadIngreso)}</td>
                 <td>${escapeHtml(modalidad)}</td>
-                <td>S/ ${escapeHtml(boletaFinal)}</td>
+                <td>${boleta === '-' ? '-' : 'S/ ' + escapeHtml(boleta)}</td>
+                <td>${boletaConMatricula === '-' ? '-' : 'S/ ' + escapeHtml(boletaConMatricula)}</td>
                 ${esAdmin ? `<td>${escapeHtml(asesor)}</td>` : ''}
             </tr>`;
     });
 
-    const colspan = (esAdmin ? 7 : 6) + (mostrarCampana ? 1 : 0);
+    const colspan = (esAdmin ? 8 : 7) + (mostrarCampana ? 1 : 0);
 
     const modalHtml = `
         <div class="cal-modal-overlay cal-modal-overlay-top" id="calModalOverlay" onclick="cerrarDetalleDia(event)">
@@ -1217,7 +1232,7 @@ function abrirDetalleDia(claveDia) {
                 <div class="cal-modal-body">
                     <table>
                         <thead><tr>
-                            <th>CATEGORÍA</th>${mostrarCampana ? '<th>CAMPAÑA</th>' : ''}<th>ID</th><th>CARRERA</th><th>MODALIDAD INGRESO</th><th>MODALIDAD</th><th>BOLETA FINAL</th>${esAdmin ? '<th>ASESOR</th>' : ''}
+                            <th>CATEGORÍA</th>${mostrarCampana ? '<th>CAMPAÑA</th>' : ''}<th>ID</th><th>CARRERA</th><th>MODALIDAD INGRESO</th><th>MODALIDAD</th><th>BOLETA</th><th>BOLETA CON CONCEPTOS DE MATRÍCULA</th>${esAdmin ? '<th>ASESOR</th>' : ''}
                         </tr></thead>
                         <tbody>${filas || `<tr><td colspan="${colspan}" style="text-align:center;color:#888;padding:20px;">Sin registros</td></tr>`}</tbody>
                     </table>
@@ -1253,7 +1268,7 @@ function abrirPopupPerfilamiento(clave) {
         const nombre = l[COLUMNAS.NOMBRES] || 'Sin Nombre';
         const carrera = l[COLUMNAS.CARRERA] || l['PROGRAMA'] || '-';
         const modalidad = l[COLUMNAS.MODALIDAD] || '-';
-        const boleta = l[COLUMNAS.BOLETA_FINAL] || l[COLUMNAS.BOLETA] || '-';
+        const { boleta, boletaConMatricula } = calcularColumnasBoleta(l);
         const asesor = l[COLUMNAS.ASESOR_ULTIMO_CONTACTO] || '-';
         const campLead = l[COLUMNAS.CAMPANA] || '';
         filas += `
@@ -1263,7 +1278,8 @@ function abrirPopupPerfilamiento(clave) {
                 <td>${escapeHtml(nombre)}</td>
                 <td>${escapeHtml(carrera)}</td>
                 <td>${escapeHtml(modalidad)}</td>
-                <td>S/ ${escapeHtml(boleta)}</td>
+                <td>${boleta === '-' ? '-' : 'S/ ' + escapeHtml(boleta)}</td>
+                <td>${boletaConMatricula === '-' ? '-' : 'S/ ' + escapeHtml(boletaConMatricula)}</td>
             </tr>`;
     });
 
@@ -1280,9 +1296,9 @@ function abrirPopupPerfilamiento(clave) {
                 <div class="cal-modal-body">
                     <table>
                         <thead><tr>
-                            <th>ASESOR</th><th>ID</th><th>NOMBRE DEL LEAD</th><th>CARRERA</th><th>MODALIDAD</th><th>BOLETA</th>
+                            <th>ASESOR</th><th>ID</th><th>NOMBRE DEL LEAD</th><th>CARRERA</th><th>MODALIDAD</th><th>BOLETA</th><th>BOLETA CON CONCEPTOS DE MATRÍCULA</th>
                         </tr></thead>
-                        <tbody>${filas || '<tr><td colspan="6" style="text-align:center;color:#888;padding:20px;">Sin registros</td></tr>'}</tbody>
+                        <tbody>${filas || '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">Sin registros</td></tr>'}</tbody>
                     </table>
                 </div>
             </div>
@@ -1315,7 +1331,9 @@ function construirFilasExportCalendario(items, esAdmin, incluirFecha) {
         fila['CARRERA'] = lead['CARRERA'] || lead['PROGRAMA'] || '';
         fila['MODALIDAD INGRESO'] = lead['MODALIDAD INGRESO'] || '';
         fila['MODALIDAD'] = lead['MODALIDAD'] || '';
-        fila['BOLETA FINAL'] = lead['BOLETA_FINAL'] || lead['BOLETA FINAL'] || '';
+        const { boleta, boletaConMatricula } = calcularColumnasBoleta(lead);
+        fila['BOLETA'] = boleta;
+        fila['BOLETA CON CONCEPTOS DE MATRÍCULA'] = boletaConMatricula;
         if (esAdmin) fila['ASESOR'] = lead[COLUMNAS.ASESOR_ULTIMO_CONTACTO] || '';
         return fila;
     });
