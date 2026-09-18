@@ -131,3 +131,65 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
 
   return jsonOk({ data: leadObj });
 }
+
+const MODELO_IA_PROPUESTA = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+
+export async function generarPropuestaIA(client: Client, body: JsonBody, env: Env) {
+  //const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
+  const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
+  if (!sesion) return jsonError(error!);
+
+  const idTarget = String(body.id || '').trim();
+  const campana = String(body.campana || '').trim();
+  if (!idTarget || !campana) return jsonError('Falta id o campaña.');
+
+  const bottomResult = await client.query(
+    `select * from leads_bottom where id_prometeo = $1 and campana = $2
+     order by actualizado_en desc limit 1`,
+    [idTarget, campana]
+  );
+  const bottom = bottomResult.rows[0];
+  if (!bottom) return jsonError('Este lead no tiene datos de perfilamiento aún.');
+
+  if (!env.AI) return jsonError('Workers AI no está habilitado en este Worker.');
+
+  const prompt = `
+Eres un asistente de un equipo de admisión universitaria. En base a la
+siguiente información de un postulante, redacta una PROPUESTA DE ACCIÓN
+concreta y accionable para que el asesor/supervisor sepa qué hacer con
+este lead a continuación. Máximo 120 palabras, en español, sin viñetas
+markdown, tono profesional y directo.
+
+Por qué eligió la carrera: ${bottom.por_que_eligio_carrera || '(sin dato)'}
+Qué busca en una universidad: ${bottom.que_busca_universidad || '(sin dato)'}
+Quién financiará: ${bottom.quien_financiara || '(sin dato)'}
+Qué le falta para decidir: ${bottom.que_le_falta || '(sin dato)'}
+Otras opciones que evalúa: ${bottom.otras_opciones || '(sin dato)'}
+Dolor / Necesidad: ${bottom.dolor_necesidad || '(sin dato)'}
+Comentarios del asesor: ${bottom.comentarios_perfil || '(sin dato)'}
+Acciones ya definidas por el supervisor: ${bottom.acciones_definidas || '(sin dato)'}
+`.trim();
+
+  try {
+    const salida: any = await env.AI.run(MODELO_IA_PROPUESTA, {
+      messages: [
+        { role: 'system', content: 'Respondes solo con el texto de la propuesta, sin encabezados ni comillas.' },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 400,
+    });
+
+    const texto = String(salida?.response ?? '').trim();
+    if (!texto) return jsonError('La IA no devolvió una propuesta.');
+
+    await client.query(
+      `update leads_bottom set propuesta_accion_ia = $3, propuesta_accion_ia_generada_en = now()
+       where id_prometeo = $1 and campana = $2`,
+      [idTarget, campana, texto]
+    );
+
+    return jsonOk({ propuesta: texto });
+  } catch (err: any) {
+    return jsonError('No se pudo generar la propuesta: ' + err.message);
+  }
+}

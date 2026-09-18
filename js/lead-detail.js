@@ -5,7 +5,8 @@
 import {
     API_URL, COLUMNAS, STATUS, STATUS_LABELS, STATUS_CLASES,
     CACHE_KEYS, SELECT_OPTIONS, PRECIOS_BASE,
-    esRolSupervisorOAdmision, TIPOS_INSTITUCION_PROCEDENCIA
+    esRolSupervisorOAdmision, TIPOS_INSTITUCION_PROCEDENCIA,
+    esRolAdmision
 } from '../core/constants.js';
 
 import {
@@ -1489,6 +1490,21 @@ function renderVista2() {
         `;
     });
 
+    if (esRolAdmision(user.rol)) {
+        html += `
+            <div style="grid-column: 1 / -1;">
+                <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">
+                    Propuesta de Acción de la IA
+                </label>
+                <textarea id="inputPropuestaIA" class="campo-editable-input" style="width:100%; min-height:70px; padding:10px 12px; border:1px solid var(--color-border); border-radius:6px; font-size:14px; font-family:inherit; resize:vertical;" ${bloqueado ? 'disabled' : ''}>${escapeHtml(lead[COLUMNAS.PROPUESTA_ACCION_IA] || '')}</textarea>
+                <button type="button" class="btn-link" id="btnGenerarPropuestaIA" ${bloqueado ? 'disabled' : ''}>
+                    <span class="material-symbols-outlined" style="font-size:14px;vertical-align:-2px;">auto_awesome</span>
+                    Generar con IA
+                </button>
+            </div>
+        `;
+    }
+
     html += `
             </div>
             <button class="btn-guardar" id="btnGuardarPerfil" ${bloqueado ? 'disabled' : ''}>
@@ -1538,6 +1554,19 @@ function renderVista2() {
             inputOpcionInstNombre.placeholder = tipoSel ? 'Escribe para buscar...' : 'Selecciona primero el tipo';
         });
     }
+
+    document.getElementById('btnGenerarPropuestaIA')?.addEventListener('click', async () => {
+        const btn = document.getElementById('btnGenerarPropuestaIA');
+        btn.disabled = true; btn.textContent = 'Generando…';
+        const result = await callAPI('generarPropuestaIA', { id, campana: state.campana });
+        if (result.success) {
+            document.getElementById('inputPropuestaIA').value = result.propuesta;
+            state.lead.PROPUESTA_ACCION_IA = result.propuesta;
+        } else {
+            alert(result.error || 'No se pudo generar la propuesta.');
+        }
+        btn.disabled = false; btn.textContent = 'Generar con IA';
+    });
 }
 
 function selectorPerfilamientoHTML(cfg, lead, bloqueado) {

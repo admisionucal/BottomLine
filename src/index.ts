@@ -10,7 +10,7 @@ import {
   actualizarCampanasAsesor,
 } from './routes/asistencia';
 import { getLeads } from './routes/leads';
-import { getLeadDetail } from './routes/leadDetail';
+import { getLeadDetail, generarPropuestaIA } from './routes/leadDetail';
 import { saveBottom, addComment } from './routes/bottom';
 import { getCatalogos } from './routes/catalogos';
 import { obtenerBottomParaCC } from './routes/obtenerBottomParaCC';
@@ -75,6 +75,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   getLeads,
   getLeadsConAprobacion,
   getLeadDetail,
+  generarPropuestaIA,
   saveBottom,
   addComment,
   getCatalogos,
