@@ -147,11 +147,34 @@ async function cargarResultados(codigo) {
 // MODAL DE DETALLE: Pregunta + Respuesta + Nota + Consejo
 // ================================================================
 
+const RES_MODAL_HTML = `
+    <div class="modal-overlay" id="resDetalleModal">
+        <div class="modal-box modal-box-detalle">
+            <button class="modal-close-x" id="resDetalleModalClose">
+                <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span>
+            </button>
+            <h4 id="resDetalleTitulo" style="margin-bottom:2px;"></h4>
+            <p id="resDetalleSub" style="color:#777; font-size:13px; margin-bottom:16px;"></p>
+            <div id="resDetalleContenido"><div class="loading">Cargando detalle…</div></div>
+        </div>
+    </div>`;
+
 let __resDetalleListenersAtados = false;
 
+function asegurarModalDetalleEnDOM() {
+    let modal = document.getElementById('resDetalleModal');
+    if (modal) return modal;
+
+    document.body.insertAdjacentHTML('beforeend', RES_MODAL_HTML);
+    modal = document.getElementById('resDetalleModal');
+    __resDetalleListenersAtados = false; // permite atar listeners al nodo recién creado
+    return modal;
+}
+
 function inicializarModalDetalle() {
+    const modal = asegurarModalDetalleEnDOM();
     if (__resDetalleListenersAtados) return;
-    const modal = document.getElementById('resDetalleModal');
+
     const btnClose = document.getElementById('resDetalleModalClose');
     if (!modal || !btnClose) return;
 
@@ -167,7 +190,7 @@ function inicializarModalDetalle() {
 }
 
 function abrirModalDetalle() {
-    const modal = document.getElementById('resDetalleModal');
+    const modal = asegurarModalDetalleEnDOM();
     if (modal) modal.classList.add('show');
 }
 
