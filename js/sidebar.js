@@ -119,6 +119,7 @@ function cargarVistaUsuario() {
 
             contenedor.innerHTML = '';
             contenedor.appendChild(usuarioApp.cloneNode(true));
+            if (resModal) contenedor.appendChild(resModal.cloneNode(true));
 
             return asegurarScriptUsuario();
         })
