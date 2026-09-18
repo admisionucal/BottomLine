@@ -104,6 +104,7 @@ function cargarVistaUsuario() {
         .then(html => {
             const doc = new DOMParser().parseFromString(html, 'text/html');
             const usuarioApp = doc.getElementById('usuarioApp');
+            const resModal = doc.getElementById('resDetalleModal');
 
             if (!usuarioApp) {
                 throw new Error('usuario.html no tiene el elemento #usuarioApp esperado');
