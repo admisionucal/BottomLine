@@ -1438,6 +1438,25 @@ function exportarCalendarioActual() {
     }
 }
 
+async function actualizarCalendarioLeads() {
+    const btn = document.getElementById('btnActualizarCalendario');
+    if (btn?.disabled) return;
+    const htmlOriginal = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">refresh</span> Actualizando…';
+    }
+    try {
+        await cargarLeadsCalendario(true); // ignora la caché y vuelve a pedir los leads
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = htmlOriginal;
+        }
+    }
+}
+
+window.actualizarCalendarioLeads = actualizarCalendarioLeads;
 window.cambiarVistaCalendario = cambiarVistaCalendario;
 window.toggleCategoriaCalendario = toggleCategoriaCalendario;
 window.cambiarMesCalendario = cambiarMesCalendario;

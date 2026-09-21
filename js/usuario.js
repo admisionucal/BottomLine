@@ -16,6 +16,34 @@ import {
 
 import { Sidebar } from '../core/components.js';
 
+// ===== CAMPAÑAS VIGENTES =====
+let __vigentesPromise = null;
+
+async function obtenerCampanasVigentes() {
+    const todas = getUserCampanas();
+    if (todas.length === 0) return [];
+    try {
+        const r = await callAPI('getCampanasConfig');
+        if (!r.success) return todas;
+        const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+        const porCodigo = {};
+        (r.data || []).forEach(c => { porCodigo[c.codigo] = c; });
+        const vigentes = todas.filter(cod => {
+            const c = porCodigo[cod];
+            return c && c.activa && (!c.fechaFinPeriodo || String(c.fechaFinPeriodo).slice(0, 10) >= hoy);
+        });
+        return vigentes.length ? vigentes : todas; // si ninguna está vigente, no dejar vacío
+    } catch (e) {
+        return todas;
+    }
+}
+
+// Una sola llamada a la API por visita al perfil, compartida por las 3 secciones
+function campanasVigentesUsuario() {
+    if (!__vigentesPromise) __vigentesPromise = obtenerCampanasVigentes();
+    return __vigentesPromise;
+}
+
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', () => {
     const user = getCurrentUser();
@@ -45,13 +73,15 @@ function initUsuario() {
     document.getElementById('userProfileEmail').textContent = user.email || '—';
 
     // Campañas
-    const campanas = getUserCampanas();
     const contCampanas = document.getElementById('userProfileCampanas');
-    if (contCampanas) {
+    if (contCampanas) contCampanas.textContent = '…';
+    __vigentesPromise = null; // fuerza a releer la config en cada visita al perfil
+    campanasVigentesUsuario().then(campanas => {
+        if (!contCampanas) return;
         contCampanas.innerHTML = campanas.length
             ? campanas.map(c => `<span class="campana-tag">${escapeHtml(c)}</span>`).join('')
             : '—';
-    }
+    });
 
     // Foto
     const fotoEl = document.getElementById('userProfileFoto');
@@ -149,7 +179,7 @@ async function cargarVpPpAsesor(user) {
     if (!cont) return;
     cont.innerHTML = '<div class="user-kpi-loading">Cargando VP/PP…</div>';
 
-    const campanas = getUserCampanas();
+    const campanas = await campanasVigentesUsuario();
     if (campanas.length === 0) {
         cont.innerHTML = renderTarjetaVpPp('Valoraciones Positivas (VP)', 0, 0, 'trending_up') +
                         renderTarjetaVpPp('Promesas de Pago (PP)', 0, 0, 'handshake');
@@ -175,7 +205,7 @@ async function cargarVpPpPorCampanaAdmin(user) {
     if (!cont) return;
     cont.innerHTML = '<div class="user-kpi-loading">Cargando VP/PP por campaña…</div>';
 
-    const campanas = getUserCampanas();
+    const campanas = await campanasVigentesUsuario();
     if (campanas.length === 0) { cont.innerHTML = ''; return; }
 
     const resumen = await obtenerResumenVpPpCacheado(user, campanas);
