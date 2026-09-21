@@ -135,7 +135,6 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
 const MODELO_IA_PROPUESTA = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 export async function generarPropuestaIA(client: Client, body: JsonBody, env: Env) {
-  //const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
   if (!sesion) return jsonError(error!);
 
@@ -153,12 +152,65 @@ export async function generarPropuestaIA(client: Client, body: JsonBody, env: En
 
   if (!env.AI) return jsonError('Workers AI no está habilitado en este Worker.');
 
+  // --- Fechas: las calculamos nosotros, no se las dejamos "adivinar" a la IA ---
+  const hoy = new Date();
+  const fmt = (d: Date) => d.toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const hoyStr = fmt(hoy);
+  const anioActual = hoy.getFullYear();
+
+  const limiteContacto = new Date(hoy);
+  limiteContacto.setDate(limiteContacto.getDate() + 3);
+  const limiteStr = fmt(limiteContacto);
+
+  // --- Historial de comentarios: fechas reales (ISO, guardadas por el sistema) ---
+  let historial: any[] = [];
+  try {
+    historial = Array.isArray(bottom.comentarios_historial)
+      ? bottom.comentarios_historial
+      : JSON.parse(bottom.comentarios_historial || '[]');
+  } catch {
+    historial = [];
+  }
+
+  const ultimo = historial[historial.length - 1];
+  let diasSinContacto: number | null = null;
+  if (ultimo?.fecha) {
+    diasSinContacto = Math.floor((hoy.getTime() - new Date(ultimo.fecha).getTime()) / 86400000);
+  }
+
+  const historialTexto = historial.slice(-5)
+    .map((h: any) => `- [${h.fecha ? fmt(new Date(h.fecha)) : 'sin fecha'}] ${h.texto || ''}`)
+    .join('\n') || '(sin comentarios previos registrados)';
+
   const prompt = `
 Eres un asistente de un equipo de admisión universitaria. En base a la
 siguiente información de un postulante, redacta una PROPUESTA DE ACCIÓN
-concreta y accionable para que el asesor/supervisor sepa qué hacer con
-este lead a continuación. Máximo 120 palabras, en español, sin viñetas
-markdown, tono profesional y directo.
+para que el asesor/supervisor sepa qué hacer con este lead a continuación.
+
+DATOS DE FECHA (usa estos, no los calcules tú mismo):
+- Hoy es: ${hoyStr}
+- Último contacto registrado: ${ultimo ? fmt(new Date(ultimo.fecha)) : 'sin registro'}${diasSinContacto !== null ? ` (hace ${diasSinContacto} día(s))` : ''}
+- Fecha límite para el próximo contacto (máx. 3 días sin contacto): ${limiteStr}
+
+Reglas:
+- El seguimiento a un lead nunca debe superar los 3 días sin contacto.
+  Indica cuándo debe ser el próximo contacto, usando la fecha límite de
+  arriba como referencia (puedes decir "hoy", "mañana", o la fecha exacta).
+- Si en el historial de comentarios aparece una fecha SIN año (ej. "25/09"
+  o "el 15 de octubre"), asume que corresponde al año actual (${anioActual}),
+  salvo que el propio texto indique otro año explícitamente.
+- Propón 1 o 2 GANCHOS DE CONTACTO concretos y específicos para ESTE lead
+  (no genéricos): usa su dolor/necesidad, sus comentarios, la carrera que
+  eligió o la universidad con la que compara, y sugiere qué enviarle o
+  decirle (testimonio, comparación de precios, info de becas, foto/video
+  del campus, etc.) según corresponda.
+- No repitas los datos de perfilamiento tal cual; úsalos para justificar
+  el gancho, no los enumeres.
+- Máximo 150 palabras, en español, sin viñetas markdown, tono profesional
+  y directo.
+
+Historial de comentarios recientes:
+${historialTexto}
 
 Por qué eligió la carrera: ${bottom.por_que_eligio_carrera || '(sin dato)'}
 Qué busca en una universidad: ${bottom.que_busca_universidad || '(sin dato)'}
@@ -176,7 +228,7 @@ Acciones ya definidas por el supervisor: ${bottom.acciones_definidas || '(sin da
         { role: 'system', content: 'Respondes solo con el texto de la propuesta, sin encabezados ni comillas.' },
         { role: 'user', content: prompt },
       ],
-      max_tokens: 400,
+      max_tokens: 500,
     });
 
     const texto = String(salida?.response ?? '').trim();
