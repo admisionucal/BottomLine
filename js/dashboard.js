@@ -229,35 +229,54 @@ function setupBuscador() {
 
 // ===== CAMPANAS =====
 async function loadCampanas(user) {
-    const campanas = getUserCampanas();
+    const codigos = getUserCampanas();
     const select = document.getElementById('selectCampana');
     if (!select) return;
 
-    select.innerHTML = '';
-    if (campanas.length === 0) {
+    if (codigos.length === 0) {
         select.innerHTML = '<option value="">Sin campañas asignadas</option>';
         return;
     }
 
-    campanas.forEach(c => {
+    const configResult = await callAPI('getCampanasConfig', {});
+    const configPorCodigo = {};
+    (configResult.data || []).forEach(c => { configPorCodigo[c.codigo] = c; });
+
+    const hoy = new Date().toISOString().slice(0, 10);
+
+    // Todas las campañas asignadas al usuario que sigan activas (incluye
+    // vencidas — se pueden seguir filtrando manualmente).
+    const activas = codigos
+        .map(cod => configPorCodigo[cod])
+        .filter(Boolean)
+        .filter(c => c.activa);
+
+    // Vigentes = activas y dentro de su periodo (o sin fechas definidas,
+    // por compatibilidad con campañas viejas que no tengan periodo cargado).
+    const vigentes = activas
+        .filter(c => !c.fechaFinPeriodo || c.fechaFinPeriodo >= hoy)
+        .sort((a, b) => (a.fechaInicioPeriodo || '').localeCompare(b.fechaInicioPeriodo || ''));
+
+    select.innerHTML = '';
+    activas.forEach(c => {
         const opt = document.createElement('option');
-        opt.value = c;
-        opt.textContent = c;
+        opt.value = c.codigo;
+        opt.textContent = c.codigo;
         select.appendChild(opt);
     });
 
-    // Restaurar campaña guardada
     const saved = cacheGet(CACHE_KEYS.FILTROS_ESTADO);
-    if (saved && saved.campana && campanas.includes(saved.campana)) {
+    if (saved && saved.campana && activas.some(c => c.codigo === saved.campana)) {
         select.value = saved.campana;
-        // Merge (no overwrite) por si el caché quedó de una versión anterior
-        // que todavía no tenía la key "dolorNecesidad" (u otra futura).
         if (saved.filtros) state.filtros = { ...state.filtros, ...saved.filtros };
         if (saved.busqueda) state.terminoBusqueda = saved.busqueda;
+    } else {
+        // Preseleccionada = la vigente más antigua; si ninguna está vigente, cae a la primera activa.
+        select.value = vigentes[0]?.codigo || activas[0]?.codigo || '';
     }
 
-    state.campana = select.value || campanas[0];
-    renderCampanaOptions(campanas);
+    state.campana = select.value;
+    renderCampanaOptions(activas.map(c => c.codigo));
 }
 
 function renderCampanaOptions(campanas) {

@@ -32,6 +32,7 @@ export async function crearUsuario(client: Client, body: JsonBody) {
 
   const usuario = String(body.usuario || '').trim();
   const nombre = String(body.nombre || '').trim();
+  const nombreCorto = String(body.nombreCorto || '').trim();
   const rol = String(body.rol || '').trim().toUpperCase();
   const password = String(body.password || '');
   const campanas = Array.isArray(body.campanas)
@@ -61,10 +62,10 @@ export async function crearUsuario(client: Client, body: JsonBody) {
   const passwordHash = 'sha256:' + (await hashPassword(password));
 
   const result = await client.query(
-    `insert into usuarios (usuario, password_hash, nombre, rol, campana, cargo, dni, email, activo)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, true)
-     returning usuario, nombre, rol`,
-    [usuario, passwordHash, nombre, rol, campanas.join(','), cargo, dni, email]
+    `insert into usuarios (usuario, password_hash, nombre, nombre_aux, rol, campana, cargo, dni, email, activo)
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+    returning usuario, nombre, rol`,
+    [usuario, passwordHash, nombre, nombreCorto, rol, campanas.join(','), cargo, dni, email]
   );
 
   return jsonOk({ usuario: result.rows[0] });

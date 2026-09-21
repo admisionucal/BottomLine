@@ -112,7 +112,7 @@ function renderGrid() {
                         <span class="cfg-switch-slider"></span>
                     </label>
                 </div>
-                <div class="cfg-campana-meta">Periodo ${escapeHtml(c.periodo)} · Inicio: ${escapeHtml(c.inicioClases || '-')}</div>
+                <div class="cfg-campana-meta">Periodo ${escapeHtml(c.periodo)} · Vence: ${c.fechaFinPeriodo ? escapeHtml(c.fechaFinPeriodo) : 'sin definir'}</div>
                 <div class="cfg-campana-meta">${Object.keys(c.archivos || {}).length} / ${TIPOS_ARCHIVO.length} archivos cargados</div>
             </div>
         `)
@@ -181,6 +181,12 @@ function renderDetalle(c, esNueva) {
             <label class="cfg-campo">Inicio de clases (ej. Agosto)
                 <input type="text" id="cfgInicioClases" value="${escapeHtml(c.inicioClases || '')}">
             </label>
+            <label class="cfg-campo">Inicio del periodo
+                <input type="date" id="cfgFechaInicioPeriodo" value="${c.fechaInicioPeriodo || ''}">
+            </label>
+            <label class="cfg-campo">Fin del periodo
+                <input type="date" id="cfgFechaFinPeriodo" value="${c.fechaFinPeriodo || ''}">
+            </label>
         </div>
         <div class="cfg-form-row">
             <label class="cfg-campo" style="flex-basis:100%;">Correos en copia oculta (BCC), separados por coma
@@ -239,6 +245,8 @@ async function guardarCampana(esNueva) {
     const periodo = document.getElementById('cfgPeriodo').value.trim();
     const perC = document.getElementById('cfgPerC').value.trim();
     const inicioClases = document.getElementById('cfgInicioClases').value.trim();
+    const fechaInicioPeriodo = document.getElementById('cfgFechaInicioPeriodo').value;
+    const fechaFinPeriodo = document.getElementById('cfgFechaFinPeriodo').value;
     const bccDefault = document.getElementById('cfgBcc').value
         .split(',').map((s) => s.trim()).filter(Boolean);
 
@@ -246,8 +254,15 @@ async function guardarCampana(esNueva) {
         alert('Código, periodo y per. corto son obligatorios.');
         return;
     }
+    if (fechaInicioPeriodo && fechaFinPeriodo && fechaInicioPeriodo > fechaFinPeriodo) {
+        alert('La fecha de inicio del periodo no puede ser posterior a la de fin.');
+        return;
+    }
 
-    const result = await callAPI('guardarCampana', { codigo, periodo, perC, inicioClases, activa: true, bccDefault });
+    const result = await callAPI('guardarCampana', {
+        codigo, periodo, perC, inicioClases, fechaInicioPeriodo, fechaFinPeriodo,
+        activa: true, bccDefault,
+    });
     if (!result.success) {
         alert(result.error || 'No se pudo guardar la campaña.');
         return;
@@ -337,6 +352,7 @@ function renderNuevoUsuarioForm() {
 async function crearUsuarioSubmit() {
     const usuario = document.getElementById('cfgNuevoUsuario').value.trim();
     const nombre = document.getElementById('cfgNuevoNombre').value.trim();
+    const nombreCorto = document.getElementById('cfgNuevoNombreCorto').value.trim();
     const password = document.getElementById('cfgNuevoPassword').value;
     const rol = document.getElementById('cfgNuevoRol').value;
     const cargo = document.getElementById('cfgNuevoCargo').value.trim();
@@ -349,13 +365,13 @@ async function crearUsuarioSubmit() {
         return;
     }
 
-    const result = await callAPI('crearUsuario', { usuario, nombre, password, rol, cargo, dni, email, campanas });
+    const result = await callAPI('crearUsuario', { usuario, nombre, nombreCorto, password, rol, cargo, dni, email, campanas });
     if (!result.success) {
         alert(result.error || 'No se pudo crear el usuario.');
         return;
     }
     Toast?.show?.('Usuario creado', 'ok');
-    ['cfgNuevoUsuario','cfgNuevoNombre','cfgNuevoPassword','cfgNuevoCargo','cfgNuevoDni','cfgNuevoEmail']
+    ['cfgNuevoUsuario','cfgNuevoNombre','cfgNuevoNombreCorto','cfgNuevoPassword','cfgNuevoCargo','cfgNuevoDni','cfgNuevoEmail']
         .forEach((id) => document.getElementById(id).value = '');
     document.getElementById('cfgNuevoRol').value = 'ASESOR';
     if (rol === 'SUPERVISOR') await cargarSupervisores(); // refresca la lista si creaste un supervisor

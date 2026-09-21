@@ -50,8 +50,10 @@ export async function getCampanasConfig(client: Client, body: JsonBody) {
   const [campanasRes, archivosRes] = await Promise.all([
     client.query(
       `select codigo, periodo, perc as "perC", inicio_clases as "inicioClases",
+              fecha_inicio_periodo as "fechaInicioPeriodo",
+              fecha_fin_periodo as "fechaFinPeriodo",
               activa, bcc_default as "bccDefault"
-       from campanas order by codigo`
+      from campanas order by codigo`
     ),
     client.query(
       `select campana_codigo as "campanaCodigo", tipo, nombre_archivo as "nombreArchivo",
@@ -87,24 +89,31 @@ export async function guardarCampana(client: Client, body: JsonBody) {
   const periodo = String(body.periodo || '').trim();
   const perc = String(body.perC || body.perc || '').trim();
   const inicioClases = String(body.inicioClases || '').trim();
+  const fechaInicioPeriodo = String(body.fechaInicioPeriodo || '').trim() || null;
+  const fechaFinPeriodo = String(body.fechaFinPeriodo || '').trim() || null;
   const activa = body.activa !== false;
   const bccDefault = Array.isArray(body.bccDefault) ? body.bccDefault : [];
 
   if (!periodo || !perc) {
     return jsonError('Periodo y perC son obligatorios (ej. periodo "2027-2", perC "27-2").');
   }
+  if (fechaInicioPeriodo && fechaFinPeriodo && fechaInicioPeriodo > fechaFinPeriodo) {
+    return jsonError('La fecha de inicio del periodo no puede ser posterior a la de fin.');
+  }
 
   await client.query(
-    `insert into campanas (codigo, periodo, perc, inicio_clases, activa, bcc_default)
-     values ($1, $2, $3, $4, $5, $6::jsonb)
+    `insert into campanas (codigo, periodo, perc, inicio_clases, fecha_inicio_periodo, fecha_fin_periodo, activa, bcc_default)
+     values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
      on conflict (codigo) do update set
        periodo = excluded.periodo,
        perc = excluded.perc,
        inicio_clases = excluded.inicio_clases,
+       fecha_inicio_periodo = excluded.fecha_inicio_periodo,
+       fecha_fin_periodo = excluded.fecha_fin_periodo,
        activa = excluded.activa,
        bcc_default = excluded.bcc_default,
        actualizado_en = now()`,
-    [codigo, periodo, perc, inicioClases, activa, JSON.stringify(bccDefault)]
+    [codigo, periodo, perc, inicioClases, fechaInicioPeriodo, fechaFinPeriodo, activa, JSON.stringify(bccDefault)]
   );
 
   return jsonOk();
