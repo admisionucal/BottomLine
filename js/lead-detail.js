@@ -1497,7 +1497,7 @@ function renderVista2() {
                     <label style="font-size:13px; font-weight:600; color:#555; margin:0;">
                         Propuesta de Acción de la IA
                     </label>
-                    <button type="button" class="btn-guardar" style="padding:6px 16px; font-size:12px;" id="btnGenerarPropuestaIA" ${bloqueado ? 'disabled' : ''}>
+                    <button type="button" class="btn-export" style="padding:6px 16px; font-size:12px;" id="btnGenerarPropuestaIA" ${bloqueado ? 'disabled' : ''}>
                         <span class="material-symbols-outlined" style="font-size:14px;vertical-align:-2px;">auto_awesome</span>
                         Generar con IA
                     </button>
