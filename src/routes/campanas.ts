@@ -50,8 +50,8 @@ export async function getCampanasConfig(client: Client, body: JsonBody) {
   const [campanasRes, archivosRes] = await Promise.all([
     client.query(
       `select codigo, periodo, perc as "perC", inicio_clases as "inicioClases",
-              fecha_inicio_periodo as "fechaInicioPeriodo",
-              fecha_fin_periodo as "fechaFinPeriodo",
+              to_char(fecha_inicio_periodo, 'YYYY-MM-DD') as "fechaInicioPeriodo",
+              to_char(fecha_fin_periodo, 'YYYY-MM-DD') as "fechaFinPeriodo",
               activa, bcc_default as "bccDefault"
       from campanas order by codigo`
     ),

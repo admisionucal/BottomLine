@@ -49,34 +49,47 @@ export async function getSolicitudesCC(client: Client, body: JsonBody) {
   if (!sesion) return jsonError(error!);
 
   const params: any[] = [];
-  const condiciones: string[] = [`status <> 'CANCELADO'`];
+  const condiciones: string[] = [`s.status <> 'CANCELADO'`];
 
   if (sesion.rol === 'SUPERVISOR') {
     const campanasPermitidas = (body.campanas || []).map((c: any) => String(c).trim());
     if (campanasPermitidas.length > 0) {
-      condiciones.push(`campana = any($${params.push(campanasPermitidas)})`);
+      condiciones.push(`s.campana = any($${params.push(campanasPermitidas)})`);
     }
   }
 
+  // Filtro por estados (ej. ['PENDIENTE','PROCESANDO'])
+  if (Array.isArray(body.estados) && body.estados.length > 0) {
+    condiciones.push(`s.status = any($${params.push(body.estados.map((e: any) => String(e)))})`);
+  }
+
+  // Una sola solicitud (para abrir el detalle sin bajar toda la lista)
+  if (body.idSolicitud) {
+    condiciones.push(`s.id_solicitud = $${params.push(String(body.idSolicitud))}`);
+  }
+
   const result = await client.query(
-    `select * from solicitudes_cc where ${condiciones.join(' and ')} order by fecha_solicitud desc`,
+    `select s.*,
+            l.nombres as nombre_lead,
+            l.programa as carrera_lead,
+            l.modalidad as modalidad_lead,
+            l.modalidad_ingreso as modalidad_ingreso_lead,
+            l.telefono2 as celular_lead
+       from solicitudes_cc s
+       left join leads l on l.id_prometeo = s.id_prometeo and l.campana = s.campana
+      where ${condiciones.join(' and ')}
+      order by s.fecha_solicitud desc`,
     params
   );
 
-  const data = await Promise.all(
-    result.rows.map(async (r) => {
-      const obj = filaASolicitudCCObj(r);
-      const basicos = await capturarIdentidadBase(client, r.campana, r.id_prometeo);
-      return {
-        ...obj,
-        NOMBRE_LEAD: basicos.nombre,
-        CARRERA_LEAD: basicos.carrera,
-        MODALIDAD_LEAD: basicos.modalidad,
-        MODALIDAD_INGRESO_LEAD: basicos.modalidadIngreso,
-        CELULAR_LEAD: basicos.celular,
-      };
-    })
-  );
+  const data = result.rows.map((r) => ({
+    ...filaASolicitudCCObj(r),
+    NOMBRE_LEAD: r.nombre_lead || '',
+    CARRERA_LEAD: r.carrera_lead || '',
+    MODALIDAD_LEAD: r.modalidad_lead || '',
+    MODALIDAD_INGRESO_LEAD: r.modalidad_ingreso_lead || '',
+    CELULAR_LEAD: r.celular_lead || '',
+  }));
 
   return jsonOk({ data });
 }

@@ -38,6 +38,18 @@ async function callAPI(action, data = {}) {
     }
 }
 
+// Acepta '2026-09-06' o '2026-09-06T00:00:00.000Z' y devuelve 'YYYY-MM-DD'
+function soloFecha(v) {
+    return v ? String(v).slice(0, 10) : '';
+}
+// '2026-09-06' -> '06/09/2026'
+function fechaLegible(v) {
+    const f = soloFecha(v);
+    if (!f) return 'sin definir';
+    const [y, m, d] = f.split('-');
+    return `${d}/${m}/${y}`;
+}
+
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', () => initConfiguracion());
 
@@ -112,7 +124,7 @@ function renderGrid() {
                         <span class="cfg-switch-slider"></span>
                     </label>
                 </div>
-                <div class="cfg-campana-meta">Periodo ${escapeHtml(c.periodo)} · Vence: ${c.fechaFinPeriodo ? escapeHtml(c.fechaFinPeriodo) : 'sin definir'}</div>
+                <div class="cfg-campana-meta">Periodo ${escapeHtml(c.periodo)} · Vence: ${fechaLegible(c.fechaFinPeriodo)}</div>
                 <div class="cfg-campana-meta">${Object.keys(c.archivos || {}).length} / ${TIPOS_ARCHIVO.length} archivos cargados</div>
             </div>
         `)
@@ -182,10 +194,10 @@ function renderDetalle(c, esNueva) {
                 <input type="text" id="cfgInicioClases" value="${escapeHtml(c.inicioClases || '')}">
             </label>
             <label class="cfg-campo">Inicio del periodo
-                <input type="date" id="cfgFechaInicioPeriodo" value="${c.fechaInicioPeriodo || ''}">
+                <input type="date" id="cfgFechaInicioPeriodo" value="${soloFecha(c.fechaInicioPeriodo)}">
             </label>
             <label class="cfg-campo">Fin del periodo
-                <input type="date" id="cfgFechaFinPeriodo" value="${c.fechaFinPeriodo || ''}">
+                <input type="date" id="cfgFechaFinPeriodo" value="${soloFecha(c.fechaFinPeriodo)}">
             </label>
         </div>
         <div class="cfg-form-row">

@@ -37,6 +37,7 @@ let state = {
     },
     campana: '',
     calCampanas: [],
+    campanasVigentes: [],
     calLeadsPorCampana: {},
     mapaCalendario: {},
     categoriasVisibles: { viva: true, muerta: false, pagoCompleto: false, pagoFraccionado: false, visitaGuiada: true },
@@ -242,20 +243,21 @@ async function loadCampanas(user) {
     const configPorCodigo = {};
     (configResult.data || []).forEach(c => { configPorCodigo[c.codigo] = c; });
 
-    const hoy = new Date().toISOString().slice(0, 10);
+    // Fecha de hoy en hora de Perú (YYYY-MM-DD)
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
 
-    // Todas las campañas asignadas al usuario que sigan activas (incluye
-    // vencidas — se pueden seguir filtrando manualmente).
+    // Todas las activas se pueden filtrar (incluye vencidas), se ven solo como "26.2"
     const activas = codigos
         .map(cod => configPorCodigo[cod])
         .filter(Boolean)
         .filter(c => c.activa);
 
-    // Vigentes = activas y dentro de su periodo (o sin fechas definidas,
-    // por compatibilidad con campañas viejas que no tengan periodo cargado).
+    // Vigentes = dentro de su periodo, la más antigua primero
     const vigentes = activas
-        .filter(c => !c.fechaFinPeriodo || c.fechaFinPeriodo >= hoy)
-        .sort((a, b) => (a.fechaInicioPeriodo || '').localeCompare(b.fechaInicioPeriodo || ''));
+        .filter(c => !c.fechaFinPeriodo || String(c.fechaFinPeriodo).slice(0, 10) >= hoy)
+        .sort((a, b) => String(a.fechaInicioPeriodo || '').localeCompare(String(b.fechaInicioPeriodo || '')));
+
+    state.campanasVigentes = vigentes.map(c => c.codigo);
 
     select.innerHTML = '';
     activas.forEach(c => {
@@ -265,13 +267,13 @@ async function loadCampanas(user) {
         select.appendChild(opt);
     });
 
+    // Solo se restaura la campaña guardada si sigue vigente; si no, va la vigente más antigua
     const saved = cacheGet(CACHE_KEYS.FILTROS_ESTADO);
-    if (saved && saved.campana && activas.some(c => c.codigo === saved.campana)) {
+    if (saved && saved.campana && vigentes.some(c => c.codigo === saved.campana)) {
         select.value = saved.campana;
         if (saved.filtros) state.filtros = { ...state.filtros, ...saved.filtros };
         if (saved.busqueda) state.terminoBusqueda = saved.busqueda;
     } else {
-        // Preseleccionada = la vigente más antigua; si ninguna está vigente, cae a la primera activa.
         select.value = vigentes[0]?.codigo || activas[0]?.codigo || '';
     }
 
@@ -324,7 +326,7 @@ function renderCampanaOptions(campanas) {
 
 // ===== FILTRO DE CAMPAÑA DEL CALENDARIO =====
 function setupCalendarioCampanaFiltro(user) {
-    const campanas = getUserCampanas();
+    const campanas = getCampanasCalendario();
     const grupo = document.getElementById('calCampanaFilterGroup');
     if (!grupo) return;
 
@@ -350,8 +352,14 @@ window.addEventListener('multiselect-change', (e) => {
     cargarLeadsCalendario();
 });
 
-function getCalCampanasEfectivas() {
+function getCampanasCalendario() {
     const todas = getUserCampanas();
+    const filtradas = todas.filter(c => state.campanasVigentes.includes(c));
+    return filtradas.length ? filtradas : todas;
+}
+
+function getCalCampanasEfectivas() {
+    const todas = getCampanasCalendario();
     if (!state.calCampanas || state.calCampanas.length === 0) return todas;
     return state.calCampanas.filter(c => todas.includes(c));
 }
@@ -1632,7 +1640,7 @@ window.inicializarIndicadores = inicializarIndicadores;
 async function cargarLeadsIndicadores(forceRefresh = false) {
     const user = getCurrentUser();
     if (!user) return;
-    const campanas = getUserCampanas();
+    const campanas = getCampanasCalendario();
 
     if (campanas.length === 0) {
         state.indicadores.leadsPorCampana = {};

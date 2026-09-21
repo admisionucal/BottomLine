@@ -49,6 +49,7 @@ const state = {
     pageSize: 11,
     pagesPerBlock: 20,
     ultimaActualizacion: null,
+    cargandoResueltas: false,
     // Vista 2
     solicitudActual: null,
     leadActual: null,
@@ -82,6 +83,7 @@ window.initCCEmbebido = function() {
 };
 
 let __ccListenersAtados = false;
+let __cargaCCId = 0;
 
 function initCC() {
     const user = getCurrentUser();
@@ -147,34 +149,32 @@ function initCC() {
 }
 
 // ===== VISTA 1: LISTADO =====
-// Mismo patrón de caché que loadLeads() en dashboard.js: sessionStorage
-// por email+rol, con forceRefresh para el botón "Actualizar".
 async function cargarSolicitudesCC(forceRefresh = false) {
     const user = getCurrentUser();
     const wrap = document.getElementById('tablaCCWrap');
 
-    // '_v2' fuerza a descartar cualquier caché vieja en sessionStorage que no
-    // tenga los campos MODALIDAD_LEAD/MODALIDAD_INGRESO_LEAD/BENEFICIO_LEAD/
-    // CELULAR_LEAD (agregados después) — si no, quedan "vacíos" hasta que el
-    // usuario le dé manualmente a Actualizar.
     const cacheKey = CACHE_KEYS.SOLICITUDES_CC(user.email, user.rol, true) + '_v2';
     if (!forceRefresh) {
         const cached = cacheGet(cacheKey);
         if (cached && cached.data) {
             state.solicitudes = cached.data;
             state.ultimaActualizacion = cached.timestamp;
+            state.cargandoResueltas = false;
             aplicarFiltrosCC();
             return;
         }
     }
 
+    const cargaId = ++__cargaCCId;
     wrap.innerHTML = '<div class="loading">Cargando solicitudes...</div>';
 
     try {
+        // FASE 1: solo las pendientes (lo que el usuario necesita ver ya)
         const result = await callAPI('getSolicitudesCC', {
             campanas: getUserCampanas(),
-            incluirResueltas: true
+            estados: ['PENDIENTE', 'PROCESANDO']
         });
+        if (cargaId !== __cargaCCId) return;
 
         if (!result.success) {
             wrap.innerHTML = `<div class="loading">Error: ${escapeHtml(result.error || 'No se pudieron cargar las solicitudes')}</div>`;
@@ -183,16 +183,44 @@ async function cargarSolicitudesCC(forceRefresh = false) {
 
         state.solicitudes = result.data || [];
         state.ultimaActualizacion = Date.now();
-        cacheSet(cacheKey, { data: state.solicitudes, timestamp: state.ultimaActualizacion });
+        state.cargandoResueltas = true;
         aplicarFiltrosCC();
+
+        // FASE 2: enviadas y rechazadas en segundo plano (sin await)
+        cargarResueltasCC(cargaId, cacheKey);
     } catch (e) {
         wrap.innerHTML = `<div class="loading">Error de conexión: ${escapeHtml(e.message)}</div>`;
     }
 }
 
+async function cargarResueltasCC(cargaId, cacheKey) {
+    try {
+        const result = await callAPI('getSolicitudesCC', {
+            campanas: getUserCampanas(),
+            estados: ['ENVIADO', 'RECHAZADO']
+        });
+        if (cargaId !== __cargaCCId) return; // el usuario ya pidió otra carga
+
+        if (result.success) {
+            const ids = new Set(state.solicitudes.map(s => s.ID_SOLICITUD));
+            const nuevas = (result.data || []).filter(s => !ids.has(s.ID_SOLICITUD));
+            state.solicitudes = state.solicitudes.concat(nuevas);
+            // La caché se guarda solo cuando ya está todo completo
+            cacheSet(cacheKey, { data: state.solicitudes, timestamp: state.ultimaActualizacion });
+        }
+    } catch (e) {
+        // silencioso: la lista de pendientes ya está visible
+    } finally {
+        if (cargaId === __cargaCCId) {
+            state.cargandoResueltas = false;
+            aplicarFiltrosCC(true); // mantiene la página actual
+        }
+    }
+}
+
 const ORDEN_ESTADO_CC = { PENDIENTE: 0, PROCESANDO: 0, ENVIADO: 1, RECHAZADO: 2 };
 
-function aplicarFiltrosCC() {
+function aplicarFiltrosCC(mantenerPagina = false) {
     const { carrera, asesor, estado, campana } = state.filtros;
 
     state.solicitudesFiltradas = state.solicitudes.filter(sol => {
@@ -219,7 +247,8 @@ function aplicarFiltrosCC() {
         return new Date(b.FECHA_SOLICITUD || 0) - new Date(a.FECHA_SOLICITUD || 0);
     });
 
-    state.currentPage = 1;
+    if (!mantenerPagina) state.currentPage = 1;
+
     renderTablaCC();
     populateFiltrosCC();
 }
@@ -237,7 +266,7 @@ function renderTablaCC() {
     const total = state.solicitudesFiltradas.length;
 
     const contador = document.getElementById('ccCount');
-    if (contador) contador.textContent = `${total} solicitud${total === 1 ? '' : 'es'}`;
+    if (contador) contador.textContent = `${total} solicitud${total === 1 ? '' : 'es'}` + (state.cargandoResueltas ? ' · cargando enviadas y rechazadas…' : '');
 
     if (total === 0) {
         wrap.innerHTML = '<p style="padding:20px;color:#888;">No hay solicitudes de Condiciones Comerciales.</p>';
@@ -377,7 +406,7 @@ async function mostrarVistaDetalle(idSolicitud, solicitudPrecargada) {
         if (!solicitud) {
             const resultLista = await callAPI('getSolicitudesCC', {
                 campanas: getUserCampanas(),
-                incluirResueltas: true
+                idSolicitud
             });
             if (!resultLista.success) throw new Error(resultLista.error || 'No se pudo cargar la solicitud');
             solicitud = (resultLista.data || []).find(s => s.ID_SOLICITUD === idSolicitud);
