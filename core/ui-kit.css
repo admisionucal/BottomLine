@@ -390,13 +390,47 @@ html, body {
 .modal-box {
     background: white;
     border-radius: 14px;
-    padding: 28px;
-    max-width: 380px;
+    padding: 25px;
+    max-width: 342px;
     width: 90%;
     text-align: center;
     box-shadow: 0 12px 40px rgba(0,0,0,.15);
 }
 .modal-box.modal-box-detalle { max-width: 800px; width: 92%; text-align: left; max-height: 82vh; overflow-y: auto; padding: 24px 26px; }
+/* -- Botones del modal de confirmación -- */
+.modal-icon { font-size: 40px; margin-bottom: 4px; }
+.modal-icon .material-symbols-outlined { font-size: 40px; }
+.modal-title { font-size: 17px; font-weight: 700; color: var(--color-text-primary); margin-top: 6px; }
+.modal-sub { font-size: 13px; color: #666; margin: 6px 0 20px; }
+
+.modal-buttons { display: flex; gap: 10px; justify-content: center; }
+.modal-btn {
+    flex: 1;
+    padding: 11px 16px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter .15s, transform .15s;
+}
+.modal-btn:hover { transform: translateY(-1px); }
+
+/* Cancelar: fondo suave del cuadro correspondiente */
+.modal-btn-cancel { background: #F1F2F4; color: #444; }
+.modal-btn-cancel.entrada  { background: #EEF8F1; color: #2e7d32; }
+.modal-btn-cancel.almuerzo { background: #FFF6E8; color: #b3690a; }
+.modal-btn-cancel.regreso  { background: #EEF5FF; color: #1565c0; }
+.modal-btn-cancel.salida   { background: #FFF1F1; color: #d32f2f; }
+.modal-btn-cancel:hover { filter: brightness(0.96); }
+
+/* Confirmar: color sólido igual al ícono del cuadro correspondiente */
+.modal-btn-confirm { background: var(--color-primary); color: white; }
+.modal-btn-confirm.entrada  { background: #31A24C; }
+.modal-btn-confirm.almuerzo { background: #F39C12; }
+.modal-btn-confirm.regreso  { background: #1F7AE0; }
+.modal-btn-confirm.salida   { background: #E74C3C; }
+.modal-btn-confirm:hover { filter: brightness(0.92); }
 
 /* -- Tablas -- */
 .table-wrap {

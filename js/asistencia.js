@@ -461,6 +461,7 @@ async function marcar(tipo) {
     document.getElementById('modalTitle').textContent = c.title;
     document.getElementById('modalSub').textContent = c.sub;
     document.getElementById('modalConfirmBtn').className = 'modal-btn modal-btn-confirm ' + c.cls;
+    document.getElementById('modalCancelBtn').className = 'modal-btn modal-btn-cancel ' + c.cls;
     document.getElementById('confirmModal').classList.add('show');
 }
 
