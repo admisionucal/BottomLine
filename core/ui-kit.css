@@ -719,7 +719,7 @@ table tbody tr:hover { background: #fafbff; }
 }
 
 .colab-cfg-fila {
-    display: grid; grid-template-columns: 154px 80px 72px repeat(6, 40px) 1fr; gap: 8px; align-items: center;
+    display: grid; grid-template-columns: 154px 80px 72px repeat(6, 70px) 1fr; gap: 8px; align-items: center;
     padding: 10px 6px; border-bottom: 1px solid #eee;
 }
 .colab-cfg-campanas .multiselect-btn { font-size: 12px; padding: 5px 20px 5px 6px; }
