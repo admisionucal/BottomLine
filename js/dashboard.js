@@ -38,6 +38,7 @@ let state = {
     campana: '',
     calCampanas: [],
     campanasVigentes: [],
+    campanasActivas: [],
     calLeadsPorCampana: {},
     mapaCalendario: {},
     categoriasVisibles: { viva: true, muerta: false, pagoCompleto: false, pagoFraccionado: false, visitaGuiada: true },
@@ -258,6 +259,7 @@ async function loadCampanas(user) {
         .sort((a, b) => String(a.fechaInicioPeriodo || '').localeCompare(String(b.fechaInicioPeriodo || '')));
 
     state.campanasVigentes = vigentes.map(c => c.codigo);
+    state.campanasActivas = activas.map(c => c.codigo);
 
     select.innerHTML = '';
     activas.forEach(c => {
@@ -463,12 +465,8 @@ async function loadLeads(forceRefresh = false) {
 // se veían y se podían marcar, pero no pasaba nada: no hay a quién más
 // escucharlo en toda la app.
 window.addEventListener('multiselect-change', (e) => {
-    const { key, values } = e.detail;
-    // Comparación case-insensitive: el key llega como
-    // containerId.replace('filter','').toLowerCase() (ej. "filterDolorNecesidad"
-    // -> "dolornecesidad"), pero las claves de state.filtros son camelCase
-    // (ej. "dolorNecesidad"). Sin esto, cualquier filtro con más de una
-    // palabra en su nombre nunca hace match y se queda sin efecto.
+    const { key, values, containerId } = e.detail;
+    if (!String(containerId || '').startsWith('filter')) return; // ignora indFilter* y calFilter*
     const filtroKey = Object.keys(state.filtros).find(k => k.toLowerCase() === key.toLowerCase());
     if (filtroKey) {
         state.filtros[filtroKey] = values;
@@ -1652,44 +1650,49 @@ async function inicializarIndicadores() {
 }
 window.inicializarIndicadores = inicializarIndicadores;
 
-// Carga los leads de TODAS las campañas activas del usuario (no depende del
-// filtro de campaña del calendario del Dashboard). Reutiliza la misma
-// caché (CACHE_KEYS.LEADS_RAW) que cargarLeadsCalendario, así que si el
-// Dashboard ya trajo esa data no se vuelve a pedir por red.
+async function cargarLeadsCampanaIndicadores(campana, forceRefresh = false) {
+    const user = getCurrentUser();
+    if (!user) return null;
+    const cacheKey = CACHE_KEYS.LEADS_RAW(user.email, user.rol, campana);
+    if (!forceRefresh) {
+        const cached = cacheGet(cacheKey);
+        if (cached && cached.data) return cached.data;
+    }
+    try {
+        const result = await callAPI('getLeads', {
+            email: user.email,
+            rol: user.rol,
+            campana,
+            nombreAsesor: user.nombre_completo || user.nombre_asesor || user.nombre || ''
+        });
+        if (result.success) {
+            const data = result.data || [];
+            cacheSet(cacheKey, { data, timestamp: Date.now() });
+            return data;
+        }
+    } catch (error) {
+        // se ignora
+    }
+    return null;
+}
+
+// Carga los leads de TODAS las campañas activas del usuario
 async function cargarLeadsIndicadores(forceRefresh = false) {
     const user = getCurrentUser();
     if (!user) return;
-    const campanas = getCampanasCalendario();
+    const todas = getUserCampanas();
 
-    if (campanas.length === 0) {
+    if (todas.length === 0) {
         state.indicadores.leadsPorCampana = {};
         return;
     }
 
-    const campanasACargar = campanas.length > 3 ? campanas.slice(0, 3) : campanas;
-    const resultados = await Promise.all(campanasACargar.map(async (campana) => {
-        const cacheKey = CACHE_KEYS.LEADS_RAW(user.email, user.rol, campana);
-        if (!forceRefresh) {
-            const cached = cacheGet(cacheKey);
-            if (cached && cached.data) return { campana, leads: cached.data };
-        }
-        try {
-            const result = await callAPI('getLeads', {
-                email: user.email,
-                rol: user.rol,
-                campana,
-                nombreAsesor: user.nombre_completo || user.nombre_asesor || user.nombre || ''
-            });
-            if (result.success) {
-                const data = result.data || [];
-                cacheSet(cacheKey, { data, timestamp: Date.now() });
-                return { campana, leads: data };
-            }
-        } catch (error) {
-            // Se ignora
-        }
-        return { campana, leads: [] };
-    }));
+    const base = state.campanasVigentes.length ? state.campanasVigentes : todas;
+    const campanasACargar = [...new Set([...base, ...(state.indicadores.filtros.campana || [])])];
+    const resultados = await Promise.all(campanasACargar.map(async (campana) => ({
+        campana,
+        leads: (await cargarLeadsCampanaIndicadores(campana, forceRefresh)) || []
+    })));
 
     state.indicadores.leadsPorCampana = {};
     resultados.forEach(({ campana, leads }) => { state.indicadores.leadsPorCampana[campana] = leads; });
@@ -1726,16 +1729,25 @@ function todosLosLeadsIndicadores() {
     return Object.values(state.indicadores.leadsPorCampana || {}).flat();
 }
 
-// Mismo estilo/orden que los Filtros del Dashboard (grid de 3 en 3):
-// Programa (≈Carrera), Modalidad de Ingreso, Modalidad, Asesor, Campaña, Canal.
-//
-// Filtros interdependientes: las opciones que se ofrecen en CADA filtro se
-// calculan sobre los leads que ya pasan TODOS LOS DEMÁS filtros (nunca sobre
-// el propio, para no auto-restringirse a lo ya marcado). Así, al elegir un
-// valor en un filtro, el resto de los filtros solo muestra opciones que
-// realmente existen dentro de ese contexto — y createMultiSelect ya poda
-// automáticamente cualquier selección previa que haya dejado de existir.
 function poblarFiltrosIndicadores() {
+    if (!state.indicadores.multiListener) {
+        state.indicadores.multiListener = true;
+        window.addEventListener('multiselect-change', async (e) => {
+            const id = e.detail.containerId || '';
+            if (!id.startsWith('indFilter')) return;
+            const nombre = id.slice('indFilter'.length);
+            const k = Object.keys(state.indicadores.filtros).find(k => k.toLowerCase() === nombre.toLowerCase());
+            if (!k) return;
+            state.indicadores.filtros[k] = e.detail.values;
+            if (k === 'campana') await Promise.all(e.detail.values
+                .filter(c => !(c in state.indicadores.leadsPorCampana))
+                .map(async c => { const d = await cargarLeadsCampanaIndicadores(c); if (d) state.indicadores.leadsPorCampana[c] = d; }));
+            poblarFiltrosIndicadores();
+            renderIndicadores();
+            renderIndCalendarioFiltro();
+        });
+    }
+
     const valoresUnicos = (columna, excluirClave) => [...new Set(
         leadsIndicadoresFiltradosExcluyendo(excluirClave)
             .map(l => String(l[columna] || '').trim()).filter(Boolean)
@@ -1756,51 +1768,19 @@ function poblarFiltrosIndicadores() {
         if (raw && !labelsAsesor[raw]) labelsAsesor[raw] = l[COLUMNAS.ASESOR_ULTIMO_CONTACTO] || raw;
     });
     createMultiSelect('indFilterAsesor', nombresRawAsesor, state.indicadores.filtros.asesor, 'Todos', labelsAsesor);
-
-    // Campaña: siempre con TODAS las campañas efectivas del usuario (no se
-    // recorta por los demás filtros, para no perder de vista campañas
-    // completas). No se permite la opción "Todas" (catch-all) — el usuario
-    // debe ver siempre las campañas activas marcadas explícitamente, con al
-    // menos una seleccionada en todo momento.
-    const camposCampana = [...new Set(todosLosLeadsIndicadores().map(l => String(l[COLUMNAS.CAMPANA] || '').trim()).filter(Boolean))].sort();
-    createMultiSelect('indFilterCampana', camposCampana, state.indicadores.filtros.campana, 'Todas', null, { permitirTodos: false });
-    // Si todavía no había selección (primera carga), createMultiSelect ya
-    // marcó todas las opciones por defecto — reflejamos eso en el state
-    // para que el resto de la lógica (filtro, calendario, etc.) lo sepa.
-    if (state.indicadores.filtros.campana.length === 0 && camposCampana.length > 0) {
-        state.indicadores.filtros.campana = camposCampana.slice();
-    }
-
     createMultiSelect('indFilterCanal', valoresUnicos(COLUMNAS.CANAL, 'canal'), state.indicadores.filtros.canal, 'Todos');
     createMultiSelect('indFilterStatus', valoresUnicos(COLUMNAS.STATUS_GESTION, 'status'), state.indicadores.filtros.status, 'Todos', STATUS_LABELS);
     createMultiSelect('indFilterPerfil', ['Completo', 'Pendiente Supervisor', 'Pendiente Asesor'], state.indicadores.filtros.perfil, 'Todos');
 
-    if (!state.indicadores.filtrosListenerListo) {
-        window.addEventListener('multiselect-change', (e) => {
-            const map = {
-                indFilterPrograma: 'programa', indFilterIngreso: 'ingreso', indFilterModalidad: 'modalidad',
-                indFilterAsesor: 'asesor', indFilterCampana: 'campana', indFilterCanal: 'canal',
-                indFilterStatus: 'status', indFilterPerfil: 'perfil'
-            };
-            const filtroKey = map[e.detail.containerId];
-            if (!filtroKey) return;
-            state.indicadores.filtros[filtroKey] = e.detail.values;
-            // Recalcula las opciones de TODOS los filtros (cascada — cada
-            // uno se recalcula sobre el contexto que dejan los demás) y
-            // luego recalcula todos los indicadores/tablas/gráficos.
-            poblarFiltrosIndicadores();
-            // poblarFiltrosIndicadores reconstruye el HTML de los 6
-            // dropdowns (createMultiSelect), lo que cierra el panel que el
-            // usuario tenía abierto — lo reabrimos para que pueda seguir
-            // marcando varias opciones sin interrupciones.
-            const contActivo = document.getElementById(e.detail.containerId);
-            contActivo?.querySelector('.multiselect-panel')?.classList.add('open');
-            contActivo?.closest('.filter-group')?.classList.add('open');
-            renderIndicadores();
-            renderIndCalendarioFiltro();
-        });
-        state.indicadores.filtrosListenerListo = true;
+    const desdeLeads = todosLosLeadsIndicadores().map(l => String(l[COLUMNAS.CAMPANA] || '').trim()).filter(Boolean);
+    const opcionesCampana = [...new Set([...state.campanasActivas, ...desdeLeads])].sort();
+
+    // Primera carga: solo las vigentes quedan marcadas; las vencidas están disponibles para marcar
+    if (state.indicadores.filtros.campana.length === 0 && opcionesCampana.length > 0) {
+        const porDefecto = state.campanasVigentes.filter(c => opcionesCampana.includes(c));
+        state.indicadores.filtros.campana = porDefecto.length ? porDefecto : opcionesCampana.slice();
     }
+    createMultiSelect('indFilterCampana', opcionesCampana, state.indicadores.filtros.campana, 'Todas', null, { permitirTodos: false });
 }
 
 // El filtro "Calendario" reemplaza al viejo rango de fechas: mismo estilo y
