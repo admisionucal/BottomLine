@@ -707,14 +707,19 @@ table tbody tr:hover { background: #fafbff; }
 .btn-save { background: #0040A1; border: none; border-radius: 6px; color: white; font-weight: 600; font-size: 14px; padding: 10px 24px; cursor: pointer; }
 .btn-save:hover { background: #002D73; }
 
-.mant-layout { display: grid; grid-template-columns: 315px 1fr; gap: 16px; align-items: stretch; }
+.mant-layout { display: grid; grid-template-columns: 252px 1fr; gap: 16px; align-items: stretch; }
 .mant-layout > .card { display: flex; flex-direction: column; height: 100%; }
 .mant-col-izq { display: flex; flex-direction: column; gap: 16px; height: 100%; }
 .mant-col-izq .card { flex: 1; margin-bottom: 0; display: flex; flex-direction: column; justify-content: center; }
 @media (max-width: 900px) { .mant-layout { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .mant-layout { grid-template-columns: 1fr; } }
+@media (max-width: 900px) and (min-width: 561px) {
+    .mant-col-izq { flex-direction: row; }
+    .mant-col-izq .card { flex: 1; min-width: 0; }
+}
 
 .colab-cfg-fila {
-    display: grid; grid-template-columns: 140px auto 90px repeat(6, 100px); gap: 8px; align-items: center;
+    display: grid; grid-template-columns: 154px auto 72px repeat(6, 40px); gap: 8px; align-items: center;
     padding: 10px 6px; border-bottom: 1px solid #eee;
 }
 .colab-cfg-campanas .multiselect-btn { font-size: 12px; padding: 5px 20px 5px 6px; }
