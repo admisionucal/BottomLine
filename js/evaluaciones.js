@@ -7,7 +7,7 @@
 // cada evaluación.
 // ================================================================
 
-import { API_URL, ROLES } from '../core/constants.js';
+import { API_URL, ROLES, esRolSupervisorOAdmision } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml, formatearFecha } from '../core/utils.js';
 import { Sidebar } from '../core/components.js';
 
@@ -50,7 +50,7 @@ async function initEvaluaciones() {
         new Sidebar({ active: 'usuario', activeSubitem: 'navUsuarioEvaluaciones' });
     }
 
-    const esAdmin = user.rol === ROLES.SUPERVISOR || user.rol === ROLES.ADMISION;
+    const esAdmin = esRolSupervisorOAdmision(user.rol);
     const subtitulo = document.getElementById('evalSubtitulo');
     if (subtitulo) {
         subtitulo.textContent = esAdmin
@@ -79,7 +79,7 @@ async function cargarEvaluaciones(user, esAdmin) {
         return;
     }
 
-    const puedeEditar = user.rol === ROLES.ADMISION || user.rol === ROLES.SUPERVISOR;
+    const puedeEditar = esRolSupervisorOAdmision(user.rol);
     grid.innerHTML = data.map((ev) => esAdmin ? renderCardAdmin(ev, puedeEditar) : renderCardAsesor(ev)).join('');
 }
 

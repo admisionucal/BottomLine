@@ -2,7 +2,7 @@
 // CONFIGURACIÓN - Gestión de campañas y sus archivos (solo ADMISION)
 // ================================================================
 
-import { API_URL, ROLES } from '../core/constants.js';
+import { API_URL, ROLES, esRolAdmision } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml } from '../core/utils.js';
 import { Sidebar, Toast } from '../core/components.js';
 import { createMultiSelect } from '../core/components.js';
@@ -68,7 +68,7 @@ async function initConfiguracion() {
     // Estrictamente ADMISION — a diferencia del resto del panel admin
     // (que usa esRolSupervisorOAdmision), esta sección es únicamente
     // para el perfil ADMISION.
-    if (user.rol !== ROLES.ADMISION) {
+    if (!esRolAdmision(user.rol)) {
         alert('Acceso denegado: esta sección es solo para el perfil Admisión.');
         if (typeof window.mostrarBottomLine === 'function') {
             window.mostrarBottomLine();

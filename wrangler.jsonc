@@ -17,9 +17,11 @@
 	"ai": {
 		"binding": "AI"
 	},
+	// Secretos (no van aquí): IMPORT_SECRET, SUPABASE_SERVICE_ROLE_KEY y,
+	// para la Capacitación IA, ANTHROPIC_API_KEY. Se cargan con:
+	//   npx wrangler secret put NOMBRE
 	"vars": {
 		"APPS_SCRIPT_URL": "https://script.google.com/macros/s/AKfycby9ev70hHVHWWpWE0mFqTllVYyug_vI9UZTbdhEGCnpwslbxBUjcHzPyaWoG3tvUUkAWg/exec",
-		"IMPORT_SECRET": "XdY8&gHRadm",
 		"SUPABASE_URL": "https://uqcxmuwquqvfwkqobolb.supabase.co",
 		"SUPABASE_STORAGE_BUCKET": "campana-archivos"
 	}

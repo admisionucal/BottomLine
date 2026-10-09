@@ -2,7 +2,7 @@
 // COMPONENTS - Componentes dinámicos inyectados por DOM
 // ================================================================
 
-import { ROLES, esRolSupervisorOAdmision, esRolAdmision } from './constants.js';
+import { ROLES, esRolSupervisorOAdmision, esRolAdmision, puedeVerCapacitacionIA } from './constants.js';
 import { escapeHtml, getCurrentUser, normalizarUrlFoto } from './utils.js';
 
 // ================================================================
@@ -67,6 +67,9 @@ export class Sidebar {
                         </button>
                         <button type="button" class="nav-subitem ${esSub('navUsuarioEvaluaciones')}" id="navUsuarioEvaluaciones" title="Evaluaciones" onclick="window.mostrarEvaluaciones && mostrarEvaluaciones(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">quiz</span> Evaluaciones
+                        </button>
+                        <button type="button" class="nav-subitem ${esSub('navUsuarioCapacitacion')}" id="navUsuarioCapacitacion" title="Capacitación IA" style="display:none;" onclick="window.mostrarCapacitacion ? mostrarCapacitacion() : (window.location.href='capacitacion-chat.html'); window.marcarSubitemActivo && marcarSubitemActivo(this);">
+                            <span class="material-symbols-outlined">smart_toy</span> Capacitación IA
                         </button>
                         <button type="button" class="nav-subitem ${esSub('navUsuarioResultados')}" id="navUsuarioResultados" title="Resultados" style="display:none;" onclick="window.mostrarResultados && mostrarResultados(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">leaderboard</span> Resultados
@@ -156,6 +159,11 @@ export class Sidebar {
 
         if (esRolAdmision(user.rol)) {
             const el = document.getElementById('sidebarFooterConfig');
+            if (el) el.style.display = '';
+        }
+
+        if (puedeVerCapacitacionIA(user.rol)) {
+            const el = document.getElementById('navUsuarioCapacitacion');
             if (el) el.style.display = '';
         }
     }

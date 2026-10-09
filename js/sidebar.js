@@ -51,7 +51,7 @@ function marcarSubitemActivo(el) {
 }
 
 function ocultarTodasLasVistas() {
-    ['view-bottomline', 'view-placeholder', 'view-calendario', 'view-asistencia', 'view-usuario', 'view-unificar', 'view-cc', 'view-configuracion', 'view-indicadores', 'view-evaluaciones', 'view-resultados']
+    ['view-bottomline', 'view-placeholder', 'view-calendario', 'view-asistencia', 'view-usuario', 'view-unificar', 'view-cc', 'view-configuracion', 'view-indicadores', 'view-evaluaciones', 'view-resultados', 'view-capacitacion']
         .forEach(id => { 
             const el = document.getElementById(id); 
             if (el) el.style.display = 'none'; });
@@ -732,6 +732,96 @@ function asegurarScriptResultados() {
     return __resScriptPromise;
 }
 
+// ===== VISTA: CAPACITACIÓN IA =====
+let __capModuloCargado = false;
+let __capCargaEnCurso = null;
+
+function mostrarCapacitacion() {
+    const viewUsuario = document.getElementById('view-usuario');
+    const viewBottomline = document.getElementById('view-bottomline');
+    const viewCap = document.getElementById('view-capacitacion');
+
+    if (!viewUsuario && !viewBottomline) {
+        // Página independiente: si ya estamos en ella no se recarga.
+        if (!document.getElementById('capacitacionApp')) window.location.href = 'capacitacion-chat.html';
+        return;
+    }
+
+    ocultarTodasLasVistas();
+    if (viewCap) viewCap.style.display = 'block';
+
+    document.querySelectorAll('.nav-group-btn').forEach(b => b.classList.remove('active'));
+    const grupo = document.getElementById('navGroupUsuario');
+    if (grupo) grupo.querySelector('.nav-group-btn').classList.add('active');
+
+    if (__capModuloCargado) {
+        if (typeof initCapacitacionEmbebido === 'function') initCapacitacionEmbebido();
+        return;
+    }
+    cargarVistaCapacitacion();
+}
+
+function cargarVistaCapacitacion() {
+    if (__capCargaEnCurso) return __capCargaEnCurso;
+
+    const contenedor = document.getElementById('view-capacitacion');
+    if (!contenedor) {
+        window.location.href = 'capacitacion-chat.html';
+        return;
+    }
+
+    __capCargaEnCurso = fetch('capacitacion-chat.html')
+        .then(resp => {
+            if (!resp.ok) throw new Error('HTTP ' + resp.status + ' al pedir capacitacion-chat.html');
+            return resp.text();
+        })
+        .then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const capApp = doc.getElementById('capacitacionApp');
+            if (!capApp) throw new Error('capacitacion-chat.html no tiene el elemento #capacitacionApp esperado');
+
+            if (!document.querySelector('style[data-cap-styles]')) {
+                doc.querySelectorAll('style').forEach(styleTag => {
+                    const clon = styleTag.cloneNode(true);
+                    clon.setAttribute('data-cap-styles', '');
+                    document.head.appendChild(clon);
+                });
+            }
+
+            contenedor.innerHTML = '';
+            contenedor.appendChild(capApp.cloneNode(true));
+
+            return asegurarScriptCapacitacion();
+        })
+        .then(() => {
+            __capModuloCargado = true;
+            if (typeof initCapacitacionEmbebido === 'function') return initCapacitacionEmbebido();
+        })
+        .catch(err => {
+            console.error('cargarVistaCapacitacion:', err);
+            contenedor.innerHTML = '<div class="loading" style="color:#d32f2f;">Error al cargar Capacitación IA: ' + err.message + '</div>';
+        })
+        .finally(() => { __capCargaEnCurso = null; });
+
+    return __capCargaEnCurso;
+}
+
+let __capScriptPromise = null;
+function asegurarScriptCapacitacion() {
+    if (typeof initCapacitacionEmbebido === 'function') return Promise.resolve();
+    if (!__capScriptPromise) {
+        __capScriptPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.src = 'js/capacitacion-chat.js';
+            script.onload = resolve;
+            script.onerror = () => { __capScriptPromise = null; reject(new Error('No se pudo cargar js/capacitacion-chat.js')); };
+            document.body.appendChild(script);
+        });
+    }
+    return __capScriptPromise;
+}
+
 function mostrarConfiguracion() {
     const viewUsuario = document.getElementById('view-usuario');
     const viewBottomline = document.getElementById('view-bottomline');
@@ -839,3 +929,4 @@ window.irAMarcarAsistenciaDesdeUsuario = irAMarcarAsistenciaDesdeUsuario;
 window.mostrarConfiguracion = mostrarConfiguracion;
 window.mostrarEvaluaciones = mostrarEvaluaciones;
 window.mostrarResultados = mostrarResultados;
+window.mostrarCapacitacion = mostrarCapacitacion;

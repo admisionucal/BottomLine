@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RUMBO GAC - Capacitación IA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Hanken+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="core/ui-kit.css">
+    <style>
+        .container { width: 95%; max-width: 1300px; margin: 0 auto; padding: 24px 0; }
+        .cap-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .cap-head h2 { margin-bottom: 4px; font-family: var(--font-family-heading); }
+        .cap-sub { color: var(--color-text-secondary); font-size: 13px; }
+        .cap-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; border-radius: 20px; padding: 4px 10px; background: var(--color-primary-light); color: var(--color-primary); }
+
+        .cap-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--color-border); margin: 18px 0; overflow-x: auto; }
+        .cap-tab { background: none; border: none; padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--color-text-secondary); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; font-family: inherit; }
+        .cap-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+
+        .cap-section-title { font-size: 14px; font-weight: 700; margin: 22px 0 10px; display: flex; align-items: center; gap: 6px; }
+        .cap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+        .cap-card { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-card); }
+        .cap-card h4 { font-size: 14px; margin: 0; }
+        .cap-card p { font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.45; margin: 0; flex: 1; }
+        .cap-card .btn-primary { align-self: flex-start; }
+        .cap-nivel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--color-accent-hover); }
+        .cap-card.done { border-color: #b7dfc1; background: var(--color-success-bg); }
+        .cap-empty { color: var(--color-text-muted); font-size: 13px; padding: 10px 0; }
+        .cap-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--color-warning-bg); border: 1px solid #ffd8a8; border-radius: 10px; padding: 12px 16px; font-size: 13px; }
+
+        /* ----- Chat ----- */
+        .chat-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+        .chat-box { background: #efeae2; border-radius: 12px; border: 1px solid var(--color-border); display: flex; flex-direction: column; height: calc(100vh - 150px); min-height: 460px; overflow: hidden; }
+        .chat-top { background: #075e54; color: #fff; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+        .chat-avatar { width: 36px; height: 36px; border-radius: 50%; background: #d9fdd3; color: #075e54; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+        .chat-top .nombre { font-weight: 600; font-size: 14px; }
+        .chat-top .estado { font-size: 11.5px; opacity: .85; min-height: 14px; }
+        .chat-msgs { flex: 1; overflow-y: auto; padding: 14px 4%; display: flex; flex-direction: column; gap: 4px; }
+        .msg { max-width: 78%; padding: 6px 10px 4px; border-radius: 8px; font-size: 13.5px; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; box-shadow: 0 1px 0.5px rgba(0,0,0,.13); position: relative; }
+        .msg .hora { display: block; text-align: right; font-size: 10px; color: #667781; margin-top: 2px; }
+        .msg.asesor { align-self: flex-end; background: #d9fdd3; }
+        .msg.lead { align-self: flex-start; background: #fff; }
+        .msg.pendiente { opacity: .65; }
+        .msg-sistema { align-self: center; font-size: 11.5px; color: #54656f; background: #fff8c5; border-radius: 6px; padding: 4px 10px; margin: 6px 0; }
+        .chat-input { display: flex; gap: 8px; align-items: flex-end; padding: 10px; background: #f0f2f5; }
+        .chat-input textarea { flex: 1; resize: none; border: none; border-radius: 8px; padding: 10px 12px; font-family: inherit; font-size: 14px; max-height: 140px; min-height: 42px; outline: none; }
+        .chat-send { width: 42px; height: 42px; border-radius: 50%; border: none; background: #00a884; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .chat-send:disabled { opacity: .5; cursor: not-allowed; }
+        .chat-side { display: flex; flex-direction: column; gap: 12px; }
+        .side-card { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: 10px; padding: 14px; font-size: 13px; }
+        .side-card h5 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--color-text-muted); margin: 0 0 8px; }
+        .side-row { margin-bottom: 6px; }
+        .side-row b { display: block; font-size: 11.5px; color: var(--color-text-secondary); font-weight: 600; }
+        .btn-fin { background: var(--color-danger); color: #fff; border: none; border-radius: var(--radius); padding: 10px 14px; font-weight: 700; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; font-family: inherit; }
+        .btn-fin:disabled { opacity: .6; cursor: not-allowed; }
+        .side-hint { font-size: 11.5px; color: var(--color-text-muted); line-height: 1.4; }
+
+        /* ----- Feedback ----- */
+        .fb-wrap { max-width: 860px; }
+        .fb-scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0; }
+        .fb-score { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: 10px; padding: 14px 16px; }
+        .fb-score .lbl { font-size: 12px; color: var(--color-text-secondary); font-weight: 600; }
+        .fb-score .val { font-size: 30px; font-weight: 700; font-family: var(--font-family-heading); }
+        .fb-score .banda { font-size: 12px; font-weight: 600; }
+        .sc-alta { color: var(--color-success); } .sc-media { color: #B06A00; } .sc-baja { color: var(--color-danger); }
+        .fb-hab { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; border-radius: 20px; padding: 5px 12px; }
+        .fb-hab.si { background: var(--color-success-bg); color: var(--color-success); }
+        .fb-hab.no { background: var(--color-danger-bg); color: var(--color-danger); }
+        .fb-block { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+        .fb-block h4 { font-size: 14.5px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; }
+        .fb-block ul { margin: 0; padding-left: 18px; }
+        .fb-block li { margin-bottom: 6px; font-size: 13.5px; line-height: 1.45; }
+        .fb-block p { font-size: 13.5px; line-height: 1.5; margin: 0 0 6px; }
+        .fb-prio { border-left: 3px solid var(--color-accent); padding: 4px 0 4px 12px; margin-bottom: 12px; }
+        .fb-prio .t { font-weight: 700; margin-bottom: 4px; font-size: 13.5px; }
+        .fb-ej { background: #f8f9fc; border-radius: 6px; padding: 6px 10px; font-style: italic; font-size: 13px; margin-top: 4px; }
+        .fb-block.ojo { border-color: #f5c2c2; background: var(--color-danger-bg); }
+        .fb-block.next { border-color: #c9dbff; background: var(--color-info-bg); }
+        details.fb-det { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: 10px; padding: 12px 18px; margin-bottom: 12px; }
+        details.fb-det summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+        .crit-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 10px; }
+        .crit-table th, .crit-table td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
+        .crit-table th { color: var(--color-text-secondary); font-weight: 600; }
+        .nota { display: inline-block; min-width: 26px; text-align: center; border-radius: 6px; font-weight: 700; padding: 2px 6px; }
+        .nota.n5, .nota.n4 { background: var(--color-success-bg); color: var(--color-success); }
+        .nota.n3 { background: var(--color-warning-bg); color: #B06A00; }
+        .nota.n2, .nota.n1 { background: var(--color-danger-bg); color: var(--color-danger); }
+        .fb-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+        .fb-actions button { font-family: inherit; }
+        .fb-chatlog { max-height: 420px; overflow-y: auto; background: #efeae2; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+        .fb-chatlog .msg { max-width: 85%; }
+
+        /* ----- Admin ----- */
+        .adm-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+        .adm-toolbar input, .adm-toolbar select, .form-grid input, .form-grid select, .form-grid textarea { padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 13px; font-family: inherit; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; }
+        .form-grid label { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); display: flex; flex-direction: column; gap: 4px; }
+        .form-grid .full { grid-column: 1 / -1; }
+        .asig-list { max-height: 320px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: 8px; padding: 6px 10px; text-align: left; }
+        .asig-list label { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+        #capacitacionApp .btn-secundario, #capDetalleModal .btn-secundario { padding: 8px 14px; font-size: 13px; }
+        details.fb-det p, details.fb-det li { font-size: 13.5px; line-height: 1.5; }
+        details.fb-det ul { padding-left: 18px; margin: 0; }
+        .link { color: var(--color-primary); font-weight: 600; cursor: pointer; text-decoration: none; background: none; border: none; font-family: inherit; font-size: inherit; padding: 0; }
+        .link:hover { text-decoration: underline; }
+        .loading-ia { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 50px 0; color: var(--color-text-secondary); font-size: 14px; }
+        .spinner { width: 34px; height: 34px; border: 3px solid var(--color-primary-light); border-top-color: var(--color-primary); border-radius: 50%; animation: girar 0.9s linear infinite; }
+        @keyframes girar { to { transform: rotate(360deg); } }
+
+        @media (max-width: 900px) {
+            .chat-layout { grid-template-columns: 1fr; }
+            .chat-box { height: 65vh; }
+            .form-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="main-area">
+            <div class="container" id="capacitacionApp">
+                <div class="cap-head">
+                    <div>
+                        <h2>Capacitación IA</h2>
+                        <p class="cap-sub">Practica conversaciones de WhatsApp con postulantes simulados y recibe feedback con la rúbrica UCAL.</p>
+                    </div>
+                    <span class="cap-chip" id="capProveedor" style="display:none;"></span>
+                </div>
+
+                <!-- ===== Vista: inicio ===== -->
+                <div id="vistaInicio">
+                    <div class="cap-tabs" id="capTabs">
+                        <button class="cap-tab active" data-tab="practicar">Practicar</button>
+                        <button class="cap-tab" data-tab="historial">Mi historial</button>
+                        <button class="cap-tab admin-only" data-tab="equipo" style="display:none;">Resultados del equipo</button>
+                        <button class="cap-tab admin-only" data-tab="escenarios" style="display:none;">Escenarios y asignaciones</button>
+                    </div>
+                    <div id="tabPracticar"><div class="loading">Cargando…</div></div>
+                    <div id="tabHistorial" style="display:none;"></div>
+                    <div id="tabEquipo" style="display:none;">
+                        <div class="adm-toolbar">
+                            <label style="font-size:12px;">Desde <input type="date" id="eqDesde"></label>
+                            <label style="font-size:12px;">Hasta <input type="date" id="eqHasta"></label>
+                            <input type="text" id="eqBuscar" placeholder="Buscar asesor…">
+                            <button class="btn-secundario" id="eqFiltrar">Filtrar</button>
+                        </div>
+                        <div id="eqTabla"></div>
+                    </div>
+                    <div id="tabEscenarios" style="display:none;">
+                        <div class="adm-toolbar">
+                            <button class="btn-primary" id="escNuevo"><span class="material-symbols-outlined" style="font-size:16px;">add</span> Nuevo escenario</button>
+                            <span class="cap-sub" id="escChatsInfo"></span>
+                        </div>
+                        <div id="escTabla"></div>
+                    </div>
+                </div>
+
+                <!-- ===== Vista: chat ===== -->
+                <div id="vistaChat" style="display:none; margin-top:16px;">
+                    <div class="chat-layout">
+                        <div class="chat-box">
+                            <div class="chat-top">
+                                <div class="chat-avatar" id="chatAvatar">?</div>
+                                <div>
+                                    <div class="nombre" id="chatNombre">Postulante</div>
+                                    <div class="estado" id="chatEstado"></div>
+                                </div>
+                            </div>
+                            <div class="chat-msgs" id="chatMsgs"></div>
+                            <div class="chat-input">
+                                <textarea id="chatTexto" rows="1" placeholder="Escribe un mensaje (Enter para enviar, Shift+Enter para salto de línea)"></textarea>
+                                <button class="chat-send" id="chatEnviar" title="Enviar"><span class="material-symbols-outlined">send</span></button>
+                            </div>
+                        </div>
+                        <div class="chat-side">
+                            <div class="side-card">
+                                <h5>Simulación comercial UCAL</h5>
+                                <div class="side-row"><b>Escenario</b><span id="sideEscenario"></span></div>
+                                <div class="side-row"><b>Nivel</b><span id="sideNivel"></span></div>
+                                <div class="side-row"><b>Objetivo de práctica</b><span id="sideObjetivo"></span></div>
+                            </div>
+                            <div class="side-card">
+                                <h5>Datos del formulario</h5>
+                                <div class="side-row"><b>Nombre</b><span id="fichaNombre"></span></div>
+                                <div class="side-row"><b>Carrera de interés</b><span id="fichaCarrera"></span></div>
+                                <div class="side-row"><b>Canal</b><span id="fichaCanal"></span></div>
+                                <div class="side-row" id="fichaMsgRow"><b>Mensaje del formulario</b><span id="fichaMsg"></span></div>
+                            </div>
+                            <button class="btn-fin" id="chatFinalizar"><span class="material-symbols-outlined" style="font-size:18px;">flag</span> Finalizar simulación</button>
+                            <p class="side-hint">También puedes escribir <b>FINALIZAR SIMULACIÓN</b> en el chat. Tú inicias la conversación, como en la bandeja real.</p>
+                            <button class="btn-secundario" id="chatSalir">Salir sin evaluar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== Vista: feedback ===== -->
+                <div id="vistaFeedback" style="display:none; margin-top:16px;"></div>
+
+                <!-- Los modales van dentro de #capacitacionApp para que también
+                     funcionen cuando la vista se embebe en dashboard.html -->
+                <!-- Modal: detalle de una práctica (supervisor) -->
+                <div class="modal-overlay" id="capDetalleModal">
+                    <div class="modal-box modal-box-detalle" style="max-width:900px;">
+                        <button class="modal-close-x" data-cerrar="capDetalleModal"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
+                        <div id="capDetalleContenido"></div>
+                    </div>
+                </div>
+
+                <!-- Modal: crear / editar escenario -->
+                <div class="modal-overlay" id="escModal">
+                    <div class="modal-box modal-box-detalle" style="max-width:640px;">
+                        <button class="modal-close-x" data-cerrar="escModal"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
+                        <h4 id="escModalTitulo" style="margin-bottom:14px;">Escenario</h4>
+                        <div class="form-grid">
+                            <label class="full">Título<input type="text" id="escTitulo" maxlength="200"></label>
+                            <label>Nivel
+                                <select id="escNivel"><option value="1">1 · Básico</option><option value="2">2 · Intermedio</option><option value="3">3 · Avanzado</option><option value="4">4 · Certificación</option></select>
+                            </label>
+                            <label>Activo
+                                <select id="escActivo"><option value="true">Sí</option><option value="false">No</option></select>
+                            </label>
+                            <label class="full">Objetivo de práctica (lo ve el asesor)<input type="text" id="escObjetivo" maxlength="500"></label>
+                            <label>Tipo de ingreso
+                                <select id="escTipo"><option value="">Cualquiera</option><option value="nuevo">Nuevo</option><option value="traslado_con_convalidacion">Traslado con convalidación</option><option value="programa_mas2">Programa +2</option><option value="cpa">CPA</option></select>
+                            </label>
+                            <label>Modalidad
+                                <select id="escModalidad"><option value="">Cualquiera</option><option value="semipresencial">Semipresencial</option><option value="virtual">Virtual</option></select>
+                            </label>
+                            <label class="full">Carrera<select id="escCarrera"><option value="">Cualquiera</option></select></label>
+                            <label class="full">Indicaciones internas para el lead (no las ve el asesor)<textarea id="escInstr" rows="3" maxlength="2000" placeholder="Ej.: la mamá es quien paga y compara con la U de Lima."></textarea></label>
+                            <label class="full">Nota interna<textarea id="escDesc" rows="2" maxlength="1000"></textarea></label>
+                            <label>Orden<input type="number" id="escOrden" value="0"></label>
+                        </div>
+                        <div class="modal-buttons" style="margin-top:16px;">
+                            <button class="modal-btn modal-btn-cancel" data-cerrar="escModal">Cancelar</button>
+                            <button class="modal-btn modal-btn-confirm" id="escGuardar">Guardar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: asignar escenario -->
+                <div class="modal-overlay" id="asigModal">
+                    <div class="modal-box modal-box-detalle" style="max-width:520px;">
+                        <button class="modal-close-x" data-cerrar="asigModal"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
+                        <h4 id="asigTitulo" style="margin-bottom:4px;">Asignar</h4>
+                        <p class="cap-sub" style="margin-bottom:12px;">Los asesores marcados verán esta práctica como obligatoria.</p>
+                        <div class="adm-toolbar">
+                            <input type="text" id="asigBuscar" placeholder="Buscar…" style="flex:1;">
+                            <button class="link" id="asigTodos">Marcar todos</button>
+                            <button class="link" id="asigNinguno">Ninguno</button>
+                        </div>
+                        <div class="asig-list" id="asigLista"></div>
+                        <div class="form-grid" style="margin-top:12px;">
+                            <label>Fecha límite (opcional)<input type="date" id="asigFecha"></label>
+                        </div>
+                        <div class="modal-buttons" style="margin-top:16px;">
+                            <button class="modal-btn modal-btn-cancel" data-cerrar="asigModal">Cancelar</button>
+                            <button class="modal-btn modal-btn-confirm" id="asigGuardar">Guardar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="core/utils.js"></script>
+    <script type="module" src="core/constants.js"></script>
+    <script type="module" src="core/components.js"></script>
+    <script type="module" src="js/sidebar.js"></script>
+    <script type="module" src="js/capacitacion-chat.js"></script>
+</body>
+</html>

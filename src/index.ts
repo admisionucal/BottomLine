@@ -49,6 +49,20 @@ import {
   getAsignacionesEvaluacion,
   guardarAsignacionesEvaluacion,
 } from './routes/evaluaciones';
+import {
+  simGetPanel,
+  simIniciar,
+  simEnviar,
+  simFinalizar,
+  simAbandonar,
+  simDetalle,
+  simResultados,
+  simGetEscenarios,
+  simGuardarEscenario,
+  simGetAsignaciones,
+  simGuardarAsignaciones,
+  simEstadoIA,
+} from './routes/simulador';
 
 // Igual que getLeadsConAprobacion(body) en code.gs: mismo getLeads, pero
 // solo accesible para SUPERVISOR/ADMISION.
@@ -111,6 +125,19 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   guardarVentanaEvaluacion,
   getAsignacionesEvaluacion,
   guardarAsignacionesEvaluacion,
+  // Capacitación IA (simulador comercial)
+  simGetPanel,
+  simIniciar,
+  simEnviar,
+  simFinalizar,
+  simAbandonar,
+  simDetalle,
+  simResultados,
+  simGetEscenarios,
+  simGuardarEscenario,
+  simGetAsignaciones,
+  simGuardarAsignaciones,
+  simEstadoIA,
 };
 
 export default {
@@ -151,7 +178,13 @@ export default {
         }
       }
 
-      // Fallback: acción todavía no migrada -> se reenvía tal cual a Apps Script.
+      // Fallback: acción todavía no migrada -> se reenvía a Apps Script.
+      // Solo se reenvían las acciones de usuario que Apps Script atiende hoy;
+      // cualquier otra (p. ej. registrarSesionExterna, que solo debe llamar
+      // el propio Worker al hacer login) se rechaza aquí.
+      if (!ACCIONES_APPS_SCRIPT.has(action)) {
+        return jsonError('Acción desconocida: ' + action);
+      }
       return proxyAAppsScript(request, body, env);
     }
 
@@ -159,6 +192,16 @@ export default {
     return env.ASSETS.fetch(request);
   },
 };
+
+// Acciones que el frontend todavía resuelve en Apps Script (Condiciones
+// Comerciales). Si se migra alguna a Postgres, quitarla de aquí.
+const ACCIONES_APPS_SCRIPT = new Set([
+  'solicitarCC',
+  'cancelarSolicitudCC',
+  'enviarCC',
+  'generarPreviewPDF',
+  'rechazarCC',
+]);
 
 async function proxyAAppsScript(originalRequest: Request, body: any, env: Env): Promise<Response> {
   const resp = await fetch(env.APPS_SCRIPT_URL, {

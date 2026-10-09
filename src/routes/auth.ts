@@ -77,10 +77,13 @@ export async function login(client: Client, body: JsonBody, env: Env, ctx: Execu
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'registrarSesionExterna',
+        // code.gs valida esta clave: sin ella cualquiera podría crear sesiones.
+        secret: env.IMPORT_SECRET,
         token,
         usuario: user.usuario,
         email: emailUser,
-        rol: user.rol,
+        // Apps Script no conoce SISTEMAS: para Condiciones Comerciales actúa como ADMISION.
+        rol: user.rol === 'SISTEMAS' ? 'ADMISION' : user.rol,
         nombre: user.nombre_aux || user.nombre,
       }),
     }).catch(() => {})

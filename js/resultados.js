@@ -2,7 +2,7 @@
 // RESULTADOS - "Usuarios > Resultados" (solo SUPERVISOR / ADMISION)
 // ================================================================
 
-import { API_URL, ROLES } from '../core/constants.js';
+import { API_URL, ROLES, esRolSupervisorOAdmision } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml, formatearFecha } from '../core/utils.js';
 import { Sidebar, renderTable } from '../core/components.js';
 
@@ -39,7 +39,7 @@ async function initResultados(codigoInicial) {
         return;
     }
 
-    if (user.rol !== ROLES.SUPERVISOR && user.rol !== ROLES.ADMISION) {
+    if (!esRolSupervisorOAdmision(user.rol)) {
         alert('Acceso denegado: esta sección es solo para Supervisor y Admisión.');
         if (typeof window.mostrarUsuario === 'function') {
             window.mostrarUsuario();

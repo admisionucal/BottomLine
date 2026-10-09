@@ -9,7 +9,13 @@ export interface Sesion {
   email: string;
   rol: string;
   nombre: string;
+  // Perfil guardado en la base. Solo difiere de `rol` para SISTEMAS (ver exigirSesion).
+  rolReal?: string;
 }
+
+// Perfil de pruebas: tiene todos los permisos de ADMISION y, además, ve las
+// funciones que todavía están en prueba (p. ej. Capacitación IA).
+export const ROL_SISTEMAS = 'SISTEMAS';
 
 export async function crearSesion(client: Client, user: Sesion): Promise<string> {
   const token = crypto.randomUUID();
@@ -58,10 +64,20 @@ export async function exigirSesion(
   if (!sesion) {
     return { sesion: null, error: 'Sesión inválida o expirada. Vuelve a iniciar sesión.' };
   }
-  if (rolesPermitidos && rolesPermitidos.indexOf(sesion.rol) === -1) {
+  // SISTEMAS se comporta como ADMISION en todo el backend (así no hay que
+  // tocar cada ruta). El perfil real queda en `rolReal` para las funciones
+  // que solo ve SISTEMAS.
+  const rolReal = sesion.rol;
+  const efectiva: Sesion = rolReal === ROL_SISTEMAS ? { ...sesion, rol: 'ADMISION', rolReal } : { ...sesion, rolReal };
+
+  if (
+    rolesPermitidos &&
+    rolesPermitidos.indexOf(efectiva.rol) === -1 &&
+    rolesPermitidos.indexOf(rolReal) === -1
+  ) {
     return { sesion: null, error: 'Acceso denegado: privilegios insuficientes.' };
   }
-  return { sesion };
+  return { sesion: efectiva };
 }
 
 // ---------- Bloqueo por intentos fallidos ----------

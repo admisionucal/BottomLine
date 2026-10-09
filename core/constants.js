@@ -125,14 +125,28 @@ export const ROLES = {
     ASESOR: 'ASESOR',
     SUPERVISOR: 'SUPERVISOR',
     ADMISION: 'ADMISION',
+    // Perfil de pruebas: todo lo de ADMISION + funciones que aún no se liberan.
+    SISTEMAS: 'SISTEMAS',
 };
 
 export function esRolSupervisorOAdmision(rol) {
-    return rol === ROLES.SUPERVISOR || rol === ROLES.ADMISION;
+    return rol === ROLES.SUPERVISOR || rol === ROLES.ADMISION || rol === ROLES.SISTEMAS;
 }
 
 export function esRolAdmision(rol) {
-    return rol === ROLES.ADMISION;
+    return rol === ROLES.ADMISION || rol === ROLES.SISTEMAS;
+}
+
+export function esRolSistemas(rol) {
+    return rol === ROLES.SISTEMAS;
+}
+
+// ETAPA DE PRUEBAS: perfiles que ven Capacitación IA. Para liberarla,
+// agregar perfiles aquí y en ROLES_CAPACITACION de src/routes/simulador.ts.
+export const ROLES_CAPACITACION_IA = [ROLES.SISTEMAS];
+
+export function puedeVerCapacitacionIA(rol) {
+    return ROLES_CAPACITACION_IA.includes(rol);
 }
 
 // ----- OPCIONES PARA SELECTORES (Catálogos estáticos) -----

@@ -1,5 +1,5 @@
 import type { Client } from 'pg';
-import { jsonOk, jsonError, type JsonBody } from '../types';
+import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 import { exigirSesion } from '../lib/session';
 import { calcularPerfilamientoCompleto } from '../lib/perfilamiento';
 

@@ -3,3 +3,14 @@
 node_modules
 wrangler.jsonc
 .assetsignore
+# No publicar código del servidor, SQL, scripts ni configuración
+.gitignore
+.dev.vars
+package.json
+package-lock.json
+tsconfig.json
+src/
+sql/
+scripts/
+Claude outputs/
+*.md
