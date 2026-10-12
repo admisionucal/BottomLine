@@ -44,20 +44,6 @@ export async function getSolicitudPendiente(client: Client, body: JsonBody) {
   return jsonOk({ data: result.rows[0] ? filaASolicitudObj(result.rows[0]) : null });
 }
 
-export async function getSolicitudesPendientesCampana(client: Client, body: JsonBody) {
-  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
-  if (!sesion) return jsonError(error!);
-
-  const campana = String(body.campana || '').trim();
-
-  const result = await client.query(
-    `select * from solicitudes where campana = $1 and status = 'PENDIENTE' order by fecha_solicitud desc`,
-    [campana]
-  );
-
-  return jsonOk({ data: result.rows.map(filaASolicitudObj) });
-}
-
 export async function createSolicitud(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ASESOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -94,8 +80,6 @@ export async function createSolicitud(client: Client, body: JsonBody) {
       ]
     );
   } catch (e: any) {
-    // Código 23505 = unique_violation -> chocó con el índice único parcial
-    // (ya hay una solicitud PENDIENTE para este lead).
     if (e.code === '23505') {
       return jsonError('Ya existe una solicitud pendiente para este lead.');
     }
@@ -124,8 +108,6 @@ export async function resolveSolicitud(client: Client, body: JsonBody) {
   if (!solicitud) return jsonError('Solicitud no encontrada');
 
   if (nuevoStatus === 'APROBADO') {
-    // Igual que resolveSolicitudInterno real: aplica lo solicitado directo
-    // sobre la ficha del lead, reusando el mismo saveBottom ya migrado.
     await saveBottom(client, {
       idPrometeo: solicitud.id_prometeo,
       campana: solicitud.campana,

@@ -1,29 +1,22 @@
-// ================================================================
-// UNIFICAR IDS - Módulo de unificación de leads duplicados
-// ================================================================
-
 import {
     COLUMNAS, esRolSupervisorOAdmision
 } from '../core/constants.js';
 import {
     getCurrentUser, getUserCampanas, escapeHtml
 } from '../core/utils.js';
-import { Sidebar, Toast } from '../core/components.js';
+import { Sidebar } from '../core/components.js';
 import { buscarLeads, unificarLeads } from './unificar-core.js';
 
-// ===== ESTADO =====
 const state = {
     resultados: [],
     seleccionados: new Map(),
     campana: ''
 };
 
-// ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', () => {
     initUnificar();
 });
 
-// ===== PUNTO DE ENTRADA (para embebido en dashboard) =====
 window.initUnificarEmbebido = function() {
     initUnificar();
 };
@@ -47,16 +40,11 @@ function initUnificar() {
         return;
     }
 
-    // Si el sidebar ya existe (venimos embebidos dentro de dashboard.html)
-    // no creamos uno nuevo; si es la página standalone, sí.
     const modoEmbebido = !!document.querySelector('.sidebar-nav');
     if (!modoEmbebido) {
         new Sidebar({ active: 'bottomline', activeSubitem: 'navUnificarIds' });
     }
 
-    // Cargar campañas. Se agrega "TODAS" al inicio: la unificación ya no
-    // exige que principal y secundarios estén en la misma campaña, así
-    // que la búsqueda tiene que poder abarcar todas de una vez.
     const campanas = getUserCampanas();
     const sel = document.getElementById('selectCampana');
     if (sel) {
@@ -76,8 +64,6 @@ function initUnificar() {
         if (campanas.length > 0) state.campana = campanas[0];
     }
 
-    // Los listeners solo se atan una vez: los elementos del DOM persisten
-    // entre reingresos a esta vista (embebida o standalone).
     if (!__unifListenersAtados) {
         document.getElementById('btnBuscar').addEventListener('click', buscar);
         document.getElementById('searchValue').addEventListener('keypress', (e) => {
@@ -89,7 +75,6 @@ function initUnificar() {
     }
 }
 
-// ===== BÚSQUEDA =====
 async function buscar() {
     const campana = document.getElementById('selectCampana').value;
     const searchType = document.getElementById('searchType').value;
@@ -113,7 +98,7 @@ async function buscar() {
             campana: campana
         };
         if (campana !== 'TODAS') {
-            state.campana = campana; // campaña por defecto de esta búsqueda
+            state.campana = campana;
         }
 
         const data = await buscarLeads(payload);
@@ -172,7 +157,6 @@ function renderResultados() {
 
     tbody.innerHTML = html;
 
-    // Eventos de checkboxes
     tbody.querySelectorAll('.check').forEach(chk => {
         chk.addEventListener('change', () => {
             const id = chk.dataset.id;
@@ -191,7 +175,6 @@ function renderResultados() {
     });
 }
 
-// ===== PANEL DE SELECCIÓN =====
 function actualizarPanelSeleccion() {
     const panel = document.getElementById('seleccionCard');
     const resumen = document.getElementById('resumenSeleccion');
@@ -208,7 +191,6 @@ function actualizarPanelSeleccion() {
 
     const items = Array.from(state.seleccionados.values());
     const activos = items.filter(i => i.activo);
-    const huerfanos = items.filter(i => !i.activo);
 
     resumen.innerHTML = items.map(i =>
         `<div class="sel-item ${i.activo ? 'base' : ''}">
@@ -238,8 +220,6 @@ function actualizarPanelSeleccion() {
         return;
     }
 
-    // La campaña ya no importa para habilitar el botón: se puede unificar
-    // entre campañas distintas sin restricción.
     predominanteContainer.style.display = 'block';
     btnUnificar.disabled = false;
 }
@@ -250,7 +230,6 @@ function cancelarSeleccion() {
     document.getElementById('seleccionCard').style.display = 'none';
 }
 
-// ===== UNIFICAR =====
 async function unificar() {
     const items = Array.from(state.seleccionados.values());
     const activo = items.find(i => i.activo);
@@ -281,7 +260,6 @@ async function unificar() {
             adminEmail: user.email
         });
 
-        // Si el usuario canceló ahí, no mostramos error.
         if (result.cancelado) {
             return;
         }

@@ -1,6 +1,6 @@
 import type { Client } from 'pg';
 
-export const SESSION_TTL_SECONDS = 32400; // 9 horas, igual que hoy
+export const SESSION_TTL_SECONDS = 32400;
 const LOGIN_MAX_INTENTOS = 5;
 const LOGIN_BLOQUEO_SEGUNDOS = 60;
 
@@ -9,12 +9,9 @@ export interface Sesion {
   email: string;
   rol: string;
   nombre: string;
-  // Perfil guardado en la base. Solo difiere de `rol` para SISTEMAS (ver exigirSesion).
   rolReal?: string;
 }
 
-// Perfil de pruebas: tiene todos los permisos de ADMISION y, además, ve las
-// funciones que todavía están en prueba (p. ej. Capacitación IA).
 export const ROL_SISTEMAS = 'SISTEMAS';
 
 export async function crearSesion(client: Client, user: Sesion): Promise<string> {
@@ -36,7 +33,6 @@ export async function obtenerSesion(client: Client, token: string | undefined): 
   );
   if (result.rows.length === 0) return null;
 
-  // Renovar el TTL en cada uso, igual que hacía cache.put() de nuevo en obtenerSesion().
   await client.query(
     `update sesiones set expira_en = now() + interval '${SESSION_TTL_SECONDS} seconds' where token = $1`,
     [token]
@@ -64,9 +60,6 @@ export async function exigirSesion(
   if (!sesion) {
     return { sesion: null, error: 'Sesión inválida o expirada. Vuelve a iniciar sesión.' };
   }
-  // SISTEMAS se comporta como ADMISION en todo el backend (así no hay que
-  // tocar cada ruta). El perfil real queda en `rolReal` para las funciones
-  // que solo ve SISTEMAS.
   const rolReal = sesion.rol;
   const efectiva: Sesion = rolReal === ROL_SISTEMAS ? { ...sesion, rol: 'ADMISION', rolReal } : { ...sesion, rolReal };
 
@@ -79,8 +72,6 @@ export async function exigirSesion(
   }
   return { sesion: efectiva };
 }
-
-// ---------- Bloqueo por intentos fallidos ----------
 
 export async function loginBloqueado(client: Client, usuarioNorm: string): Promise<boolean> {
   const result = await client.query(

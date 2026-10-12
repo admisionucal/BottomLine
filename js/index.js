@@ -1,11 +1,6 @@
-// ================================================================
-// INDEX - Módulo de Login
-// ================================================================
+import { API_URL } from '../core/constants.js';
+import { getCurrentUser, setUser } from '../core/utils.js';
 
-import { API_URL, CACHE_KEYS } from '../core/constants.js';
-import { getCurrentUser, setUser, cacheRemove } from '../core/utils.js';
-
-// Elementos DOM
 const form = document.getElementById('loginForm');
 const usuarioInput = document.getElementById('usuario');
 const passwordInput = document.getElementById('password');
@@ -13,14 +8,12 @@ const loginBtn = document.getElementById('loginBtn');
 const errorMsg = document.getElementById('errorMsg');
 const togglePassword = document.getElementById('togglePassword');
 
-// ----- Mostrar/Ocultar contraseña -----
 togglePassword.addEventListener('click', () => {
     const isHidden = passwordInput.type === 'password';
     passwordInput.type = isHidden ? 'text' : 'password';
     togglePassword.textContent = isHidden ? 'visibility_off' : 'visibility';
 });
 
-// ----- Manejar Login -----
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -53,7 +46,6 @@ form.addEventListener('submit', async (e) => {
     }
 });
 
-// ----- API Call (versión simplificada para login) -----
 async function callAPI(action, data = {}) {
     const payload = { action, ...data };
     try {
@@ -69,7 +61,6 @@ async function callAPI(action, data = {}) {
     }
 }
 
-// ----- UI Helpers -----
 function showError(msg) {
     errorMsg.textContent = msg;
     errorMsg.style.display = 'block';
@@ -79,7 +70,6 @@ function hideError() {
     errorMsg.style.display = 'none';
 }
 
-// ----- Verificar sesión activa -----
 (function checkSession() {
     const user = getCurrentUser();
     if (user) {

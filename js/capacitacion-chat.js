@@ -1,12 +1,8 @@
-// ================================================================
-// CAPACITACIÓN IA — simulador comercial por chat (fase 1)
-// ================================================================
-
-import { API_URL, ROLES, esRolSupervisorOAdmision, puedeVerCapacitacionIA } from '../core/constants.js';
+import { API_URL, esRolSupervisorOAdmision, puedeVerCapacitacionIA } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml, formatearFecha } from '../core/utils.js';
 import { Sidebar, renderTable, Toast } from '../core/components.js';
 
-const ESPERA_ANTES_DE_RESPONDER_MS = 2500; // el lead "espera" a que termines de escribir
+const ESPERA_ANTES_DE_RESPONDER_MS = 2500;
 const FRASE_FIN = 'FINALIZAR SIMULACION';
 
 const state = {
@@ -16,11 +12,11 @@ const state = {
     sesionId: null,
     encabezado: null,
     ficha: null,
-    cola: [],            // mensajes del asesor aún no enviados al servidor
+    cola: [],
     timer: null,
-    esperando: false,    // hay una llamada a la IA en curso
+    esperando: false,
     finalizando: false,
-    ultimaSesion: null,  // para "repetir" desde el feedback
+    ultimaSesion: null,
     escenarios: [],
     asignacion: { escenarioId: null, asesores: [], marcados: new Set() },
 };
@@ -47,12 +43,8 @@ const horaAhora = () => new Date().toLocaleTimeString('es-PE', { hour: '2-digit'
 const claseScore = (v, umbralAlto, umbralMedio) => (v >= umbralAlto ? 'sc-alta' : v >= umbralMedio ? 'sc-media' : 'sc-baja');
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Página independiente (capacitacion-chat.html)
 document.addEventListener('DOMContentLoaded', () => init(false));
 
-// Vista embebida dentro de dashboard.html (Usuario > Capacitación IA).
-// sidebar.js inyecta #capacitacionApp y llama a esta función cada vez que
-// se entra al menú.
 window.initCapacitacionEmbebido = function () {
     return init(true);
 };
@@ -68,7 +60,6 @@ async function init(embebido) {
     }
     state.esAdmin = esRolSupervisorOAdmision(state.user.rol);
     if (!puedeVerCapacitacionIA(state.user.rol)) {
-        // Se arma el menú igual (página independiente) para que pueda salir de aquí.
         if (!embebido && !document.querySelector('.sidebar-nav')) {
             new Sidebar({ active: 'usuario' });
         }
@@ -77,7 +68,6 @@ async function init(embebido) {
     }
 
     if (eventosConectados) {
-        // Volvió desde el menú: si hay una práctica abierta se deja tal cual.
         if (!state.sesionId && !state.finalizando) {
             mostrarVista('inicio');
             await cargarPanel();
@@ -96,7 +86,6 @@ async function init(embebido) {
     root.querySelectorAll('.cap-tab').forEach((b) => b.addEventListener('click', () => cambiarTab(b.dataset.tab)));
     root.querySelectorAll('[data-cerrar]').forEach((b) => b.addEventListener('click', () => $(b.dataset.cerrar).classList.remove('show')));
 
-    // Chat
     const ta = $('chatTexto');
     ta.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarDesdeInput(); }
@@ -104,13 +93,12 @@ async function init(embebido) {
     ta.addEventListener('input', () => {
         ta.style.height = 'auto';
         ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
-        if (state.cola.length) programarEnvio(); // sigue escribiendo: el lead espera
+        if (state.cola.length) programarEnvio();
     });
     $('chatEnviar').addEventListener('click', enviarDesdeInput);
     $('chatFinalizar').addEventListener('click', finalizar);
     $('chatSalir').addEventListener('click', salirSinEvaluar);
 
-    // Admin
     $('eqFiltrar').addEventListener('click', cargarEquipo);
     $('escNuevo').addEventListener('click', () => abrirEscenario(null));
     $('escGuardar').addEventListener('click', guardarEscenario);
@@ -125,10 +113,6 @@ async function init(embebido) {
 
     await cargarPanel();
 }
-
-// ================================================================
-// PANEL / TABS
-// ================================================================
 
 function mostrarVista(v) {
     $('vistaInicio').style.display = v === 'inicio' ? '' : 'none';
@@ -231,10 +215,6 @@ function pintarHistorial() {
     cont.querySelectorAll('[data-ver]').forEach((b) => b.addEventListener('click', () => verFeedback(b.dataset.ver)));
 }
 
-// ================================================================
-// CHAT
-// ================================================================
-
 async function iniciar(params) {
     mostrarVista('feedback');
     $('vistaFeedback').innerHTML = `<div class="loading-ia"><div class="spinner"></div>Preparando a tu cliente simulado…</div>`;
@@ -320,8 +300,6 @@ function enviarDesdeInput() {
     programarEnvio();
 }
 
-// Igual que en WhatsApp: el asesor puede mandar varios globos seguidos;
-// el lead contesta cuando el asesor deja de escribir un momento.
 function programarEnvio() {
     clearTimeout(state.timer);
     state.timer = setTimeout(enviarCola, ESPERA_ANTES_DE_RESPONDER_MS);
@@ -329,7 +307,7 @@ function programarEnvio() {
 
 async function enviarCola() {
     if (state.esperando || !state.cola.length) return;
-    if ($('chatTexto').value.trim()) { programarEnvio(); return; } // sigue escribiendo
+    if ($('chatTexto').value.trim()) { programarEnvio(); return; }
     const lote = state.cola.splice(0);
     state.esperando = true;
     $('chatEstado').textContent = 'en línea';
@@ -376,7 +354,6 @@ async function finalizar() {
     clearTimeout(state.timer);
     $('chatFinalizar').disabled = true;
 
-    // Esperar a que termine una respuesta en curso y mandar lo pendiente.
     while (state.esperando) await esperar(300);
     const pendientes = state.cola.splice(0).map((m) => m.texto);
 
@@ -402,10 +379,6 @@ async function finalizar() {
     conectarAccionesFeedback($('vistaFeedback'), r.data);
     cargarPanel();
 }
-
-// ================================================================
-// FEEDBACK (Formato V1.2: ejecutivo primero, detalle después)
-// ================================================================
 
 async function verFeedback(sesionId, enModal = false) {
     const r = await callAPI('simDetalle', { sesionId });
@@ -464,7 +437,6 @@ function renderFeedback(d, esPropio) {
     html += `<div class="fb-block"><h4><span class="material-symbols-outlined" style="color:var(--color-primary)">lightbulb</span> Lo que realmente necesitaba el cliente</h4><p>${escapeHtml(ej.necesidad_real || '')}</p></div>
         <div class="fb-block next"><h4><span class="material-symbols-outlined">rocket_launch</span> Para tu próxima práctica</h4><p>${escapeHtml(ej.proxima_practica || '')}</p></div>`;
 
-    // ----- Lo que había detrás del cliente -----
     const pr = ev.perfil_revelado || {};
     const po = d.perfilOculto || {};
     html += `<details class="fb-det"><summary>🔎 Lo que había detrás del cliente</summary>
@@ -479,7 +451,6 @@ function renderFeedback(d, esPropio) {
         </div>
     </details>`;
 
-    // ----- Evaluación completa -----
     const crit = ev.criterios || {};
     html += `<details class="fb-det"><summary>📋 Ver evaluación completa</summary>
         <table class="crit-table"><thead><tr><th>Criterio</th><th>Nota</th><th>Evidencia y comentario</th></tr></thead><tbody>
@@ -550,10 +521,6 @@ function conectarAccionesFeedback(cont, d) {
         }
     }));
 }
-
-// ================================================================
-// SUPERVISIÓN
-// ================================================================
 
 async function cargarEquipo() {
     const cont = $('eqTabla');

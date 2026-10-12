@@ -1,7 +1,6 @@
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 
-// Mapea las claves que manda actualizar_leads_hoy.gs (COLUMNAS_HOY) a columnas reales.
 const MAPEO_HOY: Record<string, string> = {
   'NOMBRES': 'nombres',
   'TELEFONO 3': 'telefono3',
@@ -27,7 +26,6 @@ function esValorMerge(valor: any): boolean {
   return !VALORES_NO_MERGE.has(String(valor).trim().toUpperCase());
 }
 
-// Idénticas a hoyOverrideEsConfiable() / permitirActualizarAsignacionDetail() en code.gs.
 function hoyOverrideEsConfiable(
   statusHoy: any,
   asesorBase: string,
@@ -62,8 +60,6 @@ function permitirActualizarAsignacion(
   return aHoy !== '' && aHoy === aBase;
 }
 
-// Este endpoint no usa sesión de usuario (lo llama un script server-to-server,
-// no un navegador), así que se protege con un secreto compartido simple.
 export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: Env) {
   if (!env.IMPORT_SECRET || body.secret !== env.IMPORT_SECRET) {
     return jsonError('No autorizado.', 401);
@@ -84,9 +80,6 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
     if (!idPrometeo) continue;
 
     try {
-      // Igual patrón que en la migración manual: si el lead no existe en la
-      // base todavía, se crea un registro mínimo (en_base=false) para no
-      // perder la actualización del scraper.
       await client.query(
         `insert into leads (id_prometeo, campana, en_base)
          values ($1, $2, false)
@@ -94,9 +87,6 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
         [idPrometeo, campana]
       );
 
-      // Traemos la referencia ESTABLE (asesor_base/status_base, que solo
-      // toca el import diario) — no el asesor/status actual, que puede ya
-      // estar modificado por una corrida anterior de este mismo scraper.
       const ref = await client.query(
         `select en_base, asesor_base, status_base, fecha_prim_vp_pp from leads where id_prometeo = $1 and campana = $2`,
         [idPrometeo, campana]
@@ -114,26 +104,18 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
 
       const columnas: Record<string, any> = {};
 
-      // STATUS: se mergea siempre que venga un valor válido (igual que el código real).
       if (esValorMerge(statusHoy)) columnas.status_gestion = statusHoy;
 
-      // ASESOR: solo si la regla de asignación lo permite.
       if (permitirAsesor && esValorMerge(asesorHoy)) columnas.asesor = asesorHoy;
 
-      // Resto de campos "simples": se mergean siempre que el valor sea válido,
-      // sin depender de "confiable" (igual que getLeads real).
       for (const [claveSheet, colPg] of Object.entries(MAPEO_HOY)) {
         const valor = leadRaw[claveSheet];
         if (esValorMerge(valor)) columnas[colPg] = valor;
       }
 
-      // FECHA COMPROMISO DE PAGO Y DE VISITA: caso especial, solo si "confiable".
       if (confiable && esValorMerge(leadRaw['FECHA COMPROMISO DE PAGO'])) {
         columnas.fecha_compromiso_pago = leadRaw['FECHA COMPROMISO DE PAGO'];
 
-        // FECHA PRIM VP/PP: se llena una sola vez, la primera vez que el lead
-        // tiene un compromiso de pago confiable (VP o PP). Una vez seteada, no
-        // se vuelve a tocar aunque el compromiso de pago cambie después.
         if (!fechaPrimVpPpActual) {
           columnas.fecha_prim_vp_pp = leadRaw['FECHA COMPROMISO DE PAGO'];
         }

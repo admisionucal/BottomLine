@@ -1,7 +1,7 @@
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 import { exigirSesion, ROL_SISTEMAS, type Sesion } from '../lib/session';
-import { generar, generarJSON, limiteHistorial, proveedorActivo, MODELO_WORKERS, type MensajeIA } from '../lib/ia';
+import { generar, generarJSON, limiteHistorial, proveedorActivo, type MensajeIA } from '../lib/ia';
 import {
   CARRERAS,
   CRITERIOS,
@@ -17,23 +17,10 @@ import {
   type PerfilLead,
 } from '../lib/simuladorPrompts';
 
-// ================================================================
-// CAPACITACIÓN IA — simulador comercial (fase 1: chat)
-// ================================================================
-//
-// Flujo: simIniciar (crea el perfil oculto) -> simEnviar (n veces, el
-// lead responde) -> simFinalizar (auditoría con la rúbrica V3.3).
-// El canal ('chat' | 'llamada' | 'video') queda guardado en la sesión
-// para reutilizar este mismo motor en las fases 2 y 3.
-
 const ROLES_ADMIN = ['SUPERVISOR', 'ADMISION'];
 
-// ETAPA DE PRUEBAS: solo el perfil SISTEMAS ve Capacitación IA.
-// Para abrirla, agregar perfiles aquí (p. ej. 'SUPERVISOR', 'ADMISION', 'ASESOR')
-// y en ROLES_CAPACITACION_IA de core/constants.js.
 const ROLES_CAPACITACION = [ROL_SISTEMAS];
 
-// Valida sesión + acceso a Capacitación IA (y, si se pide, nivel supervisor).
 async function sesionCapacitacion(client: Client, body: JsonBody, soloAdmin = false): Promise<{ sesion: Sesion | null; error?: string }> {
   const { sesion, error } = await exigirSesion(client, body, null);
   if (!sesion) return { sesion: null, error };
@@ -76,11 +63,6 @@ async function conocimiento(client: Client): Promise<{ rubrica: string; feedback
   };
 }
 
-// ================================================================
-// PRECIO CORRECTO (fuente: catalogo_boletas en Supabase + virtual)
-// ================================================================
-
-// Mismo criterio que obtenerBoletaVirtualFija() en js/lead-detail.js.
 const VIRTUAL_690 = new Set([
   'comunicacionymarketingdigital',
   'disenodigitaldeinteriores',
@@ -114,7 +96,6 @@ async function calcularPrecioCorrecto(client: Client, p: PerfilLead) {
     };
   }
 
-  // Semipresencial: buscar en catalogo_boletas
   const esTraslado = p.tipo_ingreso.startsWith('traslado');
   const monto = esTraslado ? Number(p.institucion_procedencia?.boleta_mensual || 0) : Number(p.colegio?.pension_mensual || 0);
   let filas: any[] = [];
@@ -129,7 +110,6 @@ async function calcularPrecioCorrecto(client: Client, p: PerfilLead) {
     if (!esTraslado) return t.includes('NUEV') || t.includes('ORDINARIO') || t.includes('COLEGIO');
     return t.includes('TRASLADO') && (tipoBuscado[1] === 'CON' ? /\bCON\b/.test(t) : /\bSIN\b/.test(t) || !/\bCON\b/.test(t));
   });
-  // Redondeo al inmediato inferior: la fila con mayor mínimo <= monto.
   let elegida: any = null;
   for (const f of candidatas) {
     const min = numero(f.boleta_procedencia_min) ?? 0;
@@ -159,10 +139,6 @@ async function calcularPrecioCorrecto(client: Client, p: PerfilLead) {
       : 'No se encontró la fila en catalogo_boletas; evalúa el precio con criterio y no marques EC-1 salvo error evidente.',
   };
 }
-
-// ================================================================
-// PANEL INICIAL
-// ================================================================
 
 export async function simGetPanel(client: Client, body: JsonBody, env: Env) {
   const { sesion, error } = await sesionCapacitacion(client, body);
@@ -218,10 +194,6 @@ export async function simGetPanel(client: Client, body: JsonBody, env: Env) {
   });
 }
 
-// ================================================================
-// INICIAR
-// ================================================================
-
 async function elegirSemilla(client: Client, filtros: Record<string, any>, interacciones: string[]) {
   const params: any[] = [interacciones];
   const conds: string[] = ['c.activo = true', 'c.n_mensajes_lead >= 3'];
@@ -258,7 +230,6 @@ async function perfilamientoPorTelefono(client: Client, telefono: string) {
       [telefono]
     );
     if (!r.rowCount) return null;
-    // Solo campos con contenido; ningún dato personal (nombre, DNI, colegio, teléfono).
     return Object.fromEntries(Object.entries(r.rows[0]).filter(([, v]) => v !== null && String(v).trim() !== ''));
   } catch {
     return null;
@@ -326,7 +297,6 @@ export async function simIniciar(client: Client, body: JsonBody, env: Env) {
   const canal = ['chat', 'llamada', 'video'].includes(body.canal) ? body.canal : 'chat';
   const enfoque = String(body.enfoque || '').slice(0, 300);
 
-  // Escenario (o práctica libre por nivel)
   let escenario: any = null;
   let asignacionId: number | null = null;
   if (body.asignacionId) {
@@ -348,10 +318,8 @@ export async function simIniciar(client: Client, body: JsonBody, env: Env) {
   const objetivo = String(escenario?.objetivo || '');
   const filtros = escenario?.filtros || {};
 
-  // Cerrar prácticas que quedaron abiertas
   await client.query(`update sim_sesiones set estado = 'abandonada' where usuario = $1 and estado = 'en_curso'`, [sesion.usuario]);
 
-  // Semilla real + perfilamiento + ejemplos de estilo
   const interacciones = NIVELES[nivel].interaccion;
   const semilla = await elegirSemilla(client, filtros, interacciones);
   const perfilamiento = semilla ? await perfilamientoPorTelefono(client, semilla.telefono) : null;
@@ -370,7 +338,6 @@ export async function simIniciar(client: Client, body: JsonBody, env: Env) {
     extra = [];
   }
 
-  // 1) Perfil oculto
   const { system, user } = promptPerfil({
     nivel,
     objetivo,
@@ -427,7 +394,6 @@ export async function simIniciar(client: Client, body: JsonBody, env: Env) {
   });
 }
 
-// Lo único que el asesor ve del lead: lo que llegaría en el formulario.
 function fichaPublica(p: PerfilLead) {
   return {
     nombre: String(p.nombre || '').split(' ')[0],
@@ -436,10 +402,6 @@ function fichaPublica(p: PerfilLead) {
     mensajeFormulario: p.primer_mensaje_formulario || '',
   };
 }
-
-// ================================================================
-// CONVERSAR
-// ================================================================
 
 async function cargarSesionPropia(client: Client, sesion: Sesion, id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(String(id || ''))) return null;
@@ -503,7 +465,6 @@ export async function simEnviar(client: Client, body: JsonBody, env: Env) {
     const r = await generar(env, { system, mensajes: mensajesIA, maxTokens: 350, temperatura: 0.85 });
     texto = r.texto;
   } catch (e: any) {
-    // Se guardan igual los mensajes del asesor para no perderlos.
     await agregarMensajes(client, s.id, nuevosAsesor);
     return jsonError('El cliente no pudo responder (IA): ' + (e?.message || e));
   }
@@ -530,7 +491,7 @@ function limpiarRespuestaLead(texto: string, nombre: string): string[] {
     .map((t) =>
       t
         .replace(new RegExp(`^\\s*(${escaparRegex(primerNombre)}|lead|cliente|L)\\s*:\\s*`, 'i'), '')
-        .replace(/^\*[^*]{1,60}\*\s*/g, '') // acotaciones tipo *se ríe*
+        .replace(/^\*[^*]{1,60}\*\s*/g, '')
         .replace(/^\s*["“”]+|["“”]+\s*$/g, '')
         .trim()
     )
@@ -551,10 +512,6 @@ export async function simAbandonar(client: Client, body: JsonBody) {
   );
   return jsonOk();
 }
-
-// ================================================================
-// FINALIZAR Y AUDITAR
-// ================================================================
 
 export async function simFinalizar(client: Client, body: JsonBody, env: Env) {
   const { sesion, error } = await sesionCapacitacion(client, body);
@@ -636,10 +593,6 @@ export async function simFinalizar(client: Client, body: JsonBody, env: Env) {
   return simDetalle(client, { ...body, sesionId: s.id });
 }
 
-// ================================================================
-// DETALLE (asesor dueño o supervisor)
-// ================================================================
-
 export async function simDetalle(client: Client, body: JsonBody) {
   const { sesion, error } = await sesionCapacitacion(client, body);
   if (!sesion) return jsonError(error!);
@@ -668,7 +621,6 @@ export async function simDetalle(client: Client, body: JsonBody) {
       estado: s.estado,
       mensajes: (s.mensajes || []).map((m: any) => ({ r: m.r, t: m.t === SIN_RESPUESTA ? '' : m.t, sinRespuesta: m.t === SIN_RESPUESTA })),
       ficha: fichaPublica(perfil as PerfilLead),
-      // El perfil oculto y el precio correcto solo se muestran al terminar.
       perfilOculto: finalizada ? perfil : null,
       precioCorrecto: finalizada ? s.precio_correcto : null,
       evaluacion: s.evaluacion,
@@ -682,10 +634,6 @@ export async function simDetalle(client: Client, body: JsonBody) {
     },
   });
 }
-
-// ================================================================
-// SUPERVISIÓN: resultados, escenarios y asignaciones
-// ================================================================
 
 export async function simResultados(client: Client, body: JsonBody) {
   const { sesion, error } = await sesionCapacitacion(client, body, true);
@@ -799,7 +747,6 @@ export async function simGuardarAsignaciones(client: Client, body: JsonBody) {
 
   try {
     await client.query('begin');
-    // Se quitan solo los que ya no están; los que siguen conservan su historial.
     await client.query(`delete from sim_asignaciones where escenario_id = $1 and not (usuario = any($2::text[]))`, [escenarioId, usuarios]);
     for (const u of usuarios) {
       await client.query(
@@ -814,12 +761,4 @@ export async function simGuardarAsignaciones(client: Client, body: JsonBody) {
     return jsonError('No se pudo guardar la asignación: ' + (e?.message || e));
   }
   return jsonOk({ asignados: usuarios.length });
-}
-
-// Pequeño diagnóstico para el supervisor: qué IA se está usando.
-export async function simEstadoIA(client: Client, body: JsonBody, env: Env) {
-  const { sesion, error } = await sesionCapacitacion(client, body, true);
-  if (!sesion) return jsonError(error!);
-  const proveedor = proveedorActivo(env);
-  return jsonOk({ proveedor, modelo: proveedor === 'claude' ? env.CLAUDE_MODEL || 'claude-sonnet-4-5' : MODELO_WORKERS });
 }

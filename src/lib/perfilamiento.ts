@@ -1,5 +1,3 @@
-// Igual que calcularPerfilamientoCompleto() en code.gs: separa los 5 campos
-// que llena el ASESOR de 1 campo que llena el SUPERVISOR (ACCIONES_DEFINIDAS).
 const CAMPOS_ASESOR = [
   'POR_QUE_ELIGIO_CARRERA', 'QUE_BUSCA_UNIVERSIDAD', 'QUIEN_FINANCIARA',
   'QUE_LE_FALTA', 'OTRAS_OPCIONES', 'DOLOR_NECESIDAD',

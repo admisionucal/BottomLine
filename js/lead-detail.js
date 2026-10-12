@@ -1,27 +1,10 @@
-// ================================================================
-// LEAD DETAIL - Módulo de detalle de lead
-// ================================================================
+import { API_URL, COLUMNAS, STATUS, STATUS_LABELS, STATUS_CLASES, CACHE_KEYS, SELECT_OPTIONS, PRECIOS_BASE, esRolSupervisorOAdmision, TIPOS_INSTITUCION_PROCEDENCIA } from '../core/constants.js';
 
-import {
-    API_URL, COLUMNAS, STATUS, STATUS_LABELS, STATUS_CLASES,
-    CACHE_KEYS, SELECT_OPTIONS, PRECIOS_BASE,
-    esRolSupervisorOAdmision, TIPOS_INSTITUCION_PROCEDENCIA,
-    esRolAdmision
-} from '../core/constants.js';
+import { getCurrentUser, getSessionToken, cacheGet, cacheSet, cacheRemove, escapeHtml, normalizarTexto, parseNumero, getEspecializacionETU } from '../core/utils.js';
 
-import {
-    getCurrentUser, getSessionToken,
-    cacheGet, cacheSet, cacheRemove,
-    escapeHtml, normalizarTexto, parseNumero,
-    diffHoras, horasLabel,
-    parsearFechaFlexible, fechaAClaveISO,
-    hoyDDMMYYYY, nowPeru, getEspecializacionETU
-} from '../core/utils.js';
-
-import { Sidebar, Toast, Modal } from '../core/components.js';
+import { Sidebar } from '../core/components.js';
 import { construirDatosCC } from './cc-template.js';
 
-// ===== ESTADO =====
 const state = {
     lead: null,
     campana: '',
@@ -44,7 +27,6 @@ const state = {
     solicitudCC: null
 };
 
-// ===== CAMPOS DE PERFILAMIENTO =====
 const VALOR_OTRAS_OPCIONES_INSTITUCION = 'Evaluando otras instituciones';
 
 const CAMPOS_SELECT_PERFILAMIENTO = [
@@ -56,7 +38,6 @@ const CAMPOS_SELECT_PERFILAMIENTO = [
     { columna: COLUMNAS.DOLOR_NECESIDAD, label: 'Dolor / Necesidad', selectId: 'selectDolorNecesidad', cacheKey: CACHE_KEYS.CATALOGO_DOLOR_NECESIDAD, dataKey: 'doloresNecesidades', stateKey: 'catalogoDoloresNecesidades', permiteAgregarNuevo: true },
 ];
 
-// ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', async () => {
     const user = getCurrentUser();
     if (!user) {
@@ -76,7 +57,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // Los catálogos (BOLETAS, BENEFICIOS, INSTITUCIONES/CARRERAS_PROCEDENCIA)
     await cargarCatalogos();
     state.catalogoBoletas = cacheGet(CACHE_KEYS.BOLETAS) || [];
     state.catalogoBeneficios = cacheGet(CACHE_KEYS.BENEFICIOS) || [];
@@ -86,7 +66,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         state[cfg.stateKey] = cacheGet(cfg.cacheKey) || [];
     });
 
-    // Configurar tabs
     document.querySelectorAll('.tabs button[data-tab]').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
@@ -130,7 +109,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderCorreosCCLista();
     });    
 
-    // Modal de snapshot
     document.getElementById('snapshotModalClose').addEventListener('click', () => {
         document.getElementById('snapshotModal').classList.remove('show');
     });
@@ -143,7 +121,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await cargarLead();
 });
 
-// ===== CATÁLOGOS =====
 async function cargarCatalogos() {
     try {
         const result = await callAPI('getCatalogos');
@@ -161,8 +138,6 @@ async function cargarCatalogos() {
     }
 }
 
-// Determina el "caso" de ingreso del lead a partir de su MODALIDAD_INGRESO:
-// 1 = Ordinario, 2 = Traslado con Conva, 3 = Traslado sin Conva.
 function determinarCasoIngreso(lead) {
     const tipoIngresoLower = String(obtenerCampo(lead, COLUMNAS.MODALIDAD_INGRESO) || '').trim().toLowerCase();
     if (tipoIngresoLower.indexOf('sin conva') !== -1) return 3;
@@ -205,11 +180,9 @@ async function actualizarCatalogosPerfilamiento() {
     }
 }
 
-// ===== LEAD =====
 async function cargarLead() {
     const user = getCurrentUser();
 
-    // Intentar caché
     const cachedSelected = cacheGet(CACHE_KEYS.LEAD_SELECTED(state.idPrometeo, state.campana));
 
     if (cachedSelected) {
@@ -221,8 +194,6 @@ async function cargarLead() {
         if (esLeadNoOrdinario(state.lead)) actualizarCatalogoProcedencia().then(() => renderVista1());
     }
 
-    // Siempre se pide el dato fresco al backend (para todos los roles),
-    // y ese resultado es el que manda al final.
     try {
         const result = await callAPI('getLeadDetail', {
             id: state.idPrometeo,
@@ -235,7 +206,6 @@ async function cargarLead() {
             state.lead = result.data;
             state.historialAsesores = result.historialAsesores || null;
 
-            // Si venimos del dashboard, el status puede estar chanceado
             if (cachedSelected) {
                 const statusCache = cachedSelected[COLUMNAS.STATUS_GESTION];
                 if (statusCache === STATUS.PAGO_COMPLETO || statusCache === STATUS.PAGO_FRACCIONADO) {
@@ -268,7 +238,6 @@ async function cargarLead() {
     }
 }
 
-// ===== SOLICITUD PENDIENTE =====
 async function cargarSolicitudPendiente() {
     try {
         const result = await callAPI('getSolicitudPendiente', {
@@ -285,7 +254,6 @@ async function cargarSolicitudPendiente() {
     }
 }
 
-// ===== SOLICITUD CONDICIONES COMERCIALES =====
 async function cargarSolicitudCC() {
     try {
         const result = await callAPI('getSolicitudCC', {
@@ -299,7 +267,6 @@ async function cargarSolicitudCC() {
     }
 }
 
-// ===== RENDER =====
 function renderAll() {
     if (!state.lead) return;
     renderHeaderLead();
@@ -378,18 +345,15 @@ function obtenerCampo(lead, ...posibles) {
     return '';
 }
 
-// ===== VISTA 1: DATOS =====
 function renderVista1() {
     const container = document.getElementById('vista1Content');
     if (!container || !state.lead) return;
 
     const lead = state.lead;
     const id = obtenerCampo(lead, COLUMNAS.ID_PROMETEO) || '---';
-    const nombre = obtenerCampo(lead, COLUMNAS.NOMBRES) || 'Sin Nombre';
     const colegio = obtenerCampo(lead, COLUMNAS.COLEGIO, 'NOMBRE DEL COLEGIO', 'Nombre del colegio') || '-';
     const carrera = obtenerCampo(lead, COLUMNAS.CARRERA, COLUMNAS.PROGRAMA) || '-';
     const modalidad = obtenerCampo(lead, COLUMNAS.MODALIDAD) || '-';
-    const tipoIngreso = String(obtenerCampo(lead, COLUMNAS.MODALIDAD_INGRESO) || '').trim();
     const caso = determinarCasoIngreso(lead);
 
     const boletaActual = obtenerCampo(lead, COLUMNAS.BOLETA) || '';
@@ -402,20 +366,13 @@ function renderVista1() {
     const boletaProcedenciaActual = obtenerCampo(lead, COLUMNAS.BOLETA_PROCEDENCIA) || '';
     const cicloQuedoActual = obtenerCampo(lead, COLUMNAS.CICLO_QUEDO) || '';
     const tiempoOfrecidoActual = obtenerCampo(lead, COLUMNAS.TIEMPO_OFRECIDO) || '';
-    // Por defecto: Alumno Regular / 5 cuotas
     const tipoAlumnoActual = obtenerCampo(lead, COLUMNAS.TIPO_ALUMNO) || 'ALUMNO REGULAR';
     const cuotasActual = obtenerCampo(lead, COLUMNAS.NUMERO_CUOTAS) || '5 cuotas';
     const metodoPagoActual = obtenerCampo(lead, COLUMNAS.METODO_PAGO) || '';
     const rindeExamenActual = obtenerCampo(lead, COLUMNAS.RINDE_EXAMEN_SUFICIENCIA) || 'NO';
     const mostrarRindeExamen = (caso === 1 && normalizarTexto(modalidad) === 'remoto') || caso === 3;
-    const boletaFinal = obtenerCampo(lead, COLUMNAS.BOLETA_FINAL) || '-';
     const boletaColegioRaw = obtenerCampo(lead, COLUMNAS.BOLETA_COLEGIO);
     const boletaColegio = (boletaColegioRaw === null || boletaColegioRaw === '') ? '0' : boletaColegioRaw;
-    const celular1 = obtenerCampo(lead, COLUMNAS.TELEFONO_2) || '';
-    const celular2 = obtenerCampo(lead, COLUMNAS.TELEFONO_3) || '';
-    const celularesTexto = [celular1, celular2].filter(Boolean).join(' / ') || '-';
-    const correo = obtenerCampo(lead, COLUMNAS.EMAIL) || '-';
-    const dni = obtenerCampo(lead, COLUMNAS.DNI) || '-';
     const descuentoActual = obtenerCampo(lead, COLUMNAS.DESCUENTO_PRECIOS) || '0';
 
     const tipoIngresoCatalogo = tipoIngresoCatalogoPorCaso(caso);
@@ -456,7 +413,6 @@ function renderVista1() {
                     <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:20px;" id="bloqueEditableFicha">
     `;
 
-    // Campos editables
     const esCarreraElegibleETU = !!getEspecializacionETU(carrera);
     html += campoEditableHTML('Tipo de Alumno',
         selectSimpleHTML('selectTipoAlumno', SELECT_OPTIONS.tipoAlumno, tipoAlumnoActual, bloqueado) +
@@ -525,7 +481,6 @@ function renderVista1() {
         </div>
     `;
 
-    // Solicitud de escala menor
     const permiteSolicitar = !esColegioAliado && boletaVirtualFija === null && boletaActual !== '';
     const opcionesRangoInferior = permiteSolicitar
         ? opcionesBoletaBeneficioCatalogo(filasCatalogoRangosInferiores(state.catalogoBoletas, tipoIngresoCatalogo, boletaReferencia))
@@ -535,7 +490,6 @@ function renderVista1() {
 
     container.innerHTML = html;
 
-    // Eventos
     ['selectDescuento', 'selectBoletaBeneficio', 'selectBeneficioAdicional', 'selectCuotas'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', actualizarMonto);
@@ -601,16 +555,6 @@ function capturarEdicionesTemporal() {
     if (getVal('inputBoletaProcedencia') !== undefined) cambios[COLUMNAS.BOLETA_PROCEDENCIA] = getVal('inputBoletaProcedencia');
     if (getVal('selectCicloQuedo') !== undefined) cambios[COLUMNAS.CICLO_QUEDO] = getVal('selectCicloQuedo');
     return cambios;
-}
-
-function campoHTML(label, value) {
-    const safe = (value !== undefined && value !== null && String(value).trim() !== '') ? value : '-';
-    return `
-        <div>
-            <span style="color:#888; font-size:12px; display:block; text-transform:uppercase; font-weight:600;">${escapeHtml(label)}</span>
-            <strong style="color:#222; font-size:15px; display:block; margin-top:2px;">${escapeHtml(safe)}</strong>
-        </div>
-    `;
 }
 
 function campoEditableHTML(label, inputHTML) {
@@ -722,7 +666,6 @@ function initComboBuscable(id, opcionesIniciales) {
         }
     });
 
-    // Permite refrescar la lista de opciones desde afuera (ej. al cambiar el Tipo)
     input._actualizarOpcionesCombo = (nuevas) => { opciones = nuevas; };
 }
 
@@ -802,7 +745,6 @@ function renderSolicitudBox(permite, opciones, id, esColegioAliado) {
     `;
 }
 
-// ===== LÓGICA DE CATÁLOGO =====
 function tipoIngresoCatalogoPorCaso(caso) {
     if (caso === 2) return 'Traslado con Conva';
     if (caso === 3) return 'Traslado sin Conva';
@@ -820,11 +762,7 @@ function filasCatalogoSinRango(catalogo, tipoIngreso) {
 }
 
 function rangosUnicosOrdenados(filasTipo) {
-    // Clave: MIN-MAX combinados. Deduplicar solo por MAX es incorrecto:
-    // colapsa rangos distintos que comparten el mismo MAX (ej. 201-400 y 0-400),
-    // haciendo que uno de los dos "desaparezca" y rompiendo la detección de
-    // superposición (0-400 contiene a 0-200 y 201-400).
-    const rangosMap = new Map(); // key: `${min}-${max}`
+    const rangosMap = new Map();
     filasTipo.forEach(fila => {
         const min = parseNumero(fila.BOLETA_PROCEDENCIA_MIN);
         const max = parseNumero(fila.BOLETA_PROCEDENCIA_MAX);
@@ -832,8 +770,6 @@ function rangosUnicosOrdenados(filasTipo) {
         const key = `${min}-${max}`;
         if (!rangosMap.has(key)) rangosMap.set(key, { min, max });
     });
-    // Orden: por MAX y, en caso de empate, por MIN ascendente (el rango más
-    // "angosto"/específico queda antes que el que lo engloba).
     return Array.from(rangosMap.values()).sort((a, b) => a.max - b.max || a.min - b.min);
 }
 
@@ -860,7 +796,6 @@ function filasCatalogoFiltradas(catalogo, tipoIngreso, referencia) {
 
     const rangosOrdenados = rangosUnicosOrdenados(filasTipo);
 
-    // Todos los rangos donde cae el monto original
     const indicesMatch = encontrarIndicesRango(rangosOrdenados, ref);
 
     if (indicesMatch.length === 0) return [];
@@ -869,13 +804,11 @@ function filasCatalogoFiltradas(catalogo, tipoIngreso, referencia) {
         ...indicesMatch.map(i => rangosOrdenados[i].max)
     );
 
-    // Ordinario +200, los demás +100
     const esOrdinario = tipoNorm === normalizarTexto('Ordinario');
     const incremento = esOrdinario ? 200 : 100;
 
     const montoBusqueda = maximoRangoOriginal + incremento;
 
-    // Todos los rangos donde cae el nuevo monto
     const indicesSubida = encontrarIndicesRango(
         rangosOrdenados,
         montoBusqueda
@@ -967,10 +900,9 @@ function obtenerBoletaVirtualFija(carrera, caso, modalidad) {
     if (preciosEspeciales690[carreraNorm] !== undefined) return 690;
     if (carreraNorm === 'disenograficopublicitario' && caso === 2) return 690;
 
-    return 650; // remoto, cualquier otra carrera
+    return 650;
 }
 
-// ===== MONTO A PAGAR =====
 function actualizarMonto() {
     const box = document.getElementById('montoAPagarBox');
     if (!box) return;
@@ -1042,7 +974,6 @@ function actualizarMonto() {
     `;
 }
 
-// ===== SOLICITUD DE CONDICIONES COMERCIALES =====
 let ccCorreosAdicionales = [];
 
 function renderSolicitudCCBox(hayBoletaGuardada) {
@@ -1113,7 +1044,7 @@ function idBaseArchivoCC(campo) {
 }
 
 async function normalizarOrientacionImagen(file) {
-    if (!file.type || !file.type.startsWith('image/')) return file; // PDFs: sin cambios
+    if (!file.type || !file.type.startsWith('image/')) return file;
     try {
         const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
         const canvas = document.createElement('canvas');
@@ -1124,7 +1055,7 @@ async function normalizarOrientacionImagen(file) {
         if (!blob) return file;
         return new File([blob], file.name, { type: 'image/jpeg' });
     } catch (e) {
-        return file; // navegador sin soporte: se sube tal cual, sin corregir
+        return file;
     }
 }
 
@@ -1135,7 +1066,7 @@ function inicializarInputArchivoCC(campo, multiple) {
     btn?.addEventListener('click', () => input.click());
     input?.addEventListener('change', async () => {
         const seleccionados = Array.from(input.files || []);
-        input.value = ''; // permite volver a elegir el mismo archivo si lo quita y lo agrega de nuevo
+        input.value = '';
         const normalizados = await Promise.all(seleccionados.map(normalizarOrientacionImagen));
         ccArchivos[campo] = multiple ? ccArchivos[campo].concat(normalizados) : normalizados.slice(0, 1);
         renderListaArchivosCC(campo);
@@ -1200,14 +1131,12 @@ function abrirModalSolicitudCC() {
     ccArchivos = { dni: [], certificado: [], boletaProcedencia: [] };
     ['dni', 'certificado', 'boletaProcedencia'].forEach(renderListaArchivosCC);
 
-    // Boleta de Procedencia: solo aplica a Traslado (con o sin convalidación).
     const tipoIngreso = String(obtenerCampo(state.lead, COLUMNAS.MODALIDAD_INGRESO) || '').toLowerCase();
     const esTraslado = tipoIngreso.indexOf('con conva') !== -1 || tipoIngreso.indexOf('sin conva') !== -1;
     const bloqueBoletaProc = document.getElementById('ccBloqueBoletaProcedencia');
     if (bloqueBoletaProc) bloqueBoletaProc.style.display = esTraslado ? '' : 'none';
     if (!esTraslado) ccArchivos.boletaProcedencia = [];
 
-    // DNI: si el lead no lo tiene registrado, se pide acá mismo
     const dniActual = String(obtenerCampo(state.lead, COLUMNAS.DNI) || '').trim();
     const bloqueDniFaltante = document.getElementById('ccBloqueDniFaltante');
     const dniInput = document.getElementById('ccDniInput');
@@ -1340,7 +1269,6 @@ async function cancelarSolicitudCC() {
     }
 }
 
-// ===== GUARDAR FICHA =====
 async function guardarFicha(idPrometeo) {
     const user = getCurrentUser();
 
@@ -1421,7 +1349,6 @@ async function guardarFicha(idPrometeo) {
     }
 }
 
-// ===== VISTA 2: PERFILAMIENTO =====
 function renderVista2() {
     const container = document.getElementById('vista2Content');
     if (!container || !state.lead) return;
@@ -1527,7 +1454,6 @@ function renderVista2() {
         document.getElementById(cfg.selectId)?.addEventListener('change', () => onCambioSelectorPerfilamiento(cfg));
     });
 
-    // Institución de "Otras opciones": mostrar/ocultar + combo dependiente
     const selectOtrasOpciones = document.getElementById('selectOtrasOpciones');
     const wrapOpcionInstitucion = document.getElementById('otrasOpcionesInstitucionWrap');
     if (selectOtrasOpciones && wrapOpcionInstitucion) {
@@ -1586,8 +1512,6 @@ function selectorPerfilamientoHTML(cfg, lead, bloqueado) {
 
     let opcionExtra = '';
     if (valorActual && !coincide) {
-        // Cubre leads antiguos con texto libre que ya no calza con el catálogo:
-        // se conserva como opción seleccionada, pero se puede limpiar o reemplazar.
         opcionExtra = `<option value="${escapeHtml(valorActual)}" selected>${escapeHtml(valorActual)}</option>`;
     }
 
@@ -1621,15 +1545,10 @@ function selectorPerfilamientoHTML(cfg, lead, bloqueado) {
     return html;
 }
 
-// "¿Qué le falta para tomar una decisión?" admite varias opciones; se
-// guarda como texto separado por comas en la misma columna. Se muestra
-// colapsado (solo lo marcado) y se despliega un panel con checkboxes al
-// hacer clic.
 function checklistPerfilamientoHTML(cfg, lead, bloqueado) {
     const catalogo = state[cfg.stateKey] || [];
     const seleccionados = String(lead[cfg.columna] || '').split(',').map(v => v.trim()).filter(Boolean);
 
-    // Cubre valores de leads antiguos que ya no están en el catálogo
     const extras = seleccionados.filter(v => !catalogo.some(d => String(d.nombre) === v));
     const opciones = [...catalogo.map(d => d.nombre), ...extras];
 
@@ -1663,10 +1582,6 @@ function checklistPerfilamientoHTML(cfg, lead, bloqueado) {
     `;
 }
 
-// Institución de "Otras opciones": Tipo + Institución dependientes,
-// visibles solo cuando OTRAS_OPCIONES = VALOR_OTRAS_OPCIONES_INSTITUCION.
-// Reutiliza el mismo catálogo de instituciones (state.catalogoInstitucionesProcedencia)
-// y el mismo patrón que Institución de Procedencia (traslados).
 function otrasOpcionesInstitucionHTML(lead, bloqueado) {
     const mostrar = (lead[COLUMNAS.OTRAS_OPCIONES] || '') === VALOR_OTRAS_OPCIONES_INSTITUCION;
     const tipoActual = lead[COLUMNAS.OPCION_INSTITUCION] || '';
@@ -1693,8 +1608,6 @@ function otrasOpcionesInstitucionHTML(lead, bloqueado) {
     `;
 }
 
-// Abre/cierra el panel del checklist colapsable y refresca el resumen
-// (solo lo marcado) cada vez que cambia una casilla.
 function initChecklistPerfilamiento(cfg, bloqueado) {
     const display = document.getElementById(cfg.selectId + 'Display');
     const textEl = document.getElementById(cfg.selectId + 'DisplayText');
@@ -1787,7 +1700,6 @@ async function guardarPerfilamiento(idPrometeo) {
         data[COLUMNAS.OPCION_INSTITUCION] = getVal('selectOpcionInstitucionTipo');
         data[COLUMNAS.OPCION_NOMBRE_INSTITUCION] = getVal('selectOpcionInstitucionNombre').trim();
     } else {
-        // El asesor cambió de opción: se limpian para no dejar datos huérfanos
         data[COLUMNAS.OPCION_INSTITUCION] = '';
         data[COLUMNAS.OPCION_NOMBRE_INSTITUCION] = '';
     }
@@ -1825,7 +1737,6 @@ async function guardarPerfilamiento(idPrometeo) {
     }
 }
 
-// ===== HISTORIAL =====
 function renderHistorial() {
     const container = document.getElementById('historialContent');
     if (!container || !state.lead) return;
@@ -1924,7 +1835,6 @@ function parsearHistorial(raw) {
     } catch { return []; }
 }
 
-// ===== SNAPSHOT MODAL =====
 window.abrirSnapshot = function(idx) {
     const item = state.historialSnapshots[idx];
     if (!item) return;
@@ -1990,7 +1900,6 @@ async function restaurarSnapshot(idx) {
     }
 }
 
-// ===== COMENTARIOS =====
 async function agregarComentario() {
     const input = document.getElementById('nuevoComentario');
     const texto = input?.value.trim();
@@ -2022,7 +1931,6 @@ async function agregarComentario() {
     }
 }
 
-// ===== PAGOS =====
 async function cargarPagos() {
     const container = document.getElementById('pagosContent');
     if (!container) return;
@@ -2058,9 +1966,7 @@ async function cargarPagos() {
     }
 }
 
-// ===== SOLICITUD DE ESCALA =====
 document.addEventListener('click', async (e) => {
-    // Resolver solicitud (admin)
     if (e.target.dataset.resolver) {
         const status = e.target.dataset.resolver;
         const idSol = state.solicitudPendiente?.ID_SOLICITUD;
@@ -2095,7 +2001,6 @@ document.addEventListener('click', async (e) => {
         }
     }
 
-    // Solicitar escala menor (asesor)
     if (e.target.id === 'btnSolicitarEscala') {
         const sel = document.getElementById('selectEscalaMenor');
         const msgEl = document.getElementById('solicitudMsg');
@@ -2145,7 +2050,6 @@ document.addEventListener('click', async (e) => {
         }
     }
 
-    // Cancelar solicitud
     if (e.target.id === 'btnCancelarSolicitud') {
         const idSol = state.solicitudPendiente?.ID_SOLICITUD;
         if (!idSol || !confirm('¿Confirmas cancelar tu solicitud pendiente?')) return;
@@ -2163,7 +2067,6 @@ document.addEventListener('click', async (e) => {
     }
 });
 
-// ===== UTILITIES =====
 function formatearFecha(valor) {
     if (!valor) return '';
     if (typeof valor === 'string') {
@@ -2179,8 +2082,6 @@ function formatearFecha(valor) {
     return `${dd}/${mm}/${yyyy}`;
 }
 
-// Igual que formatearFecha pero con hora:minuto — solo se usa en el Historial,
-// donde interesa saber en qué momento exacto del día ocurrió cada interacción.
 function formatearFechaHora(valor) {
     if (!valor) return '';
     const fecha = new Date(valor);
@@ -2198,7 +2099,6 @@ function sincronizarCache() {
     const id = state.lead[COLUMNAS.ID_PROMETEO];
     cacheSet(CACHE_KEYS.LEAD_SELECTED(id, state.campana), state.lead);
     cacheRemove(CACHE_KEYS.LEAD_DETAIL(id, state.campana, user.email));
-    // Invalidar caché del dashboard
     cacheRemove(CACHE_KEYS.LEADS_RAW(user.email, user.rol, state.campana));
 }
 
@@ -2207,7 +2107,6 @@ function mostrarOverlay(show) {
     if (el) el.classList.toggle('show', show);
 }
 
-// ===== API =====
 async function callAPI(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {

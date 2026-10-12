@@ -2,12 +2,6 @@ import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 import { exigirSesion } from '../lib/session';
 
-// ================================================================
-// CAMPAÑAS - catálogo + archivos (Lineamientos, T&C) por campaña
-// Reemplaza CONFIG_CC / BCC_DEFAULT_CC hardcodeados y los PDFs
-// estáticos en assets/. Solo ADMISION puede crear/editar/subir.
-// ================================================================
-
 const TIPOS_ARCHIVO = [
   'lineamientos_5c',
   'lineamientos_6c',
@@ -17,10 +11,6 @@ const TIPOS_ARCHIVO = [
 ] as const;
 type TipoArchivo = (typeof TIPOS_ARCHIVO)[number];
 
-// Nomenclatura fija: sin importar el nombre del archivo que suba el
-// admin, el que se guarda y el que ve el destinatario del correo
-// siempre sigue este patrón (mismo patrón que ya usaba
-// condiciones-comerciales.js contra assets/ estáticos).
 const NOMBRE_SEGUN_TIPO: Record<TipoArchivo, (periodo: string) => string> = {
   lineamientos_5c: (periodo) => `Lineamientos de Admisión para ingresantes al semestre académico ${periodo}.pdf`,
   lineamientos_6c: (periodo) => `Lineamientos de Admisión para ingresantes al semestre académico ${periodo} - 6c.pdf`,
@@ -41,8 +31,6 @@ function storageUrl(env: Env, path: string) {
   return `${env.SUPABASE_URL}/storage/v1/object/${env.SUPABASE_STORAGE_BUCKET}/${path}`;
 }
 
-// ===== LECTURA (cualquier usuario logueado: lo usa condiciones-comerciales.js
-//        para armar el PDF de CC y la pantalla de Configuración para listar) =====
 export async function getCampanasConfig(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ASESOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -78,7 +66,6 @@ export async function getCampanasConfig(client: Client, body: JsonBody) {
   return jsonOk({ data: campanas });
 }
 
-// ===== ESCRITURA: crear / actualizar config de una campaña (solo ADMISION) =====
 export async function guardarCampana(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -119,7 +106,6 @@ export async function guardarCampana(client: Client, body: JsonBody) {
   return jsonOk();
 }
 
-// Activar / desactivar rápido, sin reenviar todo el formulario.
 export async function toggleCampanaActiva(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -135,7 +121,6 @@ export async function toggleCampanaActiva(client: Client, body: JsonBody) {
   return jsonOk();
 }
 
-// ===== ARCHIVOS: subir (o reemplazar) uno de los 5 tipos (solo ADMISION) =====
 export async function subirArchivoCampana(client: Client, body: JsonBody, env: Env) {
   const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -154,9 +139,6 @@ export async function subirArchivoCampana(client: Client, body: JsonBody, env: E
   }
   const periodo = campanaRes.rows[0].periodo as string;
 
-  // El nombre SIEMPRE se genera según la nomenclatura fija — nunca se usa
-  // el nombre del archivo que llega del navegador, sin importar qué haya
-  // subido el admin.
   const nombreArchivo = NOMBRE_SEGUN_TIPO[tipo](periodo);
   const path = storagePath(codigo, tipo);
 
@@ -167,7 +149,7 @@ export async function subirArchivoCampana(client: Client, body: JsonBody, env: E
     headers: {
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/pdf',
-      'x-upsert': 'true', // sobreescribe si ya existía (reemplazar archivo)
+      'x-upsert': 'true',
     },
     body: bytes,
   });
@@ -215,8 +197,6 @@ export async function eliminarArchivoCampana(client: Client, body: JsonBody, env
   return jsonOk();
 }
 
-// ===== DESCARGA: usado por condiciones-comerciales.js para adjuntar el
-//        PDF al correo (en vez de fetch() directo a assets/ estático) =====
 export async function obtenerArchivoCampanaBase64(client: Client, body: JsonBody, env: Env) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ASESOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -247,7 +227,6 @@ export async function obtenerArchivoCampanaBase64(client: Client, body: JsonBody
   return jsonOk({ nombreArchivo, archivoBase64: base64 });
 }
 
-// ---------- helpers base64 (Workers no tiene Buffer) ----------
 function base64ToUint8Array(base64: string): Uint8Array {
   const limpio = base64.indexOf(',') !== -1 ? base64.split(',')[1] : base64;
   const binario = atob(limpio);

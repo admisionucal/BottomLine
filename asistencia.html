@@ -12,7 +12,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        /* Estilos específicos de asistencia */
         .asis-dashboard {
             display: grid;
             grid-template-columns: 2.4fr 1.75fr;
@@ -200,7 +199,6 @@
 
         .summary-icon-location { font-size: 22px; color: #5F6368; flex-shrink: 0; }
 
-        /* Calendario */
         .asis-cal-nav {
             display: flex;
             justify-content: space-between;
@@ -309,7 +307,6 @@
         .cal-badge-tardanza { background: var(--color-accent); }
         .cal-badge-falta { background: var(--color-danger); }
 
-        /* Resumen mensual */
         .resumen-mensual-panel {
             height: 100%;
             box-sizing: border-box;
@@ -357,7 +354,6 @@
             line-height: 1.2;
         }
 
-        /* Tabs */
         .asis-tab-panel { display: none; }
         .asis-tab-panel.active { display: block; }
 
@@ -382,7 +378,6 @@
 
             <div class="toast" id="toast"></div>
 
-            <!-- Modal de confirmación -->
             <div class="modal-overlay" id="confirmModal">
                 <div class="modal-box">
                     <div class="modal-icon" id="modalIcon"></div>
@@ -397,7 +392,6 @@
 
             <div class="container" style="width:95%;max-width:1800px;margin:0 auto;padding:24px 0;">
                 <div id="asisApp">
-                    <!-- Contenido generado por JS -->
                 </div>
             </div>
         </div>

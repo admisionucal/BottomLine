@@ -1,8 +1,4 @@
-// ================================================================
-// CONFIGURACIÓN - Gestión de campañas y sus archivos (solo ADMISION)
-// ================================================================
-
-import { API_URL, ROLES, esRolAdmision } from '../core/constants.js';
+import { API_URL, esRolAdmision } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml } from '../core/utils.js';
 import { Sidebar, Toast } from '../core/components.js';
 import { createMultiSelect } from '../core/components.js';
@@ -38,11 +34,9 @@ async function callAPI(action, data = {}) {
     }
 }
 
-// Acepta '2026-09-06' o '2026-09-06T00:00:00.000Z' y devuelve 'YYYY-MM-DD'
 function soloFecha(v) {
     return v ? String(v).slice(0, 10) : '';
 }
-// '2026-09-06' -> '06/09/2026'
 function fechaLegible(v) {
     const f = soloFecha(v);
     if (!f) return 'sin definir';
@@ -50,10 +44,8 @@ function fechaLegible(v) {
     return `${d}/${m}/${y}`;
 }
 
-// ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', () => initConfiguracion());
 
-// Punto de entrada cuando se embebe dentro de dashboard.html
 window.initConfiguracionEmbebido = function () {
     initConfiguracion();
 };
@@ -65,9 +57,6 @@ async function initConfiguracion() {
         return;
     }
 
-    // Estrictamente ADMISION — a diferencia del resto del panel admin
-    // (que usa esRolSupervisorOAdmision), esta sección es únicamente
-    // para el perfil ADMISION.
     if (!esRolAdmision(user.rol)) {
         alert('Acceso denegado: esta sección es solo para el perfil Admisión.');
         if (typeof window.mostrarBottomLine === 'function') {
@@ -88,7 +77,6 @@ async function initConfiguracion() {
     renderNuevoUsuarioForm();
 }
 
-// ===== CARGA =====
 async function cargarCampanas() {
     const grid = document.getElementById('cfgCampanasGrid');
     grid.innerHTML = '<div class="loading">Cargando campañas…</div>';
@@ -102,14 +90,12 @@ async function cargarCampanas() {
     state.campanas = result.data || [];
     renderGrid();
 
-    // Si había una campaña seleccionada, refresca su detalle con datos frescos.
     if (state.seleccionada) {
         const actualizada = state.campanas.find((c) => c.codigo === state.seleccionada);
         if (actualizada) seleccionarCampana(actualizada.codigo);
     }
 }
 
-// ===== GRID DE CAMPAÑAS =====
 function renderGrid() {
     const grid = document.getElementById('cfgCampanasGrid');
 
@@ -149,20 +135,18 @@ async function toggleActiva(codigo, activa) {
     const result = await callAPI('toggleCampanaActiva', { codigo, activa });
     if (!result.success) {
         Toast?.show ? Toast.show(result.error || 'No se pudo actualizar', 'error') : alert(result.error);
-        cargarCampanas(); // revierte el switch visualmente
+        cargarCampanas();
         return;
     }
     const c = state.campanas.find((x) => x.codigo === codigo);
     if (c) c.activa = activa;
 }
 
-// ===== NUEVA CAMPAÑA =====
 function abrirFormularioNuevaCampana() {
     state.seleccionada = null;
     renderDetalle({ codigo: '', periodo: '', perC: '', inicioClases: '', activa: true, bccDefault: [], archivos: {} }, true);
 }
 
-// ===== SELECCIONAR / EDITAR CAMPAÑA EXISTENTE =====
 function seleccionarCampana(codigo) {
     state.seleccionada = codigo;
     renderGrid();
@@ -284,7 +268,6 @@ async function guardarCampana(esNueva) {
     await cargarCampanas();
 }
 
-// ===== SUBIR / ELIMINAR ARCHIVO =====
 function subirArchivo(campana, tipo, file) {
     const reader = new FileReader();
     reader.onload = async () => {
@@ -310,7 +293,6 @@ async function eliminarArchivo(campana, tipo) {
     await cargarCampanas();
 }
 
-// ===== SUPERVISORES: CAMPAÑAS =====
 async function cargarSupervisores() {
     const cont = document.getElementById('cfgSupervisoresLista');
     const result = await callAPI('getSupervisoresConfig');
@@ -354,7 +336,6 @@ window.addEventListener('multiselect-change', async (e) => {
     }
 });
 
-// ===== NUEVO USUARIO =====
 function renderNuevoUsuarioForm() {
     const codigosActivos = state.campanas.filter((c) => c.activa).map((c) => c.codigo);
     createMultiSelect('cfgNuevoUsuarioCampanas', codigosActivos, [], 'Sin campañas', null, { permitirTodos: true, mostrarValores: true });
@@ -386,5 +367,5 @@ async function crearUsuarioSubmit() {
     ['cfgNuevoUsuario','cfgNuevoNombre','cfgNuevoNombreCorto','cfgNuevoPassword','cfgNuevoCargo','cfgNuevoDni','cfgNuevoEmail']
         .forEach((id) => document.getElementById(id).value = '');
     document.getElementById('cfgNuevoRol').value = 'ASESOR';
-    if (rol === 'SUPERVISOR') await cargarSupervisores(); // refresca la lista si creaste un supervisor
+    if (rol === 'SUPERVISOR') await cargarSupervisores();
 }

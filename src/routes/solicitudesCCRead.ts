@@ -27,23 +27,6 @@ function filaASolicitudCCObj(r: any) {
   };
 }
 
-// Igual que capturarIdentidadBase() real, versión simplificada usando "leads".
-async function capturarIdentidadBase(client: Client, campana: string, idPrometeo: string) {
-  const r = await client.query(
-    `select nombres, programa, modalidad, modalidad_ingreso, telefono2
-     from leads where id_prometeo = $1 and campana = $2`,
-    [idPrometeo, campana]
-  );
-  const row = r.rows[0];
-  return {
-    nombre: row?.nombres || '',
-    carrera: row?.programa || '',
-    modalidad: row?.modalidad || '',
-    modalidadIngreso: row?.modalidad_ingreso || '',
-    celular: row?.telefono2 || '',
-  };
-}
-
 export async function getSolicitudesCC(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -58,12 +41,10 @@ export async function getSolicitudesCC(client: Client, body: JsonBody) {
     }
   }
 
-  // Filtro por estados (ej. ['PENDIENTE','PROCESANDO'])
   if (Array.isArray(body.estados) && body.estados.length > 0) {
     condiciones.push(`s.status = any($${params.push(body.estados.map((e: any) => String(e)))})`);
   }
 
-  // Una sola solicitud (para abrir el detalle sin bajar toda la lista)
   if (body.idSolicitud) {
     condiciones.push(`s.id_solicitud = $${params.push(String(body.idSolicitud))}`);
   }

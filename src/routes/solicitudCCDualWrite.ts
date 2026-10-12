@@ -1,7 +1,6 @@
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 
-// Mapea las claves que manda code.gs (headers reales de SOLICITUDES_CC) a columnas.
 const MAPEO_CC: Record<string, string> = {
   ID_SOLICITUD: 'id_solicitud',
   FECHA_SOLICITUD: 'fecha_solicitud',
@@ -25,8 +24,6 @@ const MAPEO_CC: Record<string, string> = {
   HISTORIAL_ENVIOS: 'historial_envios',
 };
 
-// Este endpoint no usa sesión de usuario (lo llama code.gs server-to-server),
-// se protege con el mismo secreto compartido que actualizarLeadsHoy/Base.
 export async function actualizarSolicitudCC(client: Client, body: JsonBody, env: Env) {
   if (!env.IMPORT_SECRET || body.secret !== env.IMPORT_SECRET) {
     return jsonError('No autorizado.', 401);

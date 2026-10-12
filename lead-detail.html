@@ -10,7 +10,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="core/ui-kit.css">
     <style>
-        /* Estilos específicos de lead-detail */
         .container {
             width: 95%;
             max-width: 1800px;
@@ -502,7 +501,6 @@
         }
 
         @media (max-width: 900px) {
-            /* Nombre 70% / Status 30% */
             .lead-header-top {
                 flex-wrap: wrap;
                 gap: 8px 20px;
@@ -524,7 +522,6 @@
                 text-overflow: ellipsis;
             }
 
-            /* ID / Canal / Asesor */
             .lead-header .lead-datos-id {
                 grid-template-columns: max-content minmax(0, 120px) minmax(0, 120px);
                 gap: 4px 14px;
@@ -547,7 +544,6 @@
             </div>
 
             <div class="container">
-                <!-- LEAD HEADER -->
                 <div class="lead-header" id="leadHeader">
                     <div class="info">
                         <div class="lead-header-top">
@@ -610,7 +606,6 @@
                     </div>
                 </div>
 
-                <!-- TABS -->
                 <div class="tabs">
                     <button class="active" data-tab="vista1">Boleta</button>
                     <button data-tab="vista2">Perfilamiento</button>
@@ -637,7 +632,6 @@
         </div>
     </div>
 
-    <!-- Modal de solicitud de Condiciones Comerciales -->
     <div class="modal-overlay" id="solicitudCCModal">
         <div class="modal-box modal-box-detalle" style="max-width:520px;">
             <button class="modal-close-x" id="solicitudCCModalClose"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
@@ -697,7 +691,6 @@
         </div>
     </div>
 
-    <!-- Modal de detalle de snapshot -->
     <div class="modal-overlay" id="snapshotModal">
         <div class="modal-box modal-box-detalle">
             <button class="modal-close-x" id="snapshotModalClose"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>

@@ -24,8 +24,6 @@ export async function getResumenVpPp(client: Client, body: JsonBody) {
     const params: any[] = [campana];
     const condiciones: string[] = ['l.campana = $1'];
 
-    // MISMO FILTRO QUE getLeads (Dashboard): solo leads vigentes en la base
-    // actual, salvo que se hayan tocado hoy (actualizado_hoy_en).
     condiciones.push(`(l.en_base = true or (l.actualizado_hoy_en at time zone 'America/Lima')::date = (now() at time zone 'America/Lima')::date)`);  
 
     if (esAdmin) {

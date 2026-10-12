@@ -2,8 +2,6 @@ import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
 
-// Mapea el "campo" que manda el frontend a la columna real de la tabla.
-// Igual que colMap en marcarAsistenciaInterno().
 const CAMPOS_VALIDOS: Record<string, string> = {
   entrada: 'entrada',
   almuerzo: 'almuerzo',
@@ -11,7 +9,6 @@ const CAMPOS_VALIDOS: Record<string, string> = {
   salida: 'salida',
 };
 
-// Acepta 'YYYY-MM-DD' o 'DD/MM/YYYY' desde el frontend y devuelve 'YYYY-MM-DD' para Postgres.
 function normalizarFecha(fechaStr: string): string | null {
   const fecha = String(fechaStr || '').trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return fecha;
@@ -23,9 +20,6 @@ function normalizarFecha(fechaStr: string): string | null {
   return null;
 }
 
-// Convierte el 'date' de Postgres (string 'YYYY-MM-DD', o Date si algún día
-// cambia el parser de tipos) a 'DD/MM/YYYY', que es lo que espera todo el
-// frontend (calendario, Análisis, ranking, KPI "Asistencia de hoy").
 function formatearFechaDDMMYYYY(fecha: any): string {
   if (!fecha) return '';
   if (fecha instanceof Date) {
@@ -51,15 +45,12 @@ export async function marcarAsistencia(client: Client, body: JsonBody) {
   const fecha = normalizarFecha(body.fecha);
   if (!fecha) return jsonError('Fecha inválida.');
 
-  // La Entrada exige ubicación activa; las demás marcaciones no.
   const lat = parseFloat(String(body.lat ?? ''));
   const lng = parseFloat(String(body.lng ?? ''));
   if (campo === 'entrada' && (!Number.isFinite(lat) || !Number.isFinite(lng))) {
     return jsonError('Activa tu ubicación para poder marcar.');
   }
 
-  // Aseguramos que exista la fila del día (equivalente a sh.appendRow si no existía),
-  // sin pisar campos ya registrados.
   await client.query(
     `insert into asistencia (usuario, fecha, nombre, campana, cargo, dni)
      values ($1, $2, $3, $4, $5, $6)
@@ -67,10 +58,6 @@ export async function marcarAsistencia(client: Client, body: JsonBody) {
     [sesion.usuario, fecha, sesion.nombre || '', body.campaña || '', body.cargo || '', body.dni || '']
   );
 
-  // UPDATE atómico: solo escribe si el campo todavía está vacío.
-  // Esto reemplaza por completo tu conLockAsistencia() manual — Postgres
-  // ya garantiza que dos marcaciones simultáneas no se pisen entre sí.
-  // Solo se guarda la ubicación de la Entrada.
   const esEntrada = campo === 'entrada';
   const result = await client.query(
     `update asistencia set
@@ -102,7 +89,6 @@ export async function marcarAsistencia(client: Client, body: JsonBody) {
   );
 
   if (result.rowCount === 0) {
-    // O no existe la fila (no debería pasar, la creamos arriba) o el campo ya tenía valor.
     const actual = await client.query(
       `select ${campo} as valor from asistencia where usuario = $1 and fecha = $2`,
       [sesion.usuario, fecha]
@@ -172,8 +158,6 @@ export async function getAsistenciaEmpleados(client: Client, body: JsonBody) {
   return jsonOk({ data });
 }
 
-// Mantenimiento: activa/desactiva un Asesor. Reemplaza el toggle
-// que antes solo vivía en localStorage (asis_config_Asesores).
 export async function actualizarEstadoAsesor(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -193,7 +177,6 @@ export async function actualizarEstadoAsesor(client: Client, body: JsonBody) {
   return jsonOk({ usuario: result.rows[0].usuario, activo: result.rows[0].activo });
 }
 
-// Nueva función, mismo patrón que actualizarEstadoAsesor
 export async function actualizarCampanasAsesor(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -219,7 +202,7 @@ export async function actualizarCampanasAsesor(client: Client, body: JsonBody) {
 function filaAObjeto(r: any) {
   return {
     usuario: r.usuario,
-    fecha: formatearFechaDDMMYYYY(r.fecha),   // 👈 único cambio real: antes era r.fecha
+    fecha: formatearFechaDDMMYYYY(r.fecha),
     nombre: r.nombre,
     campaña: r.campana,
     cargo: r.cargo,

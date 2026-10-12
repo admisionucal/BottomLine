@@ -1,15 +1,7 @@
-// ================================================================
-// COMPONENTS - Componentes dinámicos inyectados por DOM
-// ================================================================
-
-import { ROLES, esRolSupervisorOAdmision, esRolAdmision, puedeVerCapacitacionIA } from './constants.js';
+import { esRolSupervisorOAdmision, esRolAdmision, puedeVerCapacitacionIA } from './constants.js';
 import { escapeHtml, getCurrentUser, normalizarUrlFoto } from './utils.js';
 
-// ================================================================
-// SIDEBAR
-// ================================================================
 function obtenerIniciales(nombre) {
-// Iniciales para mostrar en el footer del sidebar cuando está colapsado
     return String(nombre || '')
         .trim()
         .split(/\s+/)
@@ -20,10 +12,6 @@ function obtenerIniciales(nombre) {
 }
 
 export class Sidebar {
-    // options.active: 'usuario' | 'asistencia' | 'bottomline' — qué grupo debe
-    // aparecer abierto/resaltado al construirse (según la página/vista real).
-    // options.activeSubitem: id del nav-subitem de Bottom Line a resaltar
-    // (ej. 'navUnificarIds', 'navCondicionesCC'), opcional.
     constructor(options = {}) {
         this.sidebar = document.getElementById('sidebar');
         this.overlay = document.getElementById('sidebarOverlay');
@@ -144,7 +132,6 @@ export class Sidebar {
         this.renderFooter();
     }
 
-    // Muestra los subitems restringidos a SUPERVISOR/ADMISION.
     aplicarVisibilidadPorRol() {
         const user = getCurrentUser();
         if (!user) return;
@@ -168,7 +155,6 @@ export class Sidebar {
         }
     }
 
-    // Bloque inferior fijo del sidebar: foto, nombre, rol y cerrar sesión.
     renderFooter() {
         const footer = document.getElementById('sidebarFooter');
         if (!footer) return;
@@ -222,9 +208,6 @@ export class Sidebar {
     }
 }
 
-// ================================================================
-// TOAST (Sistema de notificaciones)
-// ================================================================
 export class Toast {
     constructor() {
         this.toast = document.getElementById('toast');
@@ -249,60 +232,6 @@ export class Toast {
     }
 }
 
-// ================================================================
-// MODAL (Genérico)
-// ================================================================
-export class Modal {
-    constructor() {
-        this.modal = document.getElementById('modalGlobal');
-        if (!this.modal) {
-            this.modal = document.createElement('div');
-            this.modal.id = 'modalGlobal';
-            this.modal.className = 'modal-overlay';
-            this.modal.innerHTML = `
-                <div class="modal-box">
-                    <div class="modal-icon" id="modalIcon"></div>
-                    <div class="modal-title" id="modalTitle"></div>
-                    <div class="modal-sub" id="modalSub"></div>
-                    <div class="modal-buttons" id="modalButtons"></div>
-                </div>
-            `;
-            document.body.appendChild(this.modal);
-        }
-        this.icon = document.getElementById('modalIcon');
-        this.title = document.getElementById('modalTitle');
-        this.sub = document.getElementById('modalSub');
-        this.buttons = document.getElementById('modalButtons');
-    }
-
-    open(config) {
-        this.icon.innerHTML = config.icon || '';
-        this.title.textContent = config.title || '';
-        this.sub.textContent = config.sub || '';
-        this.buttons.innerHTML = '';
-        
-        config.buttons.forEach(btn => {
-            const button = document.createElement('button');
-            button.className = `modal-btn ${btn.class || ''}`;
-            button.textContent = btn.label;
-            button.onclick = () => {
-                if (btn.action) btn.action();
-                this.close();
-            };
-            this.buttons.appendChild(button);
-        });
-
-        this.modal.classList.add('show');
-    }
-
-    close() {
-        this.modal.classList.remove('show');
-    }
-}
-
-// ================================================================
-// TABLA (Renderizado estandarizado)
-// ================================================================
 export function renderTable(containerId, headers, rows, options = {}) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -332,9 +261,6 @@ export function renderTable(containerId, headers, rows, options = {}) {
     container.innerHTML = html;
 }
 
-// ================================================================
-// FILTROS MULTI-SELECT
-// ================================================================
 export function createMultiSelect(containerId, options, selected = [], label = 'Todos', labelsMap = null, opciones = {}) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -397,7 +323,6 @@ export function createMultiSelect(containerId, options, selected = [], label = '
         }
     }
 
-    // Evento para "Todos"
     const chkTodos = container.querySelector('[data-todos]');
     if (chkTodos) {
         chkTodos.addEventListener('change', () => {
@@ -408,20 +333,15 @@ export function createMultiSelect(containerId, options, selected = [], label = '
                     detail: { containerId, key: containerId.replace('filter', '').toLowerCase(), values: [] }
                 }));
             } else {
-                // No tiene sentido dejar "Todos" desmarcado sin nada más
-                // seleccionado: lo mantenemos marcado en ese caso.
                 chkTodos.checked = true;
             }
         });
     }
 
-    // Eventos para checkboxes individuales
     getIndividualChecks().forEach(chk => {
         chk.addEventListener('change', () => {
             let values = Array.from(getIndividualChecks()).filter(c => c.checked).map(c => c.value);
             if (!permitirTodos && values.length === 0) {
-                // No se permite quedar en 0: se re-marca la opción que se
-                // acaba de intentar desmarcar.
                 chk.checked = true;
                 values = Array.from(getIndividualChecks()).filter(c => c.checked).map(c => c.value);
             }
@@ -434,9 +354,6 @@ export function createMultiSelect(containerId, options, selected = [], label = '
     });
 }
 
-// ================================================================
-// TOGGLE MULTI-SELECT
-// ================================================================
 export function toggleMultiSelect(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -484,9 +401,6 @@ function cerrarMultiSelectFuera(e) {
     }
 }
 
-// ================================================================
-// SORT TABLE
-// ================================================================
 export function sortTable(tbodyId, columna) {
     const tbody = document.getElementById(tbodyId);
     if (!tbody) return;
@@ -510,9 +424,6 @@ export function sortTable(tbodyId, columna) {
     th.classList.add(asc ? 'asc' : 'desc');
 }
 
-// ================================================================
-// RELOJ EN VIVO (para Asistencia)
-// ================================================================
 export function startClock(elementId, onTick) {
     let intervalId = null;
     let lastDate = '';
@@ -536,14 +447,10 @@ export function startClock(elementId, onTick) {
     return intervalId;
 }
 
-// ================================================================
-// REGISTRAR FUNCIONES EN WINDOW (para uso en HTML)
-// ================================================================
 window.toggleMultiSelect = toggleMultiSelect;
 window.sortTable = sortTable;
 window.createMultiSelect = createMultiSelect;
 
-// Funciones de navegación (hooks para ser sobrescritos por los módulos)
 window.mostrarUsuario = () => console.warn('mostrarUsuario no implementado');
 window.mostrarAsistencia = () => console.warn('mostrarAsistencia no implementado');
 window.mostrarBottomLine = () => console.warn('mostrarBottomLine no implementado');
@@ -579,7 +486,7 @@ window.logout = () => {
     window.location.href = 'index.html';
 };
 
-const INACTIVIDAD_LIMITE_MS = 1 * 60 * 60 * 1000; // 1 hora
+const INACTIVIDAD_LIMITE_MS = 1 * 60 * 60 * 1000;
 
 function iniciarControlInactividad() {
     if (window.__inactividadIniciada) return;

@@ -1,9 +1,3 @@
-// ================================================================
-// PROPUESTA DE ABORDAJE — Bottom Line > Análisis > pestaña "Propuesta"
-// ================================================================
-// La genera el Worker a las 10:10, 12:00, 15:00 y 17:00 (hora de Lima).
-// Aquí solo se muestra la última y, si el perfil puede, se regenera.
-
 import { API_URL, puedeVerPropuestaIA } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml, getUserCampanas } from '../core/utils.js';
 
@@ -32,7 +26,6 @@ function iniciar() {
         return;
     }
     btn.style.display = '';
-    // El cambio de pestaña lo hace dashboard.js; aquí solo se cargan los datos.
     btn.addEventListener('click', () => {
         if (!estado.campana) {
             const campanas = getUserCampanas() || [];
@@ -123,7 +116,6 @@ function pintar(p, puedeGenerar) {
 
     if (p.error) html += `<div class="prop-error">${escapeHtml(p.error)} Las listas de leads sí están actualizadas.</div>`;
 
-    // ----- Macro -----
     const r = p.resumen || {};
     html += `<div class="prop-card prop-macro">
         <h4><span class="material-symbols-outlined" style="font-size:18px;">public</span> Para todo el equipo</h4>
@@ -131,7 +123,6 @@ function pintar(p, puedeGenerar) {
         <div class="prop-meta" style="margin-top:8px;">Bandeja: ${r.leads_gestionables ?? 0} leads gestionables · VP Viva ${r.vp_viva ?? 0} · PP Viva ${r.pp_viva ?? 0} · Volver a llamar ${r.volver_a_llamar ?? 0} · Sin contacto ${r.sin_contacto ?? 0}</div>
     </div>`;
 
-    // ----- Micro por grupo -----
     const grupos = (p.grupos || []).filter((g) => g.total > 0);
     html += `<h4 style="margin:18px 0 10px; font-size:14px;">Por grupo de leads</h4>`;
     html += grupos.length ? '<div class="prop-grid">' + grupos.map((g) => {
@@ -146,7 +137,6 @@ function pintar(p, puedeGenerar) {
         </div>`;
     }).join('') + '</div>' : '<div class="cap-empty" style="font-size:13px;color:#888;">No hay leads en ningún grupo.</div>';
 
-    // ----- Micro por asesor -----
     const titulos = Object.fromEntries((p.grupos || []).map((g) => [g.clave, g.titulo]));
     const asesores = p.porAsesor || [];
     html += `<h4 style="margin:18px 0 10px; font-size:14px;">Por asesor</h4>`;

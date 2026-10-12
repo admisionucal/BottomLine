@@ -21,15 +21,13 @@ import { unifyIds } from './routes/unifyIds';
 import { actualizarLeadsHoy } from './routes/leadsHoy';
 import { actualizarLeadsBase } from './routes/leadsBase';
 import {
-  getSolicitudPendiente,
-  getSolicitudesPendientesCampana,
+  getSolicitudPendiente,
   createSolicitud,
   resolveSolicitud,
   cancelarSolicitud,
 } from './routes/solicitudes';
 import { getSolicitudesCC, getSolicitudCC, getSolicitudesCCCount } from './routes/solicitudesCCRead';
 import { actualizarSolicitudCC } from './routes/solicitudCCDualWrite';
-import { exigirSesion } from './lib/session';
 import {
   getCampanasConfig,
   guardarCampana,
@@ -60,25 +58,11 @@ import {
   simGetEscenarios,
   simGuardarEscenario,
   simGetAsignaciones,
-  simGuardarAsignaciones,
-  simEstadoIA,
+  simGuardarAsignaciones,
 } from './routes/simulador';
 import { getPropuestaAbordaje, generarPropuestaAbordajeAhora } from './routes/propuestas';
 import { generarPropuestasProgramadas } from './lib/propuestaAbordaje';
 
-// Igual que getLeadsConAprobacion(body) en code.gs: mismo getLeads, pero
-// solo accesible para SUPERVISOR/ADMISION.
-async function getLeadsConAprobacion(client: any, body: any, env: Env) {
-  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
-  if (!sesion) return jsonError(error!);
-  return getLeads(client, body);
-}
-
-// Acciones ya migradas a Postgres. Todo lo que NO esté aquí se reenvía
-// automáticamente a tu Apps Script actual (fallback transparente).
-// El 4to parámetro (ctx) es opcional: solo lo usan las acciones que
-// necesitan disparar trabajo en background sin bloquear la respuesta
-// (por ahora, solo login).
 const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: ExecutionContext) => Promise<Response>> = {
   login,
   logout,
@@ -88,8 +72,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   getAsistenciaEmpleados,
   actualizarEstadoAsesor,
   actualizarCampanasAsesor,
-  getLeads,
-  getLeadsConAprobacion,
+  getLeads,
   getLeadDetail,
   generarPropuestaIA,
   saveBottom,
@@ -100,8 +83,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   getResumenVpPp,
   searchLeads,
   unifyIds,
-  getSolicitudPendiente,
-  getSolicitudesPendientesCampana,
+  getSolicitudPendiente,
   createSolicitud,
   resolveSolicitud,
   cancelarSolicitud,
@@ -127,7 +109,6 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   guardarVentanaEvaluacion,
   getAsignacionesEvaluacion,
   guardarAsignacionesEvaluacion,
-  // Capacitación IA (simulador comercial)
   simGetPanel,
   simIniciar,
   simEnviar,
@@ -138,16 +119,12 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   simGetEscenarios,
   simGuardarEscenario,
   simGetAsignaciones,
-  simGuardarAsignaciones,
-  simEstadoIA,
-  // Propuesta de abordaje (Bottom Line > Análisis > Propuesta)
+  simGuardarAsignaciones,
   getPropuestaAbordaje,
   generarPropuestaAbordajeAhora,
 };
 
 export default {
-  // Cron Triggers (wrangler.jsonc > triggers.crons): 10:10, 12:00, 15:00 y 17:00 en horario
-  // laboral de Lima se genera la Propuesta de abordaje de cada campaña activa.
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(
       (async () => {
@@ -167,7 +144,6 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    // Prueba de humo de la Fase 1 (la dejamos, no estorba).
     if (url.pathname === '/api/ping') {
       const client = await getClient(env);
       try {
@@ -178,7 +154,6 @@ export default {
       }
     }
 
-    // Único endpoint de la app, mismo contrato que tu doPost actual.
     if (url.pathname === '/api' && request.method === 'POST') {
       let body: any;
       try {
@@ -201,23 +176,16 @@ export default {
         }
       }
 
-      // Fallback: acción todavía no migrada -> se reenvía a Apps Script.
-      // Solo se reenvían las acciones de usuario que Apps Script atiende hoy;
-      // cualquier otra (p. ej. registrarSesionExterna, que solo debe llamar
-      // el propio Worker al hacer login) se rechaza aquí.
       if (!ACCIONES_APPS_SCRIPT.has(action)) {
         return jsonError('Acción desconocida: ' + action);
       }
       return proxyAAppsScript(request, body, env);
     }
 
-    // Cualquier otra ruta: sitio estático, igual que siempre.
     return env.ASSETS.fetch(request);
   },
 };
 
-// Acciones que el frontend todavía resuelve en Apps Script (Condiciones
-// Comerciales). Si se migra alguna a Postgres, quitarla de aquí.
 const ACCIONES_APPS_SCRIPT = new Set([
   'solicitarCC',
   'cancelarSolicitudCC',
@@ -232,8 +200,6 @@ async function proxyAAppsScript(originalRequest: Request, body: any, env: Env): 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  // Se reenvía la respuesta de Apps Script tal cual, para que el frontend
-  // no note ninguna diferencia entre acciones locales y las reenviadas.
   const text = await resp.text();
   return new Response(text, {
     status: resp.status,

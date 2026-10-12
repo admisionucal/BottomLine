@@ -33,7 +33,6 @@ export async function login(client: Client, body: JsonBody, env: Env, ctx: Execu
     return jsonError('Contraseña incorrecta');
   }
 
-  // Migración de contraseña en texto plano a hash, igual que migrarPasswordAHash()
   if (String(user.password_hash || '').indexOf('sha256:') !== 0) {
     const nuevoHash = 'sha256:' + (await hashPassword(body.password));
     await client.query(`update usuarios set password_hash = $1 where usuario = $2`, [
@@ -44,7 +43,6 @@ export async function login(client: Client, body: JsonBody, env: Env, ctx: Execu
 
   await limpiarIntentosFallidos(client, usuarioNorm);
 
-  // Resolución de campañas: "todas" -> todas las que existan; si no, split por coma.
   const camActivasRes = await client.query(
     `select codigo from campanas where activa = true order by codigo`
   );
@@ -66,23 +64,16 @@ export async function login(client: Client, body: JsonBody, env: Env, ctx: Execu
     nombre: user.nombre_aux || user.nombre,
   });
 
-  // Registramos el mismo token en Apps Script, para que las acciones
-  // todavía no migradas (que se reenvían allá) también lo reconozcan.
-  // "Best effort": ya NO se espera esta llamada (ctx.waitUntil la deja
-  // corriendo en background) — así no le suma latencia al login. Si falla,
-  // solo afectaría a acciones no migradas, no a las que ya corren en Postgres.
   ctx.waitUntil(
     fetch(env.APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'registrarSesionExterna',
-        // code.gs valida esta clave: sin ella cualquiera podría crear sesiones.
         secret: env.IMPORT_SECRET,
         token,
         usuario: user.usuario,
         email: emailUser,
-        // Apps Script no conoce SISTEMAS: para Condiciones Comerciales actúa como ADMISION.
         rol: user.rol === 'SISTEMAS' ? 'ADMISION' : user.rol,
         nombre: user.nombre_aux || user.nombre,
       }),
@@ -109,8 +100,6 @@ export async function login(client: Client, body: JsonBody, env: Env, ctx: Execu
 export async function logout(client: Client, body: JsonBody, env: Env) {
   await eliminarSesion(client, body.sessionToken);
 
-  // También cerramos la sesión en Apps Script, para no dejar tokens vivos
-  // ahí después de que el usuario cerró sesión en el Worker.
   try {
     await fetch(env.APPS_SCRIPT_URL, {
       method: 'POST',

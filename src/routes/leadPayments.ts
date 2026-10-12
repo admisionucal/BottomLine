@@ -2,7 +2,6 @@ import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
 
-// snake_case (Postgres) -> encabezado real de la hoja pagos{campaña}.
 const MAPEO_PAGOS: Record<string, string> = {
   id_prometeo: 'ID PROMETEO',
   id_campus: 'ID CAMPUS',

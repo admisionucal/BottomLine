@@ -1,19 +1,12 @@
--- ================================================================
--- PROPUESTA DE ABORDAJE (Bottom Line > Análisis > Propuesta)
--- Correr una vez en el SQL Editor de Supabase.
--- La genera el Worker a las 10:10, 12:00, 15:00 y 17:00 (hora de
--- Lima) para cada campaña activa, o a demanda con "Generar ahora".
--- Se guardan 30 días de historial.
--- ================================================================
 create table if not exists propuestas_abordaje (
     id            bigserial primary key,
     campana       text not null,
     generado_en   timestamptz not null default now(),
-    origen        text not null default 'cron',          -- cron | manual
+    origen        text not null default 'cron',
     generado_por  text not null default '',
-    macro         text not null default '',              -- qué hacer con toda la campaña
-    grupos        jsonb not null default '[]'::jsonb,    -- [{clave, titulo, regla, total, accion, ids:[{id, asesor}]}]
-    por_asesor    jsonb not null default '[]'::jsonb,    -- [{asesor, conteos, total, accion}]
+    macro         text not null default '',
+    grupos        jsonb not null default '[]'::jsonb,
+    por_asesor    jsonb not null default '[]'::jsonb,
     resumen       jsonb not null default '{}'::jsonb,
     proveedor_ia  text not null default '',
     modelo_ia     text not null default '',

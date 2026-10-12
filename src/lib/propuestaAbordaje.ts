@@ -2,19 +2,6 @@ import type { Client } from 'pg';
 import type { Env } from '../types';
 import { generarJSON } from './ia';
 
-// ================================================================
-// PROPUESTA DE ABORDAJE (Bottom Line > Análisis > Propuesta)
-// ================================================================
-//
-// 1) El SERVIDOR arma los grupos de leads con reglas fijas (listas exactas,
-//    nada inventado por la IA).
-// 2) La IA recibe solo conteos y contexto resumido de cada grupo y escribe:
-//    - macro: qué hacer con toda la campaña
-//    - una acción por grupo
-//    - una acción por asesor
-// 3) Se guarda en propuestas_abordaje. Si la IA falla, igual se guardan los
-//    grupos (con el error), para que las listas sigan siendo útiles.
-
 const VP_VIVA = 'VALORES_VALORACIONES_POSITIVAS_VIVA';
 const PP_VIVA = 'VALORES_PROMESA_DE_PAGO_VIVA';
 const VOLVER = 'VALORES_VOLVER_A_LLAMAR';
@@ -30,7 +17,7 @@ export interface LeadMin {
   programa: string;
   modalidad: string;
   ingreso: string;
-  fechaCompromiso: string | null; // yyyy-mm-dd (hora Lima)
+  fechaCompromiso: string | null;
   diasSinContacto: number | null;
   perfilCompleto: boolean;
   dolor: string;
@@ -87,7 +74,6 @@ export const GRUPOS: { clave: string; titulo: string; regla: string; filtro: (l:
   },
 ];
 
-// ---------- Fechas en hora de Lima (UTC-5, sin horario de verano) ----------
 function ymdLima(d: Date): string {
   return new Date(d.getTime() - 5 * 3600 * 1000).toISOString().slice(0, 10);
 }
@@ -112,9 +98,7 @@ function contar(valores: string[], top = 4): { valor: string; n: number }[] {
   return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, top).map(([valor, n]) => ({ valor, n }));
 }
 
-// ---------- Lectura de leads de una campaña ----------
 export async function leerLeadsCampana(client: Client, campana: string): Promise<LeadMin[]> {
-  // Mismo cruce que getLeads (leads.ts): el bottom se toma del asesor dueño del lead.
   const r = await client.query(
     `select l.id_prometeo, l.status_gestion, l.programa, l.modalidad, l.modalidad_ingreso,
             l.fecha_compromiso_pago,
@@ -134,7 +118,6 @@ export async function leerLeadsCampana(client: Client, campana: string): Promise
 
   const ahora = Date.now();
   const vacio = (v: any) => !v || String(v).trim() === '';
-  // El cruce con usuarios puede repetir un lead (usuario o nombre): se deja uno.
   const vistos = new Set<string>();
   const filas = r.rows.filter((row) => {
     const k = String(row.id_prometeo);
@@ -176,7 +159,6 @@ export async function leerLeadsCampana(client: Client, campana: string): Promise
   });
 }
 
-// ---------- Armado de grupos ----------
 export function armarGrupos(leads: LeadMin[], ahora = new Date()) {
   const hoy = ymdLima(ahora);
   const en2dias = ymdLima(new Date(ahora.getTime() + 2 * 86400000));
@@ -200,7 +182,6 @@ export function armarGrupos(leads: LeadMin[], ahora = new Date()) {
     };
   });
 
-  // Un lead puede estar en varios grupos: el total por asesor cuenta leads únicos.
   const porAsesorMap = new Map<string, { conteos: Record<string, number>; ids: Set<string> }>();
   for (const g of GRUPOS) {
     for (const l of leads) {
@@ -229,7 +210,6 @@ export function armarGrupos(leads: LeadMin[], ahora = new Date()) {
   return { grupos, porAsesor, resumen };
 }
 
-// ---------- Prompt ----------
 function promptPropuesta(campana: string, datos: ReturnType<typeof armarGrupos>) {
   const system = `Eres el jefe comercial de Admisión de UCAL (universidad en Lima, Perú). Varias veces al día (10:10, 12:00, 15:00 y 17:00) revisas la bandeja de leads de telemarketing y propones cómo abordarla.
 Escribes en español, directo y accionable, para supervisores y asesores. Usa el vocabulario de UCAL: "cuotas educativas" o "inversión", nunca "pensión" para pagos en UCAL.
@@ -262,7 +242,6 @@ Incluye una entrada en "grupos" por cada grupo listado y una en "asesores" por c
   return { system, user };
 }
 
-// ---------- Generar y guardar ----------
 export async function generarPropuestaAbordaje(
   client: Client,
   env: Env,
@@ -321,7 +300,6 @@ export async function generarPropuestaAbordaje(
   return { id: ins.rows[0].id, generadoEn: ins.rows[0].generado_en, error };
 }
 
-// ---------- Cron: todas las campañas activas ----------
 export async function generarPropuestasProgramadas(client: Client, env: Env) {
   const r = await client.query(`select codigo from campanas where activa = true order by codigo`);
   const resultados: any[] = [];
@@ -332,7 +310,6 @@ export async function generarPropuestasProgramadas(client: Client, env: Env) {
       resultados.push({ campana: row.codigo, error: e?.message || String(e) });
     }
   }
-  // Se conservan 30 días de historial.
   await client.query(`delete from propuestas_abordaje where generado_en < now() - interval '30 days'`);
   return resultados;
 }

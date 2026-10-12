@@ -1,6 +1,3 @@
-// ================================================================
-// UNIFICAR CORE - Lógica de unificación reutilizable (sin DOM)
-// ================================================================
 import { API_URL } from '../core/constants.js';
 import { getSessionToken } from '../core/utils.js';
 

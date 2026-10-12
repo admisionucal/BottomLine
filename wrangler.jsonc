@@ -17,14 +17,9 @@
 	"ai": {
 		"binding": "AI"
 	},
-	// Propuesta de abordaje: 10:10, 12:00, 15:00 y 17:00 hora de Lima (UTC-5).
-	// Los cron de Cloudflare van en UTC: 15:10, 17:00, 20:00 y 22:00.
 	"triggers": {
 		"crons": ["10 15 * * *", "0 17,20,22 * * *"]
 	},
-	// Secretos (no van aquí): IMPORT_SECRET, SUPABASE_SERVICE_ROLE_KEY y,
-	// para la Capacitación IA, ANTHROPIC_API_KEY. Se cargan con:
-	//   npx wrangler secret put NOMBRE
 	"vars": {
 		"APPS_SCRIPT_URL": "https://script.google.com/macros/s/AKfycby9ev70hHVHWWpWE0mFqTllVYyug_vI9UZTbdhEGCnpwslbxBUjcHzPyaWoG3tvUUkAWg/exec",
 		"SUPABASE_URL": "https://uqcxmuwquqvfwkqobolb.supabase.co",

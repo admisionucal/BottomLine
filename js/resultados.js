@@ -1,8 +1,4 @@
-// ================================================================
-// RESULTADOS - "Usuarios > Resultados" (solo SUPERVISOR / ADMISION)
-// ================================================================
-
-import { API_URL, ROLES, esRolSupervisorOAdmision } from '../core/constants.js';
+import { API_URL, esRolSupervisorOAdmision } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml, formatearFecha } from '../core/utils.js';
 import { Sidebar, renderTable } from '../core/components.js';
 
@@ -25,9 +21,6 @@ async function callAPI(action, data = {}) {
 
 document.addEventListener('DOMContentLoaded', () => initResultados());
 
-// Punto de entrada cuando se embebe dentro de dashboard.html.
-// `codigoInicial` permite abrir directo en una evaluación (ej. desde la
-// tarjeta "Ver resultados" en la vista Evaluaciones).
 window.initResultadosEmbebido = function (codigoInicial) {
     initResultados(codigoInicial);
 };
@@ -109,9 +102,6 @@ async function cargarResultados(codigo) {
     state.filas = result.data || [];
     cont.innerHTML = '<div id="resTabla"></div>';
 
-    // `getEvaluaciones` (usado para poblar el <select>) ya trae, para
-    // SUPERVISOR/ADMISION, si la evaluación está asignada a todos o solo
-    // a algunos asesores — se reutiliza acá en vez de pedirlo de nuevo.
     const evalActual = state.evaluaciones.find((e) => e.codigo === codigo);
     const infoEl = document.getElementById('resAsignacionInfo');
     if (infoEl && evalActual) {
@@ -142,7 +132,6 @@ async function cargarResultados(codigo) {
 
     renderTable('resTabla', headers, rows);
 
-    // Toda la fila abre el detalle (solo si el asesor ya resolvió la evaluación).
     document.querySelectorAll('#resTabla tbody tr').forEach((tr, i) => {
         const f = state.filas[i];
         if (!f || f.estado !== 'Completado') return;
@@ -152,7 +141,6 @@ async function cargarResultados(codigo) {
     });
 }
 
-// Nota en número: "16 / 20" (sin decimales innecesarios).
 function formatoNota(obtenido, maximo) {
     const fmt = (v) => {
         const n = Number(v);
@@ -161,10 +149,6 @@ function formatoNota(obtenido, maximo) {
     };
     return `${fmt(obtenido)} / ${fmt(maximo)}`;
 }
-
-// ================================================================
-// MODAL DE DETALLE: Pregunta + Respuesta + Nota + Consejo
-// ================================================================
 
 const RES_MODAL_HTML = `
     <div class="modal-overlay" id="resDetalleModal">
@@ -186,7 +170,7 @@ function asegurarModalDetalleEnDOM() {
 
     document.body.insertAdjacentHTML('beforeend', RES_MODAL_HTML);
     modal = document.getElementById('resDetalleModal');
-    __resDetalleListenersAtados = false; // permite atar listeners al nodo recién creado
+    __resDetalleListenersAtados = false;
     return modal;
 }
 
@@ -257,13 +241,6 @@ window.__verDetalleResultado = async function (usuario) {
     `).join('');
 };
 
-// Normaliza el jsonb `detalle` (guardado por evaluacion-marca-ucal.html,
-// ver EVAL.questions / gradeLocal / mergeAI) a filas simples de
-// Pregunta + Respuesta + Nota + Consejo para pintarlas en el modal.
-//
-// - Preguntas abiertas (type: "open"): una fila por pregunta.
-// - Verdadero/Falso (type: "tf"): una fila por cada afirmación del grupo,
-//   porque cada una tiene su propia respuesta/nota/justificación.
 function construirFilasDetalle(detalle) {
     if (!detalle || !Array.isArray(detalle.per)) return [];
     const filas = [];
@@ -277,8 +254,6 @@ function construirFilasDetalle(detalle) {
                     respuesta: `Marcó: ${marcado}` + (sub.justification ? ` — "${sub.justification}"` : ''),
                     nota: sub.ok ? 'Correcto' : 'Incorrecto',
                     notaClass: sub.ok ? 'full' : 'none',
-                    // El "why" empieza con "Verdadero." / "Falso." (la respuesta
-                    // correcta); se quita para dejar solo la explicación.
                     consejo: String(sub.why || '').replace(/^\s*(verdadero|falso)\s*[.:,;-]?\s*/i, ''),
                 });
             });
@@ -290,8 +265,6 @@ function construirFilasDetalle(detalle) {
             if (item.advice) consejoPartes.push(item.advice);
 
             filas.push({
-                // `prompt` viaja en el detalle desde evaluacion-marca-ucal.html;
-                // si el intento es viejo y no lo tiene, se usa un rótulo genérico.
                 pregunta: item.prompt || `Pregunta ${idx + 1}`,
                 respuesta: (item.answer || '').trim() || '(no respondió esta pregunta)',
                 nota: `${earned} / ${points}`,

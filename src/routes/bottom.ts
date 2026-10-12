@@ -11,14 +11,11 @@ const CAMPOS_BOTTOM_EDITABLES = [
   'por_que_eligio_carrera', 'que_busca_universidad', 'quien_financiara',
   'acciones_definidas', 'que_le_falta', 'otras_opciones', 'comentarios_perfil',
   'dolor_necesidad', 'opcion_institucion', 'opcion_nombre_institucion',
-  // Montos y aprobación (columnas nuevas de bottom{campaña})
   'descuento_matricula', 'matricula_final',
   'descuento_admision', 'admision_final', 'rinde_examen_suficiencia',
   'estado_aprobacion', 'aprobado_por', 'fecha_aprobacion',
 ] as const;
 
-// Mismo array CAMPOS_PERFIL que en code.gs: si se toca cualquiera de estos,
-// se guarda una "foto" completa en el historial (perfil_snapshot).
 const CAMPOS_PERFIL = [
   'por_que_eligio_carrera', 'que_busca_universidad', 'quien_financiara',
   'acciones_definidas', 'que_le_falta', 'otras_opciones', 'comentarios_perfil',
@@ -75,9 +72,6 @@ export async function saveBottom(client: Client, body: JsonBody) {
     data.CARRERA_PROCEDENCIA = nombreNorm;
   }
 
-  // Institución de "Otras opciones" del Perfilamiento (independiente de
-  // TIPO_INSTITUCION_PROCEDENCIA/INSTITUCION_PROCEDENCIA de traslados,
-  // pero comparten el mismo catálogo).
   if (data.OPCION_NOMBRE_INSTITUCION !== undefined && String(data.OPCION_NOMBRE_INSTITUCION).trim() !== '') {
     const nombreNorm = normalizarCatalogo(String(data.OPCION_NOMBRE_INSTITUCION));
     await client.query(
@@ -235,7 +229,6 @@ export async function addComment(client: Client, body: JsonBody) {
   }
 }
 
-// Igual que en unifyIds.ts: nunca truena si el JSON viene mal.
 function parsearHistorial(raw: any): any[] {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw;
@@ -247,7 +240,6 @@ function parsearHistorial(raw: any): any[] {
   }
 }
 
-// El asesor "vigente" de un lead: mismo criterio que usa el JOIN de getLeads.
 async function resolverAsesorVigente(client: Client, idPrometeo: string, campana: string): Promise<string | null> {
   const r = await client.query(
     `select u.email
@@ -261,7 +253,6 @@ async function resolverAsesorVigente(client: Client, idPrometeo: string, campana
   return email ? String(email).trim().toLowerCase() : null;
 }
 
-// Garantiza que, antes de guardar, exista COMO MÁXIMO una fila de leads_bottom para este lead, y que sea la del asesor vigente.
 async function consolidarFilaBottom(client: Client, idPrometeo: string, campana: string, asesorVigente: string) {
   const filas = await client.query(
     `select * from leads_bottom where id_prometeo = $1 and campana = $2`,
@@ -274,7 +265,6 @@ async function consolidarFilaBottom(client: Client, idPrometeo: string, campana:
   if (otras.length === 0) return;
 
   if (!yaTieneVigente) {
-    // Renombra la primera huérfana en vez de crear una fila nueva.
     const primera = otras[0];
     await client.query(
       `update leads_bottom set asesor_email = $1, actualizado_en = now()
@@ -292,7 +282,6 @@ async function consolidarFilaBottom(client: Client, idPrometeo: string, campana:
     )
   ).rows[0];
 
-  // Fusiona historial y rellena solo los campos que el destino tenía vacíos.
   let historialFinal = parsearHistorial(destino.comentarios_historial);
   const relleno: Record<string, any> = {};
 

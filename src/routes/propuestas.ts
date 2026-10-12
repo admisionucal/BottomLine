@@ -3,12 +3,6 @@ import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 import { exigirSesion, ROL_SISTEMAS, type Sesion } from '../lib/session';
 import { generarPropuestaAbordaje } from '../lib/propuestaAbordaje';
 
-// ================================================================
-// PROPUESTA DE ABORDAJE (Bottom Line > Análisis > Propuesta)
-// ================================================================
-
-// ETAPA DE PRUEBAS: solo SISTEMAS ve y genera la propuesta.
-// Para liberarla, agregar perfiles aquí y en ROLES_PROPUESTA_IA de core/constants.js.
 const ROLES_VER = [ROL_SISTEMAS];
 const ROLES_GENERAR = [ROL_SISTEMAS];
 
@@ -44,7 +38,6 @@ export async function generarPropuestaAbordajeAhora(client: Client, body: JsonBo
   const existe = await client.query(`select 1 from campanas where codigo = $1`, [campana]);
   if (!existe.rowCount) return jsonError('La campaña no existe.');
 
-  // Evita dobles clics: si hay una de hace menos de 2 minutos, se devuelve esa.
   const reciente = await client.query(
     `select 1 from propuestas_abordaje where campana = $1 and generado_en > now() - interval '2 minutes'`,
     [campana]

@@ -7,8 +7,6 @@ function esRolSupervisorOAdmision(rol: string) {
   return rol === 'SUPERVISOR' || rol === 'ADMISION';
 }
 
-// Columnas internas del bottom que NO deben exponerse tal cual en el objeto
-// de salida (uso interno / ya representadas con otro nombre).
 const OMITIR_DEL_BOTTOM = new Set(['id_prometeo', 'campana', 'creado_en']);
 
 export async function getLeadDetail(client: Client, body: JsonBody) {
@@ -28,8 +26,6 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
   ]);
   const leadRow = leadResult.rows[0];
 
-  // Igual que el código real: si no está en base, igual se arma un objeto
-  // mínimo (puede existir solo por bottom/hoy). No es un error todavía.
   const leadObj: Record<string, any> = leadRow
     ? {
         'ID PROMETEO': leadRow.id_prometeo,
@@ -57,7 +53,6 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
       }
     : { 'ID PROMETEO': idTarget, ID_PROMETEO: idTarget, CAMPAÑA: campana };
 
-  // Nombre a mostrar del asesor (Nombre_Aux), buscando por el nombre completo guardado.
   if (leadObj.ASESOR_NOMBRE_RAW) {
     const r = await client.query(
       `select nombre_aux, nombre from usuarios where lower(nombre) = lower($1) limit 1`,
@@ -69,7 +64,6 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
     leadObj['ASESOR ULT TIP DF SN CONTC'] = '-';
   }
 
-  // Pagos: solo visibles para SUPERVISOR/ADMISION, igual que el código real.
   if (esAdmin) {
     const pagoResult = await client.query(`select * from leads_pagos where id_prometeo = $1 and campana = $2`, [
       idTarget,
@@ -89,11 +83,6 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
     }
   }
 
-  // Bottom: desde el fix de esquema (04_fix_leads_bottom_asesor.sql) puede
-  // haber una fila POR ASESOR para el mismo lead. Priorizamos la fila del
-  // asesor de la sesión actual (si existe); si no existe (p.ej. un
-  // SUPERVISOR/ADMISION viendo un lead que nunca tocó, o un asesor nuevo
-  // heredando el lead), caemos a la fila más reciente como snapshot general.
   const bottomResult = await client.query(
     `select * from leads_bottom
      where id_prometeo = $1 and campana = $2
@@ -106,13 +95,12 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
   const bottomUpper: Record<string, any> = {};
   for (const [k, v] of Object.entries(bottomRow)) {
     if (OMITIR_DEL_BOTTOM.has(k)) continue;
-    if (k === 'comentarios_historial') continue; // se procesa aparte abajo
+    if (k === 'comentarios_historial') continue;
     bottomUpper[k.toUpperCase()] = v;
   }
   Object.assign(leadObj, bottomUpper);
   leadObj['PERFILAMIENTO_COMPLETO'] = calcularPerfilamientoCompleto(bottomUpper, esAdmin);
 
-  // Historial de comentarios: un ASESOR solo ve sus propios comentarios/snapshots.
   let historial: any[] = [];
   const rawHistorial = bottomRow.comentarios_historial;
   try {
@@ -152,7 +140,6 @@ export async function generarPropuestaIA(client: Client, body: JsonBody, env: En
 
   if (!env.AI) return jsonError('Workers AI no está habilitado en este Worker.');
 
-  // --- Fechas: las calculamos nosotros, no se las dejamos "adivinar" a la IA ---
   const hoy = new Date();
   const fmt = (d: Date) => d.toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const hoyStr = fmt(hoy);
@@ -162,7 +149,6 @@ export async function generarPropuestaIA(client: Client, body: JsonBody, env: En
   limiteContacto.setDate(limiteContacto.getDate() + 3);
   const limiteStr = fmt(limiteContacto);
 
-  // --- Historial de comentarios: fechas reales (ISO, guardadas por el sistema) ---
   let historial: any[] = [];
   try {
     historial = Array.isArray(bottom.comentarios_historial)

@@ -1,21 +1,9 @@
-// ================================================================
-// SIMULADOR COMERCIAL UCAL — conocimiento y prompts
-// ================================================================
-//
-// Resumen operativo de los documentos del proyecto (01 Instrucciones
-// maestras, 02 Comportamiento de leads, 03 Rúbrica V3.3, 04 Formato de
-// feedback V1.2, 05 Realismo, 08 Pricing, 13 Lineamientos).
-// Está resumido para que entre en el contexto de Llama (Workers AI).
-// Cualquier texto se puede reemplazar sin desplegar cargando una fila en
-// la tabla sim_conocimiento (claves: rubrica, feedback, comportamiento_lead).
-
 export const CAMPANA = {
   codigo: '27.1',
   inicioClases: '22/03/2027',
   cierreInscripcion: '02/04/2027',
 };
 
-// ----- Carreras vigentes 27.1 y modalidades (Rúbrica §5) -----
 export const CARRERAS: { nombre: string; modalidades: ('semipresencial' | 'virtual')[]; nota?: string }[] = [
   { nombre: 'Arquitectura', modalidades: ['semipresencial'] },
   { nombre: 'Arquitectura de Interiores', modalidades: ['semipresencial'] },
@@ -34,7 +22,6 @@ export const CARRERAS: { nombre: string; modalidades: ('semipresencial' | 'virtu
   { nombre: 'Contabilidad', modalidades: ['semipresencial', 'virtual'] },
 ];
 
-// ----- Institutos reales del Programa +2 (Realismo §1) -----
 export const INSTITUTOS_MAS2 =
   'Toulouse Lautrec (Diseño Gráfico) · Zegel (Administración de Empresas, Marketing, Negocios Internacionales, Diseño Gráfico, Diseño y Gestión de Marcas) · ' +
   'CERTUS (Diseño Gráfico, Administración y Negocios Internacionales) · Cibertec (Diseño Gráfico, Administración de Negocios Internacionales) · ' +
@@ -42,7 +29,6 @@ export const INSTITUTOS_MAS2 =
   'ISIL (Diseño Gráfico, Administración de Negocios, Administración y Marketing) · IPAD (Diseño Gráfico) · IDAT (Diseño Gráfico) · Instituto Peruano de Marketing (Marketing) · ' +
   'Instituto San Marcos (Administración de Negocios Internacionales) · Instituto Perú Pacífico (Administración de Negocios Internacionales, Marketing Empresarial)';
 
-// ----- Niveles de dificultad (Instrucciones maestras §7 + Comportamiento §2) -----
 export const NIVELES: Record<number, { nombre: string; interaccion: string[]; detalle: string }> = {
   1: {
     nombre: 'Básico',
@@ -66,7 +52,6 @@ export const NIVELES: Record<number, { nombre: string; interaccion: string[]; de
   },
 };
 
-// ----- Criterios oficiales (Rúbrica §3) -----
 export const CRITERIOS: { clave: string; nombre: string; etapa: string }[] = [
   { clave: 'apertura', nombre: 'Apertura y conexión', etapa: 'Transmitir confianza' },
   { clave: 'contexto', nombre: 'Identifica el contexto o perfil del cliente', etapa: 'Transmitir confianza' },
@@ -81,7 +66,6 @@ export const CRITERIOS: { clave: string; nombre: string; etapa: string }[] = [
   { clave: 'gramatica', nombre: 'Gramática', etapa: 'Aspectos higiénicos' },
 ];
 
-// ----- Errores críticos (Rúbrica §8) -----
 export const ERRORES_CRITICOS: Record<string, { puntos: number; texto: string }> = {
   'EC-1': { puntos: 15, texto: 'Aplicar escala/descuento/beneficio de otro segmento, o cerrar en un monto distinto a la boleta que le corresponde' },
   'EC-2': { puntos: 15, texto: 'Afirmar información institucional sin respaldo oficial (la recategorización con monto final correcto NO es EC-2)' },
@@ -102,10 +86,6 @@ export const ERRORES_CRITICOS: Record<string, { puntos: number; texto: string }>
   'EC-12': { puntos: 5, texto: 'Presentar el examen de admisión como excluyente o filtro' },
   'EC-24': { puntos: 5, texto: 'Usar «pensión» para los pagos en UCAL (se descuenta una sola vez)' },
 };
-
-// ================================================================
-// TEXTOS BASE (reemplazables desde sim_conocimiento)
-// ================================================================
 
 export const COMPORTAMIENTO_LEAD_BASE = `
 REGLAS DEL CLIENTE SIMULADO
@@ -178,10 +158,6 @@ FORMATO DE FEEDBACK AL ASESOR V1.2 (resumen)
 - Todo ejemplo usa el vocabulario correcto: "cuota educativa", "inversión en tu desarrollo profesional", nunca "pensión" para pagos UCAL.
 - La recategorización con monto final correcto y los beneficios vigentes nunca se reportan como error.
 `.trim();
-
-// ================================================================
-// PROMPT 1: GENERAR EL PERFIL OCULTO DEL LEAD
-// ================================================================
 
 export interface PerfilLead {
   nombre: string;
@@ -293,10 +269,6 @@ Datos que NO se inventan:
   return { system, user: partes.join('\n\n') };
 }
 
-// ================================================================
-// PROMPT 2: EL LEAD CONVERSA
-// ================================================================
-
 export function promptLead(perfil: PerfilLead, ejemplos: string[], comportamiento: string): string {
   const { escenario_publico, ...ficha } = perfil as any;
   void escenario_publico;
@@ -316,10 +288,6 @@ CÓMO ESCRIBES
 - Escribe solo tus mensajes: sin comillas, sin tu nombre delante, sin acotaciones entre asteriscos ni descripciones de acciones.
 ${ejemplos.length ? `\nASÍ ESCRIBEN LEADS REALES DE UCAL (imita el tono y el largo, no copies datos):\n- ${ejemplos.join('\n- ')}` : ''}`;
 }
-
-// ================================================================
-// PROMPT 3: AUDITOR
-// ================================================================
 
 export function promptAuditor(rubrica: string, feedback: string): string {
   const criterios = CRITERIOS.map((c) => `"${c.clave}": {"nota": 1-5, "evidencia": "cita breve del chat", "comentario": "por qué esa nota"}`).join(',\n  ');
@@ -391,10 +359,6 @@ ${args.transcripcion}
 Evalúa ahora la conversación y devuelve el JSON.`;
 }
 
-// ================================================================
-// PUNTAJES (se calculan en el servidor, no se confía en la suma de la IA)
-// ================================================================
-
 export function bandaConversacion(p: number): string {
   if (p >= 90) return 'Excelente';
   if (p >= 75) return 'Sólido con observaciones';
@@ -431,8 +395,8 @@ export function calcularPuntajes(evalIA: any) {
   for (const e of Array.isArray(evalIA?.errores_criticos) ? evalIA.errores_criticos : []) {
     const codigo = String(e?.codigo || '').toUpperCase().replace(/\s+/g, '').replace(/^EC(\d)/, 'EC-$1');
     const def = ERRORES_CRITICOS[codigo];
-    if (!def) continue; // la IA no puede inventar errores críticos
-    if (codigo === 'EC-24' && vistos.has(codigo)) continue; // se descuenta una sola vez
+    if (!def) continue;
+    if (codigo === 'EC-24' && vistos.has(codigo)) continue;
     vistos.add(codigo);
     errores.push({ codigo, puntos: def.puntos, definicion: def.texto, evidencia: String(e?.evidencia || ''), explicacion: String(e?.explicacion || '') });
   }

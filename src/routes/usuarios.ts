@@ -3,9 +3,6 @@ import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
 import { hashPassword } from '../lib/crypto';
 
-// ===== Listado de Supervisores para "Campañas por Supervisor" en Configuración =====
-// Mismo shape que getAsistenciaEmpleados, pero rol=SUPERVISOR. Solo ADMISION
-// (la pantalla de Configuración es estrictamente ADMISION).
 export async function getSupervisoresConfig(client: Client, body: JsonBody) {
   const { error } = await exigirSesion(client, body, ['ADMISION']);
   if (error) return jsonError(error);
@@ -25,7 +22,6 @@ export async function getSupervisoresConfig(client: Client, body: JsonBody) {
   return jsonOk({ data });
 }
 
-// ===== Alta de usuarios (solo ADMISION) =====
 export async function crearUsuario(client: Client, body: JsonBody) {
   const { error } = await exigirSesion(client, body, ['ADMISION']);
   if (error) return jsonError(error);

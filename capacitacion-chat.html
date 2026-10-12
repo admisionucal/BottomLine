@@ -31,7 +31,6 @@
         .cap-empty { color: var(--color-text-muted); font-size: 13px; padding: 10px 0; }
         .cap-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--color-warning-bg); border: 1px solid #ffd8a8; border-radius: 10px; padding: 12px 16px; font-size: 13px; }
 
-        /* ----- Chat ----- */
         .chat-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
         .chat-box { background: #efeae2; border-radius: 12px; border: 1px solid var(--color-border); display: flex; flex-direction: column; height: calc(100vh - 150px); min-height: 460px; overflow: hidden; }
         .chat-top { background: #075e54; color: #fff; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
@@ -58,7 +57,6 @@
         .btn-fin:disabled { opacity: .6; cursor: not-allowed; }
         .side-hint { font-size: 11.5px; color: var(--color-text-muted); line-height: 1.4; }
 
-        /* ----- Feedback ----- */
         .fb-wrap { max-width: 860px; }
         .fb-scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0; }
         .fb-score { background: var(--color-bg-card); border: 1px solid var(--color-border); border-radius: 10px; padding: 14px 16px; }
@@ -93,7 +91,6 @@
         .fb-chatlog { max-height: 420px; overflow-y: auto; background: #efeae2; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
         .fb-chatlog .msg { max-width: 85%; }
 
-        /* ----- Admin ----- */
         .adm-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
         .adm-toolbar input, .adm-toolbar select, .form-grid input, .form-grid select, .form-grid textarea { padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 13px; font-family: inherit; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; }
@@ -132,7 +129,6 @@
                     <span class="cap-chip" id="capProveedor" style="display:none;"></span>
                 </div>
 
-                <!-- ===== Vista: inicio ===== -->
                 <div id="vistaInicio">
                     <div class="cap-tabs" id="capTabs">
                         <button class="cap-tab active" data-tab="practicar">Practicar</button>
@@ -160,7 +156,6 @@
                     </div>
                 </div>
 
-                <!-- ===== Vista: chat ===== -->
                 <div id="vistaChat" style="display:none; margin-top:16px;">
                     <div class="chat-layout">
                         <div class="chat-box">
@@ -198,12 +193,8 @@
                     </div>
                 </div>
 
-                <!-- ===== Vista: feedback ===== -->
                 <div id="vistaFeedback" style="display:none; margin-top:16px;"></div>
 
-                <!-- Los modales van dentro de #capacitacionApp para que también
-                     funcionen cuando la vista se embebe en dashboard.html -->
-                <!-- Modal: detalle de una práctica (supervisor) -->
                 <div class="modal-overlay" id="capDetalleModal">
                     <div class="modal-box modal-box-detalle" style="max-width:900px;">
                         <button class="modal-close-x" data-cerrar="capDetalleModal"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
@@ -211,7 +202,6 @@
                     </div>
                 </div>
 
-                <!-- Modal: crear / editar escenario -->
                 <div class="modal-overlay" id="escModal">
                     <div class="modal-box modal-box-detalle" style="max-width:640px;">
                         <button class="modal-close-x" data-cerrar="escModal"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
@@ -243,7 +233,6 @@
                     </div>
                 </div>
 
-                <!-- Modal: asignar escenario -->
                 <div class="modal-overlay" id="asigModal">
                     <div class="modal-box modal-box-detalle" style="max-width:520px;">
                         <button class="modal-close-x" data-cerrar="asigModal"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>

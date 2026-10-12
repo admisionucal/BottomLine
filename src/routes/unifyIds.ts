@@ -2,7 +2,6 @@ import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
 
-// Igual que parsearHistorial() en code.gs: nunca truena si el JSON viene mal.
 function parsearHistorial(raw: any): any[] {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw;
@@ -19,8 +18,6 @@ interface SecundarioInput {
   campana: string;
 }
 
-// Permite cruzar campañas):
-//      { idsSecundarios: [{ id, campana }, ...] }
 function normalizarSecundarios(body: JsonBody): SecundarioInput[] {
   const campanaFallback = String(body.campana || body.campanaPrincipal || '').trim();
 
@@ -60,10 +57,6 @@ export async function unifyIds(client: Client, body: JsonBody) {
   );
   if (secundariosValidos.length === 0) return jsonError('No hay IDs secundarios válidos');
 
-  // ------------------------------------------------------------------
-  // ¿algún secundario (en su propia campaña) tiene pagos registrados? 
-  // Si sí, el frontend pide confirmación al usuario.
-  // ------------------------------------------------------------------
   const idsArr = secundariosValidos.map((s) => s.id);
   const campanasArr = secundariosValidos.map((s) => s.campana);
   const pagosCheck = await client.query(
@@ -91,7 +84,6 @@ export async function unifyIds(client: Client, body: JsonBody) {
     await client.query('begin');
 
     for (const { id: idSecundario, campana: campanaSecundario } of secundariosValidos) {
-      // -------------------- 1) leads_bottom (comentarios/historial) --------------------
       const [principalRes, secundarioRes] = await Promise.all([
         client.query(`select comentarios_historial from leads_bottom where id_prometeo = $1 and campana = $2`, [
           idPrincipal,
@@ -133,9 +125,6 @@ export async function unifyIds(client: Client, body: JsonBody) {
         );
       }
 
-      // -------------------- 2) solicitudes (recategorización) --------------------
-      // El índice único de PENDIENTE es por (id_prometeo, campana), así que
-      // el chequeo de choque también va dentro de la campaña del secundario.
       const pendientePrincipal = await client.query(
         `select 1 from solicitudes where id_prometeo = $1 and campana = $2 and status = 'PENDIENTE'`,
         [idPrincipal, campanaSecundario]
@@ -147,21 +136,17 @@ export async function unifyIds(client: Client, body: JsonBody) {
           [sesion.email, idSecundario, campanaSecundario]
         );
       }
-      // Se reasigna el id_prometeo pero se conserva la campaña original de
-      // cada solicitud: así queda registro de en qué campaña ocurrió.
       await client.query(
         `update solicitudes set id_prometeo = $1 where id_prometeo = $2 and campana = $3`,
         [idPrincipal, idSecundario, campanaSecundario]
       );
 
-      // -------------------- 3) solicitudes_cc (CC) --------------------
       await client.query(
         `update solicitudes_cc set id_prometeo = $1, actualizado_en = now()
          where id_prometeo = $2 and campana = $3`,
         [idPrincipal, idSecundario, campanaSecundario]
       );
 
-      // -------------------- 4) leads_pagos --------------------
       const [pagoPrincipal, pagoSecundario] = await Promise.all([
         client.query(`select * from leads_pagos where id_prometeo = $1 and campana = $2`, [
           idPrincipal,
@@ -204,7 +189,6 @@ export async function unifyIds(client: Client, body: JsonBody) {
         }
       }
 
-      // -------------------- 5) eliminar el secundario de `leads` --------------------
       await client.query(`delete from leads where id_prometeo = $1 and campana = $2`, [
         idSecundario,
         campanaSecundario,

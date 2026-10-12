@@ -1,13 +1,8 @@
-// ================================================================
-// DUPLICADOS SUGERIDOS - Detecta candidatos a unificar reutilizando
-// la misma búsqueda de Unificar IDs (por DNI, con celular de respaldo)
-// ================================================================
 import { COLUMNAS } from '../core/constants.js';
 import { buscarLeads } from './unificar-core.js';
 
 const cache = new Map();
 
-// ===== Normalización =====
 function normalizarDigitos(v) {
     return String(v || '').replace(/\D/g, '');
 }
@@ -15,12 +10,11 @@ function normalizarDigitos(v) {
 function normalizarTexto(v) {
     return String(v || '')
         .toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quita tildes
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         .replace(/\s+/g, ' ')
         .trim();
 }
 
-// ===== Similitud de nombres (distancia de Levenshtein normalizada) =====
 function distanciaLevenshtein(a, b) {
     const m = a.length, n = b.length;
     if (m === 0) return n;
@@ -46,16 +40,15 @@ function similitudNombres(a, b) {
     return 1 - distanciaLevenshtein(s1, s2) / maxLen;
 }
 
-const UMBRAL_NOMBRE = 0.8; // 80% de similitud mínima
+const UMBRAL_NOMBRE = 0.8;
 
-// ===== Búsqueda de duplicados =====
 export async function buscarDuplicados({ idPrometeo, dni, celular, nombre }) {
     const criterios = [];
     if (dni) criterios.push({ tipo: 'dni', valor: dni, motivo: 'Mismo DNI' });
     if (celular) criterios.push({ tipo: 'celular', valor: celular, motivo: 'Mismo celular' });
     if (nombre) criterios.push({ tipo: 'nombre', valor: nombre, motivo: 'Nombre similar' });
 
-    const mapa = new Map(); // id -> { data, motivos: Set }
+    const mapa = new Map();
 
     for (const c of criterios) {
         const cacheKey = `${c.tipo}:${c.valor}`;

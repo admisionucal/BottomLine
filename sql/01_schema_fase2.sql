@@ -1,17 +1,10 @@
--- ============================================================
--- FASE 2: Usuarios + Asistencia + Sesiones
--- Correr esto una vez en el SQL Editor de Supabase
--- ============================================================
-
--- ---------- USUARIOS ----------
--- Reemplaza la hoja "USUARIOS" de tu Sheet principal.
 create table if not exists usuarios (
-  usuario       text primary key,          -- login, ej. "jperez"
-  password_hash text not null,             -- sha256 hex (mismo algoritmo que ya usas)
-  nombre        text not null default '',  -- nombre completo
-  nombre_aux    text default '',           -- nombre corto/display, si existe
-  rol           text not null,             -- SUPERVISOR | ASESOR | ADMISION
-  campana       text default '',           -- "26.2,27.1" o "todas"
+  usuario       text primary key,
+  password_hash text not null,
+  nombre        text not null default '',
+  nombre_aux    text default '',
+  rol           text not null,
+  campana       text default '',
   cargo         text default '',
   dni           text default '',
   email         text default '',
@@ -20,20 +13,15 @@ create table if not exists usuarios (
   actualizado_en timestamptz not null default now()
 );
 
--- Login case-insensitive, igual que tu lógica actual con .toLowerCase()
 create unique index if not exists idx_usuarios_usuario_lower
   on usuarios (lower(usuario));
 
--- ---------- LOGIN: intentos fallidos / bloqueo ----------
--- Reemplaza el uso de CacheService para el bloqueo de 5 intentos / 60s.
 create table if not exists login_intentos (
-  usuario_norm  text primary key,   -- usuario en minúsculas
+  usuario_norm  text primary key,
   intentos      int not null default 0,
   bloqueado_hasta timestamptz
 );
 
--- ---------- SESIONES ----------
--- Reemplaza CacheService.getScriptCache() para las sesiones (9 horas).
 create table if not exists sesiones (
   token       text primary key,
   usuario     text not null,
@@ -46,8 +34,6 @@ create table if not exists sesiones (
 
 create index if not exists idx_sesiones_expira on sesiones (expira_en);
 
--- ---------- ASISTENCIA ----------
--- Reemplaza la hoja "Asistencia" del spreadsheet externo (ASISTENCIA_SPREADSHEET_ID).
 create table if not exists asistencia (
   id            bigserial primary key,
   usuario       text not null,
@@ -56,7 +42,7 @@ create table if not exists asistencia (
   campana       text default '',
   cargo         text default '',
   dni           text default '',
-  entrada       text default '',   -- se guarda como texto "HH:mm:ss", igual que hoy
+  entrada       text default '',
   almuerzo      text default '',
   regreso       text default '',
   salida        text default '',
@@ -70,7 +56,6 @@ create table if not exists asistencia (
   tipo          text default '',
   actualizado_en timestamptz not null default now(),
 
-  -- Un solo registro por usuario y día (equivale a tu indexMap "usuario||fecha")
   unique (usuario, fecha)
 );
 

@@ -6,8 +6,6 @@ export async function searchLeads(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
 
-  // La búsqueda no está limitada a una campaña — la unificación ya
-  // no exige que principal y secundarios estén en la misma campaña.
   const campanaUnica = String(body.campana || '').trim();
   const campanasExplicitas: string[] = Array.isArray(body.campanas)
     ? body.campanas.map((c: any) => String(c).trim()).filter(Boolean)
@@ -27,8 +25,6 @@ export async function searchLeads(client: Client, body: JsonBody) {
   const columna = columnaPorTipo[searchType];
   if (!columna) return jsonError('searchType inválido.');
 
-  // A diferencia de Sheets, aquí no hace falta buscar por separado en "base"
-  // y en "bottom": los leads que solo existen por referencia
   let where = `${columna} ilike '%' || $1 || '%'`;
   const params: any[] = [searchValue];
 

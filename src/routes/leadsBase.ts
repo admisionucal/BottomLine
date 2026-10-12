@@ -1,7 +1,6 @@
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 
-// Mismo mapeo que usamos en el script manual de migración (migrar_leads.js).
 const MAPEO_LEADS: Record<string, string> = {
   'ID PROMETEO': 'id_prometeo',
   'NOMBRES': 'nombres',
@@ -25,9 +24,6 @@ const MAPEO_LEADS: Record<string, string> = {
   '# DE VPs DIF TI INTE': 'vps_dif_ti_inte',
 };
 
-// Este endpoint se llama en varios lotes (chunks) desde Apps Script para un
-// mismo import diario. `esUltimoChunk` indica cuándo ya se mandaron todas
-// las filas, para recién ahí marcar en_base=false a los IDs que no vinieron.
 export async function actualizarLeadsBase(client: Client, body: JsonBody, env: Env) {
   if (!env.IMPORT_SECRET || body.secret !== env.IMPORT_SECRET) {
     return jsonError('No autorizado.', 401);
@@ -37,7 +33,6 @@ export async function actualizarLeadsBase(client: Client, body: JsonBody, env: E
   const filas = Array.isArray(body.filas) ? body.filas : [];
   if (!campana) return jsonError('Falta campaña.');
 
-  // La migración diaria solo corre para campañas activas.
   const campanaRes = await client.query(`select activa from campanas where codigo = $1`, [campana]);
   if (campanaRes.rows[0]?.activa !== true) {
     return jsonError(`La campaña "${campana}" no está activa; no se migran leads.`);
@@ -86,16 +81,11 @@ export async function actualizarLeadsBase(client: Client, body: JsonBody, env: E
       );
       procesados++;
     } catch (e: any) {
-      // Ya no lo tragamos en silencio: lo dejamos en el log para poder
-      // diagnosticar si algo vuelve a fallar.
       console.log(`Error insertando lead ${idPrometeo}: ${e.message}`);
       if (!primerError) primerError = `ID ${idPrometeo}: ${e.message}`;
     }
   }
 
-  // Guardamos temporalmente los IDs vistos hoy para esta campaña, en una
-  // tabla auxiliar simple, para poder comparar al final (último chunk)
-  // sin tener que mandar TODOS los IDs de golpe en un solo request gigante.
   if (idsDeEsteLote.length > 0) {
     await client.query(
       `insert into import_base_seen (campana, id_prometeo, fecha)
@@ -119,7 +109,6 @@ export async function actualizarLeadsBase(client: Client, body: JsonBody, env: E
     );
     marcadosAusentes = result.rowCount || 0;
 
-    // Limpieza: ya no necesitamos el registro de "vistos hoy" de este día.
     await client.query(`delete from import_base_seen where campana = $1 and fecha = current_date`, [campana]);
   }
 

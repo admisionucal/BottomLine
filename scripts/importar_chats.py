@@ -33,18 +33,13 @@ import re
 import sys
 import unicodedata
 
-# ----------------------------------------------------------------------
-# 1. LECTURA DE FORMATOS
-# ----------------------------------------------------------------------
 
 LRM = "\u200e"
 
-# Android:  18/5/2026, 8:42 p. m. - Nombre: texto
 RE_ANDROID = re.compile(
     r"^(\d{1,2}/\d{1,2}/\d{2,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?\s*[ap]\.?\s?m\.?)\s+-\s+(.*)$",
     re.IGNORECASE,
 )
-# iPhone:   [4/06/26, 11:10:12 a. m.] Nombre: texto   |   [10/1/26, 9:45:49 AM] Tú: texto
 RE_IOS = re.compile(
     r"^\[(\d{1,2}/\d{1,2}/\d{2,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?\s?m\.?|AM|PM)?)\]\s+(.*)$",
     re.IGNORECASE,
@@ -91,11 +86,10 @@ def leer_mensajes(ruta):
             elif resto.endswith(":"):
                 remitente, texto = resto[:-1], ""
             else:
-                remitente, texto = "", resto  # línea de sistema sin remitente
+                remitente, texto = "", resto
             actual = [remitente.strip(), texto]
         elif actual is not None:
             actual[1] += "\n" + linea
-        # líneas antes del primer mensaje (encabezados) se ignoran
     if actual:
         mensajes.append(actual)
 
@@ -132,9 +126,6 @@ def normalizar_adjuntos(t):
     return t
 
 
-# ----------------------------------------------------------------------
-# 2. ROLES (quién es asesor y quién es lead)
-# ----------------------------------------------------------------------
 
 PISTAS_ASESOR = re.compile(r"\b(ucal|asesor[a]?|te saluda|universidad de ciencias|asesora educativa|asesor educativo)\b", re.IGNORECASE)
 
@@ -163,9 +154,6 @@ def asignar_roles(mensajes, asesor_archivo):
     return roles
 
 
-# ----------------------------------------------------------------------
-# 3. METADATOS DESDE EL NOMBRE DEL ARCHIVO Y EL CONTENIDO
-# ----------------------------------------------------------------------
 
 CARRERAS = [
     "Arquitectura de Interiores",
@@ -237,7 +225,6 @@ def detectar_carrera(texto_total, etiqueta):
         n = plano.count(sin_tildes(c.lower()))
         if n:
             conteo[c] = n
-    # "Arquitectura" también aparece dentro de "Arquitectura de Interiores"
     if "Arquitectura" in conteo and "Arquitectura de Interiores" in conteo:
         conteo["Arquitectura"] -= conteo["Arquitectura de Interiores"]
         if conteo["Arquitectura"] <= 0:
@@ -303,9 +290,6 @@ def nivel_interaccion(prom_palabras):
     return "muy_cortante"
 
 
-# ----------------------------------------------------------------------
-# 4. ANONIMIZACIÓN
-# ----------------------------------------------------------------------
 
 PALABRAS_NO_NOMBRE = {
     "chat", "whatsapp", "con", "asesor", "asesora", "universidad", "ucal", "conva", "cova", "cpa", "semi",
@@ -344,7 +328,6 @@ def tokens_nombre(texto):
 
 
 def anonimizar(texto, nombres_lead, nombres_asesor):
-    # 1) Líneas que son solo un nombre completo en mayúsculas (respuesta a "NOMBRES Y APELLIDOS:")
     lineas = []
     for linea in texto.split("\n"):
         l = linea.strip()
@@ -354,13 +337,11 @@ def anonimizar(texto, nombres_lead, nombres_asesor):
             linea = "[NOMBRE COMPLETO]"
         lineas.append(linea)
     t = "\n".join(lineas)
-    # 2) Datos de contacto
     t = RE_EMAIL.sub("[EMAIL]", t)
     t = RE_URL.sub("[ENLACE]", t)
     t = RE_TEL.sub("[TELÉFONO]", t)
     t = RE_DNI.sub("[DNI]", t)
     t = RE_ARROBA.sub("[USUARIO]", t)
-    # 3) Nombres conocidos del asesor y del lead
     for n in sorted(nombres_asesor, key=len, reverse=True):
         t = re.sub(r"\b" + re.escape(n) + r"\b", "[ASESOR]", t, flags=re.IGNORECASE)
     for n in sorted(nombres_lead, key=len, reverse=True):
@@ -369,9 +350,6 @@ def anonimizar(texto, nombres_lead, nombres_asesor):
     return t
 
 
-# ----------------------------------------------------------------------
-# 5. PROCESO PRINCIPAL
-# ----------------------------------------------------------------------
 
 
 def procesar_archivo(ruta):
@@ -403,7 +381,6 @@ def procesar_archivo(ruta):
         mensajes.append({"r": roles.get(rem, "lead"), "t": anonimizar(t, nombres_lead, nombres_asesor)})
 
     texto_total = "\n".join(m["t"] for m in mensajes)
-    # Las etiquetas (DGP, CONVA, +2, CPA...) vienen en el nombre del contacto
     marcas = " ".join([contacto] + [rem for rem, rol in roles.items() if rol == "lead"])
     lead_txt = [m["t"] for m in mensajes if m["r"] == "lead" and not m["t"].startswith("[")]
     palabras = [len(x.split()) for x in lead_txt]
@@ -473,7 +450,7 @@ def main():
     for f in archivos:
         try:
             chat, motivo = procesar_archivo(os.path.join(carpeta, f))
-        except Exception as e:  # un archivo raro no debe frenar al resto
+        except Exception as e:
             chat, motivo = None, f"error: {e}"
         if not chat:
             resumen.append([f, "OMITIDO", motivo, "", "", "", "", "", ""])
@@ -488,7 +465,6 @@ def main():
             chat["n_mensajes_lead"], "sí" if chat["telefono"] else "no",
         ])
 
-    # Borrar salidas anteriores para no mezclar corridas
     for f in os.listdir(salida):
         if f.startswith("14_seed_chats_parte") and f.endswith(".sql"):
             os.remove(os.path.join(salida, f))

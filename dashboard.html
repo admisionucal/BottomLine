@@ -12,7 +12,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        /* Estilos específicos del dashboard */
         .container { width: 98%; max-width: 2000px; margin: 0 auto; padding: 10px 0; }
 
         .table-controls-sticky {
@@ -26,7 +25,6 @@
             transform: translateY(-100%);
         }
 
-        /* Campaña + Actualizar + Exportar (barra del Bottom Line) */
         .bl-acciones { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
         .bl-campana { min-width: 90px; }
         .bl-campana .multiselect-btn { font-size: 12px; line-height: 15px; padding: 4px 24px 4px 10px; border: 1px solid var(--color-primary);
@@ -128,7 +126,6 @@
             transition: opacity 0.4s ease;
         }
 
-        /* Badge de notificaciones */
         .cal-trigger-badge {
             background: var(--color-accent);
             color: white;
@@ -158,25 +155,20 @@
 </head>
 <body>
     <div class="app-shell">
-        <!-- Sidebar se inyecta dinámicamente -->
         <aside class="sidebar" id="sidebar"></aside>
         <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
         <div class="main-area">
-            <!-- Header se inyecta dinámicamente -->
             
             <div class="container">
-                <!-- ===== VISTA: USUARIO ===== -->
                 <div class="view" id="view-usuario">
                     <div class="loading" id="view-usuario-loading">Cargando perfil…</div>
                 </div>
 
-                <!-- ===== VISTA: ASISTENCIA ===== -->
                 <div class="view" id="view-asistencia" style="display:none;">
                     <div class="loading" id="view-asistencia-loading">Cargando módulo de asistencia…</div>
                 </div>
 
-                <!-- ===== VISTA: CALENDARIO DE PPs ===== -->
                 <div class="view" id="view-calendario" style="display:none;">
                     <div class="cal-page-card">
                         <div class="cal-page-header">
@@ -200,27 +192,22 @@
                     </div>
                 </div>
 
-                <!-- ===== VISTA: UNIFICAR IDS ===== -->
                 <div class="view" id="view-unificar" style="display:none;">
                     <div class="loading" id="view-unificar-loading">Cargando módulo de Unificar IDs…</div>
                 </div>
 
-                <!-- ===== VISTA: CONDICIONES COMERCIALES ===== -->
                 <div class="view" id="view-cc" style="display:none;">
                     <div class="loading" id="view-cc-loading">Cargando módulo de Condiciones Comerciales…</div>
                 </div>
 
-                <!-- ===== VISTA: EVALUACIONES ===== -->
                 <div class="view" id="view-evaluaciones" style="display:none;">
                     <div class="loading" id="view-evaluaciones-loading">Cargando Evaluaciones…</div>
                 </div>
 
-                <!-- ===== VISTA: RESULTADOS ===== -->
                 <div class="view" id="view-resultados" style="display:none;">
                     <div class="loading" id="view-resultados-loading">Cargando Resultados…</div>
                 </div>
 
-                <!-- ===== VISTA: PLACEHOLDER ===== -->
                 <div class="view" id="view-capacitacion" style="display:none;">
                     <div class="loading" id="view-capacitacion-loading">Cargando Capacitación IA…</div>
                 </div>
@@ -233,7 +220,6 @@
                     </div>
                 </div>
 
-                <!-- VISTA: BOTTOM LINE -->
                 <div class="view" id="view-bottomline" style="display:none;">
                     <div class="table-wrapper">
                         <div class="table-controls-sticky" id="tableControlsSticky">
@@ -274,11 +260,6 @@
                             </div>
                         </div>
 
-                        <!-- Panel de Filtros: fuera del contenedor sticky a propósito.
-                             Vive en flujo normal justo debajo del toolbar (que es lo
-                             único que queda fijo/auto-oculto arriba) y empuja la
-                             tabla hacia abajo al abrirse, en vez de quedar pegado
-                             mientras los datos se deslizan y se sobreponen. -->
                         <div class="filtros-panel" id="navFiltrosPanel">
                             <div class="filters" id="filtersContainer">
                                 <div class="filter-group">
@@ -330,7 +311,6 @@
                     </div>
                 </div>
 
-                <!-- VISTA: INDICADORES -->
                 <div class="view" id="view-indicadores" style="display:none;">
                     <div class="ind-toolbar">
                         <div class="ind-header-row">
@@ -352,7 +332,6 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- Mismo orden/estilo que los Filtros del Dashboard (grid de 3 en 3) -->
                         <div class="filters" id="indFiltersContainer">
                             <div class="filter-group"><label class="filter-label">PROGRAMA</label><div class="multiselect" id="indFilterPrograma"></div></div>
                             <div class="filter-group"><label class="filter-label">MODALIDAD DE INGRESO</label><div class="multiselect" id="indFilterIngreso"></div></div>
@@ -378,7 +357,6 @@
                     </div>
                 </div>
             
-                <!-- VISTA: CONFIGURACIONES -->
                 <div class="view" id="view-configuracion" style="display:none;">
                     <div class="loading" id="view-configuracion-loading">Cargando Configuración…</div>
                 </div>

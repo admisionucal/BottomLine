@@ -1,8 +1,3 @@
--- ============================================================
--- SOLICITUDES_CC: espejo de lectura de la hoja SOLICITUDES_CC.
--- Las escrituras siguen ocurriendo en Apps Script (Drive/Gmail están ahí),
--- que hace dual-write hacia esta tabla en cada cambio de estado.
--- ============================================================
 create table if not exists solicitudes_cc (
   id_solicitud    text primary key,
   fecha_solicitud timestamptz,

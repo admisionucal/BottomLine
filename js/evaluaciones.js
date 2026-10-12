@@ -1,20 +1,9 @@
-// ================================================================
-// EVALUACIONES - "Usuarios > Evaluaciones"
-// ASESOR: resuelve sus evaluaciones asignadas.
-// SUPERVISOR / ADMISION: visualiza el avance del equipo (solo lectura;
-// el detalle fino vive en "Usuarios > Resultados"). ADMISION además
-// puede editar la ventana de fechas y a qué asesores está asignada
-// cada evaluación.
-// ================================================================
-
-import { API_URL, ROLES, esRolSupervisorOAdmision } from '../core/constants.js';
-import { getCurrentUser, getSessionToken, escapeHtml, formatearFecha } from '../core/utils.js';
+import { API_URL, esRolSupervisorOAdmision } from '../core/constants.js';
+import { getCurrentUser, getSessionToken, escapeHtml } from '../core/utils.js';
 import { Sidebar } from '../core/components.js';
 
 let modoEmbebido = false;
 
-// Cache de asesores activos (usuario/nombre/campaña) para no repetir la
-// llamada cada vez que se abre el editor de asignación de una tarjeta.
 let __asesoresCache = null;
 
 async function callAPI(action, data = {}) {
@@ -33,7 +22,6 @@ async function callAPI(action, data = {}) {
 
 document.addEventListener('DOMContentLoaded', () => initEvaluaciones());
 
-// Punto de entrada cuando se embebe dentro de dashboard.html
 window.initEvaluacionesEmbebido = function () {
     initEvaluaciones();
 };
@@ -165,8 +153,6 @@ function renderCardAdmin(ev, puedeEditar) {
     `;
 }
 
-// ===== Ventana de disponibilidad (fechas) =====
-
 window.editarVentana = (codigo) => {
     document.getElementById(`ventanaView-${codigo}`).style.display = 'none';
     document.getElementById(`ventanaEdit-${codigo}`).style.display = 'block';
@@ -223,8 +209,6 @@ function renderVentanaTexto(ev) {
     const hasta = ev.activoHasta ? formatearFechaHora(ev.activoHasta) : '—';
     return `Activo: ${desde} → ${hasta} · Duración: ${duracion}`;
 }
-
-// ===== Asignación a asesores concretos =====
 
 function renderAsignacionTexto(ev) {
     if (ev.asignadoANadie) return 'No asignada a nadie';

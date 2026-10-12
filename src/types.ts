@@ -7,8 +7,6 @@ export interface Env {
   SUPABASE_SERVICE_ROLE_KEY: string;
   SUPABASE_STORAGE_BUCKET: string;
   AI: Ai;
-  // Capacitación IA (opcionales): con ANTHROPIC_API_KEY se usa Claude;
-  // sin ella, Workers AI. IA_PROVEEDOR = "workers" fuerza Workers AI.
   ANTHROPIC_API_KEY?: string;
   CLAUDE_MODEL?: string;
   IA_PROVEEDOR?: string;

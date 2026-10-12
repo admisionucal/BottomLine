@@ -1,28 +1,11 @@
-// ================================================================
-// DASHBOARD - Módulo principal de leads
-// ================================================================
+import { API_URL, COLUMNAS, STATUS, STATUS_LABELS, CACHE_KEYS, esRolSupervisorOAdmision } from '../core/constants.js';
 
-import { 
-    API_URL, COLUMNAS, STATUS, STATUS_LABELS, STATUS_CLASES,
-    CACHE_KEYS, SELECT_OPTIONS, PRECIOS_BASE,
-    esRolSupervisorOAdmision, ROLES
-} from '../core/constants.js';
+import { getCurrentUser, getUserCampanas, getSessionToken, cacheGet, cacheSet, escapeHtml, parsearFechaFlexible, fechaAClaveISO, limpiarEspacios, sumarCategoria } from '../core/utils.js';
 
-import {
-    getCurrentUser, getUserCampanas, getSessionToken,
-    cacheGet, cacheSet, cacheRemove,
-    escapeHtml, normalizarTexto, parseNumero,
-    horaAMinutos, minutosAHora, diffHoras, horasLabel,
-    parsearFechaFlexible, fechaAClaveISO, fechaDDMMYYYY, hoyDDMMYYYY,
-    nowPeru, formato12h, parsearHistorial,
-    limpiarEspacios, sumarCategoria
-} from '../core/utils.js';
-
-import { Sidebar, Toast, Modal, createMultiSelect, sortTable, toggleMultiSelect, renderTable } from '../core/components.js';
+import { Sidebar, Toast, createMultiSelect, toggleMultiSelect, renderTable } from '../core/components.js';
 import { buscarDuplicados, limpiarCacheDuplicados } from './duplicados-sugeridos.js';
 import { unificarLeads } from './unificar-core.js';
 
-// ===== ESTADO =====
 let state = {
     leadsRaw: [],
     leadsFiltered: [],
@@ -58,8 +41,6 @@ let state = {
     }
 };
 
-// Config de categorías del calendario: color, label, de qué status viene, y qué campo de fecha usar.
-// Solo SUPERVISOR/ADMISION ven las 4 categorías; el ASESOR solo ve PP Viva.
 const CATEGORIAS_CALENDARIO = {
     viva: { label: 'PP Viva', color: '#0040A1', status: STATUS.PP_VIVA, campoFecha: COLUMNAS.FECHA_COMPROMISO_PAGO },
     muerta: { label: 'PP Muerta', color: '#5e35b1', status: STATUS.PP_MUERTA, campoFecha: COLUMNAS.FECHA_COMPROMISO_PAGO },
@@ -68,9 +49,6 @@ const CATEGORIAS_CALENDARIO = {
     visitaGuiada: { label: 'Visita Guiada', color: '#00897b', campoFecha: COLUMNAS.FECHA_VISITA_GUIADA }
 };
 
-// Categorías visibles/editables según rol. El asesor solo ve PP Viva + Visita
-// Guiada; las otras 3 son admin-only (igual que antes, pero ahora también
-// filtrado en la leyenda, no solo en el mapa).
 const CATEGORIAS_POR_ROL = {
     admin: ['viva', 'muerta', 'pagoCompleto', 'pagoFraccionado', 'visitaGuiada'],
     asesor: ['viva', 'visitaGuiada']
@@ -94,7 +72,6 @@ function calcularColumnasBoleta(lead) {
     };
 }
 
-// ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', async () => {
     const user = getCurrentUser();
     if (!user) {
@@ -102,18 +79,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // Vista inicial: por defecto "Usuario", pero si venimos de otra página
-    // (ej. al volver desde Lead Detail / Unificar IDs / Condiciones
-    // Comerciales vía dashboard.html?view=bottomline) respetamos esa vista.
     const vistaInicial = new URLSearchParams(window.location.search).get('view') || 'usuario';
     const gruposBottomLine = ['bottomline', 'calendario', 'unificar', 'cc'];
     const activaInicial = gruposBottomLine.includes(vistaInicial) ? 'bottomline' : vistaInicial;
-    const subitemPorVista = { bottomline: 'navDashboardBL' };
 
-    // Inyectar Sidebar y Header
-    const sidebar = new Sidebar({ active: activaInicial });
+    new Sidebar({ active: activaInicial });
 
-    // Configurar UI
     setupUI(user);
     if (esRolSupervisorOAdmision(user.rol)) actualizarBadgeCC();
     await loadCampanas(user);
@@ -123,14 +94,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     cargarLeadsIndicadores().catch(() => {});
     await cargarLeadsCalendario();
 
-    // Eventos
     document.getElementById('btnActualizar')?.addEventListener('click', () => loadLeads(true));
     document.getElementById('btnExportar')?.addEventListener('click', exportarExcel);
     document.getElementById('filtrosToggleBtn')?.addEventListener('click', toggleFiltrosPanel);
     document.getElementById('calVpPpToggleBtn')?.addEventListener('click', toggleCalVpPpPanel);
     setupAutoHideToolbar();
 
-    // Mostrar la vista embebida correspondiente
     if (vistaInicial === 'bottomline' && typeof window.mostrarBottomLine === 'function') {
         window.mostrarBottomLine();
     } else if (vistaInicial === 'indicadores' && typeof window.mostrarIndicadores === 'function') {
@@ -148,11 +117,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// La barra de "Filtros / N leads" (+ el panel de filtros si está abierto) se
-// oculta al bajar y reaparece al subir, para maximizar el espacio de la
-// tabla — igual que un navbar que se auto-esconde. No hace nada si el
-// usuario está en otra vista (el elemento solo importa cuando existe y es
-// visible dentro de Bottom Line).
 function setupAutoHideToolbar() {
     const barra = document.getElementById('tableControlsSticky');
     const filtros = document.getElementById('navFiltrosPanel');
@@ -160,15 +124,12 @@ function setupAutoHideToolbar() {
 
     let ultimoScrollY = window.scrollY;
     let ticking = false;
-    const UMBRAL = 8; // px mínimos de movimiento para no titilar con scrolls minúsculos
+    const UMBRAL = 8;
 
     window.addEventListener('scroll', () => {
         if (ticking) return;
         ticking = true;
         requestAnimationFrame(() => {
-            // Con el panel de Filtros abierto no se auto-oculta la barra: evita que
-            // la barra (con transform) y el panel (en flujo normal, debajo) se
-            // disputen el mismo espacio visual mientras el usuario está filtrando.
             if (filtros && filtros.classList.contains('open')) {
                 barra.classList.remove('oculto');
                 ultimoScrollY = window.scrollY;
@@ -181,9 +142,9 @@ function setupAutoHideToolbar() {
 
             if (Math.abs(delta) > UMBRAL) {
                 if (delta > 0 && actual > barra.offsetHeight) {
-                    barra.classList.add('oculto'); // bajando: se esconde
+                    barra.classList.add('oculto');
                 } else {
-                    barra.classList.remove('oculto'); // subiendo: reaparece
+                    barra.classList.remove('oculto');
                 }
                 ultimoScrollY = actual;
             }
@@ -192,9 +153,7 @@ function setupAutoHideToolbar() {
     }, { passive: true });
 }
 
-// ===== CONFIGURACIÓN UI =====
 function setupUI(user) {
-    // Mostrar/ocultar filtros según rol
     const esAdmin = esRolSupervisorOAdmision(user.rol);
     const asesorGroup = document.getElementById('filterAsesorGroup');
     if (!esAdmin && asesorGroup) asesorGroup.style.display = 'none';
@@ -204,15 +163,11 @@ function setupUI(user) {
         const filtersContainer = document.getElementById('filtersContainer');
         if (filtersContainer) filtersContainer.classList.add('cols-4');
 
-        // Asistencia > Marcación: EXCLUSIVA de ASESOR
         const navMarcacion = document.getElementById('navAsistenciaMarcacion');
         if (navMarcacion) navMarcacion.style.display = 'none';
     }
 }
 
-// ===== BUSCADOR (toolbar de Bottom Line) =====
-// Precarga el término restaurado desde caché (ver loadCampanas) y filtra
-// en vivo con un pequeño debounce mientras el usuario escribe.
 function setupBuscador() {
     const input = document.getElementById('dashboardSearchInput');
     if (!input) return;
@@ -229,7 +184,6 @@ function setupBuscador() {
     });
 }
 
-// ===== CAMPANAS =====
 async function loadCampanas(user) {
     const codigos = getUserCampanas();
     const select = document.getElementById('selectCampana');
@@ -244,16 +198,13 @@ async function loadCampanas(user) {
     const configPorCodigo = {};
     (configResult.data || []).forEach(c => { configPorCodigo[c.codigo] = c; });
 
-    // Fecha de hoy en hora de Perú (YYYY-MM-DD)
     const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
 
-    // Todas las activas se pueden filtrar (incluye vencidas), se ven solo como "26.2"
     const activas = codigos
         .map(cod => configPorCodigo[cod])
         .filter(Boolean)
         .filter(c => c.activa);
 
-    // Vigentes = dentro de su periodo, la más antigua primero
     const vigentes = activas
         .filter(c => !c.fechaFinPeriodo || String(c.fechaFinPeriodo).slice(0, 10) >= hoy)
         .sort((a, b) => String(a.fechaInicioPeriodo || '').localeCompare(String(b.fechaInicioPeriodo || '')));
@@ -269,7 +220,6 @@ async function loadCampanas(user) {
         select.appendChild(opt);
     });
 
-    // Solo se restaura la campaña guardada si sigue vigente; si no, va la vigente más antigua
     const saved = cacheGet(CACHE_KEYS.FILTROS_ESTADO);
     if (saved && saved.campana && vigentes.some(c => c.codigo === saved.campana)) {
         select.value = saved.campana;
@@ -326,13 +276,11 @@ function renderCampanaOptions(campanas) {
     }
 }
 
-// ===== FILTRO DE CAMPAÑA DEL CALENDARIO =====
 function setupCalendarioCampanaFiltro(user) {
     const campanas = getCampanasCalendario();
     const grupo = document.getElementById('calCampanaFilterGroup');
     if (!grupo) return;
 
-    // Si el usuario solo tiene una campaña, no hay nada que filtrar.
     if (campanas.length <= 1) {
         grupo.style.display = 'none';
         state.calCampanas = campanas.slice();
@@ -402,7 +350,6 @@ async function cargarLeadsCalendario(forceRefresh = false) {
                 return { campana, leads: data };
             }
         } catch (error) {
-            // Se ignora
         }
         return { campana, leads: [] };
     }));
@@ -415,7 +362,6 @@ async function cargarLeadsCalendario(forceRefresh = false) {
     renderLeyendaCalendario();
 }
 
-// ===== LEADS =====
 async function loadLeads(forceRefresh = false) {
     const user = getCurrentUser();
     const campana = document.getElementById('selectCampana')?.value || state.campana;
@@ -423,7 +369,6 @@ async function loadLeads(forceRefresh = false) {
 
     state.campana = campana;
 
-    // Intentar caché
     const cacheKey = CACHE_KEYS.LEADS_RAW(user.email, user.rol, campana);
     if (!forceRefresh) {
         const cached = cacheGet(cacheKey);
@@ -436,7 +381,6 @@ async function loadLeads(forceRefresh = false) {
         }
     }
 
-    // Cargar desde API
     const container = document.getElementById('tableContainer');
     if (container) container.innerHTML = '<div class="loading">Cargando leads...</div>';
 
@@ -463,14 +407,9 @@ async function loadLeads(forceRefresh = false) {
     }
 }
 
-// ===== FILTROS =====
-// createMultiSelect() (en core/components.js) dispara este evento cada vez que
-// se marca/desmarca una opción o "Todos". Sin este listener, los checkboxes
-// se veían y se podían marcar, pero no pasaba nada: no hay a quién más
-// escucharlo en toda la app.
 window.addEventListener('multiselect-change', (e) => {
     const { key, values, containerId } = e.detail;
-    if (!String(containerId || '').startsWith('filter')) return; // ignora indFilter* y calFilter*
+    if (!String(containerId || '').startsWith('filter')) return;
     const filtroKey = Object.keys(state.filtros).find(k => k.toLowerCase() === key.toLowerCase());
     if (filtroKey) {
         state.filtros[filtroKey] = values;
@@ -485,21 +424,17 @@ function applyFilters() {
     const canal = state.filtros.canal || [];
 
     state.leadsFiltered = state.leadsRaw.filter(lead => {
-        // Filtros multi-select
         if (carrera.length > 0 && !carrera.includes(lead[COLUMNAS.CARRERA] || lead[COLUMNAS.PROGRAMA] || '')) return false;
         if (canal.length > 0 && !canal.includes(canalDeLead(lead))) return false;
         if (ingreso.length > 0 && !ingreso.includes(lead[COLUMNAS.MODALIDAD_INGRESO] || '')) return false;
         if (beneficio.length > 0 && !beneficio.includes(lead[COLUMNAS.BENEFICIO] || '')) return false;
         if (modalidad.length > 0 && !modalidad.includes(lead[COLUMNAS.MODALIDAD] || '')) return false;
-        // Asesor: se filtra/compara por el Nombre crudo (ASESOR_NOMBRE_RAW),
-        // nunca por el Nombre_Aux que se muestra en la tabla.
         if (esAdmin && asesor.length > 0 && !asesor.includes(lead[COLUMNAS.ASESOR_NOMBRE_RAW] || '')) return false;
         if (status.length > 0 && !status.includes(lead[COLUMNAS.STATUS_GESTION] || '')) return false;
         if (perfil.length > 0 && !perfil.includes((lead.PERFILAMIENTO_COMPLETO || {}).estado || '')) return false;
         if (dolorNecesidad.length > 0 && !dolorNecesidad.includes(lead[COLUMNAS.DOLOR_NECESIDAD] || '')) return false;
         if (fechaPrimVpPp.length > 0 && !fechaPrimVpPp.includes(lead[COLUMNAS.FECHA_PRIM_VP_PP] || '')) return false;
 
-        // Búsqueda por texto
         if (state.terminoBusqueda) {
             const id = String(lead[COLUMNAS.ID_PROMETEO] || '').toLowerCase();
             const nombre = String(lead[COLUMNAS.NOMBRES] || '').toLowerCase();
@@ -546,8 +481,6 @@ function populateFilters() {
     createMultiSelect('filterDolorNecesidad', getValues(COLUMNAS.DOLOR_NECESIDAD, 'dolorNecesidad'), state.filtros.dolorNecesidad, 'Todos');
 
     if (esAdmin) {
-        // Value = Nombre crudo (identifica al asesor sin ambigüedad).
-        // Label = Nombre_Aux (lo único que debe verse en pantalla).
         const nombresRaw = getValues(COLUMNAS.ASESOR_NOMBRE_RAW, 'asesor');
         const labelsAsesor = {};
         state.leadsRaw
@@ -597,7 +530,6 @@ function guardarEstadoFiltros() {
     });
 }
 
-// ===== TABLA =====
 function renderTabla() {
     const container = document.getElementById('tableContainer');
     if (!container) return;
@@ -612,7 +544,6 @@ function renderTabla() {
     const end = Math.min(start + state.pageSize, total);
     const pageLeads = state.leadsFiltered.slice(start, end);
 
-    // Actualizar contador
     document.getElementById('leadCount').textContent = `${total} leads`;
 
     if (total === 0) {
@@ -652,7 +583,6 @@ function renderTabla() {
     renderTable('tableContainer', headers, rows);
     revisarDuplicadosVisibles(pageLeads);
 
-    // Sobrescribir evento de clic en ID para usar nuestra función
     container.querySelectorAll('.id-link').forEach(el => {
         el.addEventListener('click', (e) => {
             e.preventDefault();
@@ -852,7 +782,6 @@ function renderPaginacion(totalPages) {
     addBtn('›', state.currentPage + 1, state.currentPage === totalPages);
 }
 
-// ===== EXPORTAR =====
 function exportarExcel() {
     if (state.leadsFiltered.length === 0) {
         alert('No hay datos para exportar');
@@ -864,7 +793,6 @@ function exportarExcel() {
     XLSX.writeFile(wb, `Leads_${state.campana || 'Export'}.xlsx`);
 }
 
-// ===== BADGE CONDICIONES COMERCIALES =====
 async function actualizarBadgeCC() {
     const badge = document.getElementById('ccTriggerBadge');
     if (!badge) return;
@@ -882,7 +810,6 @@ async function actualizarBadgeCC() {
     }
 }
 
-// ===== CALENDARIO =====
 function actualizarCalendario() {
     const user = getCurrentUser();
     const esAdmin = esRolSupervisorOAdmision(user.rol);
@@ -907,7 +834,6 @@ function construirMapaAsesor() {
                 if (fecha) agregar(fechaAClaveISO(fecha), 'viva', lead, campana);
             }
 
-            // Visita Guiada: solo si el lead sigue como VP Viva y la fecha es hoy o futura.
             if (status === STATUS.VP_VIVA) {
                 const fechaVisita = parsearFechaFlexible(lead[COLUMNAS.FECHA_VISITA_GUIADA]);
                 if (fechaVisita && fechaVisita >= hoy) {
@@ -938,14 +864,12 @@ function construirMapaAdmin() {
         (state.calLeadsPorCampana[campana] || []).forEach(lead => {
             const status = lead[COLUMNAS.STATUS_GESTION] || '';
 
-            // Categorías por status: siguen siendo excluyentes entre sí, como antes.
             const catKey = Object.keys(categoriasEstado).find(k => categoriasEstado[k].status === status);
             if (catKey) {
                 const fecha = parsearFechaFlexible(lead[categoriasEstado[catKey].campo]);
                 if (fecha) agregar(fechaAClaveISO(fecha), catKey, lead, campana);
             }
 
-            // Visita Guiada: solo si el lead sigue como VP Viva.
             if (status === STATUS.VP_VIVA) {
                 const fechaVisita = parsearFechaFlexible(lead[COLUMNAS.FECHA_VISITA_GUIADA]);
                 if (fechaVisita && fechaVisita >= hoy) {
@@ -983,7 +907,6 @@ function itemsVisiblesDelDia(clave) {
     return items;
 }
 
-// ===== RENDER DEL CALENDARIO =====
 function cambiarVistaCalendario(vista) {
     state.vistaCalendario = vista;
     const contenido = document.querySelector('#view-calendario .cal-page-content');
@@ -994,8 +917,6 @@ function cambiarVistaCalendario(vista) {
     renderCalendarioPP();
 }
 
-// Leyenda con checkboxes: togglea qué categorías se ven en el grid, en el
-// detalle del día, y en el Excel exportado (todo lee state.categoriasVisibles).
 function renderLeyendaCalendario() {
     const cont = document.getElementById('calLeyenda');
     if (!cont) return;
@@ -1021,7 +942,6 @@ function renderLeyendaCalendario() {
     });
     html += '</div>';
 
-    // NUEVO: si hay más de una campaña activa a la vez, se explica el tono claro/normal.
     const activas = getCalCampanasEfectivas();
     if (activas.length > 1) {
         html += '<div class="cal-leyenda-campanas">';
@@ -1149,7 +1069,6 @@ function cambiarMesCalendario(delta) {
     renderCalendarioPP();
 }
 
-// Vista de año: 12 mini-calendarios a la vez.
 function renderCalendarioAnio(cont) {
     const year = state.calendarioMes.getFullYear();
     const hoyClave = fechaAClaveISO(new Date());
@@ -1254,7 +1173,6 @@ function abrirDetalleDia(claveDia) {
 
     const colspan = (esAdmin ? 9 : 8) + (mostrarCampana ? 1 : 0);
 
-    // Anchos: CARRERA un 10% más ancha que las demás columnas.
     const pesos = ['cat', ...(mostrarCampana ? ['camp'] : []), 'canal', 'id', 'carrera', 'mi', 'mod', 'bol', 'bolm', ...(esAdmin ? ['ase'] : [])]
         .map(k => (k === 'carrera' ? 1.1 : 1));
     const totalPesos = pesos.reduce((a, b) => a + b, 0);
@@ -1362,7 +1280,6 @@ function verDetalleDesdeCalendario(id) {
     verDetalle(id);
 }
 
-// ===== EXPORTAR CALENDARIO =====
 function construirFilasExportCalendario(items, esAdmin, incluirFecha) {
     const mostrarCampana = getCalCampanasEfectivas().length > 1;
     return items.map(({ lead, categoria, campana, fecha }) => {
@@ -1464,7 +1381,7 @@ async function actualizarCalendarioLeads() {
         btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">refresh</span> Actualizando…';
     }
     try {
-        await cargarLeadsCalendario(true); // ignora la caché y vuelve a pedir los leads
+        await cargarLeadsCalendario(true);
     } finally {
         if (btn) {
             btn.disabled = false;
@@ -1487,7 +1404,6 @@ window.exportarCalendarioActual = exportarCalendarioActual;
 window.renderCalendarioPP = renderCalendarioPP;
 window.renderLeyendaCalendario = renderLeyendaCalendario;
 
-// ===== FILTROS PANEL =====
 function toggleFiltrosPanel() {
     const panel = document.getElementById('navFiltrosPanel');
     const btn = document.getElementById('filtrosToggleBtn');
@@ -1496,7 +1412,6 @@ function toggleFiltrosPanel() {
     if (btn) btn.classList.toggle('active', abierto);
 }
 
-// ===== CALENDARIO FILTRO: FECHA PRIM VP/PP =====
 function toggleCalVpPpPanel() {
     const panel = document.getElementById('calVpPpPanel');
     const btn = document.getElementById('calVpPpToggleBtn');
@@ -1528,8 +1443,6 @@ function cambiarMesCalVpPp(delta) {
 }
 window.cambiarMesCalVpPp = cambiarMesCalVpPp;
 
-// Cuenta leads por fecha (YYYY-MM-DD), excluyendo el propio filtro
-// fechaPrimVpPp — mismo patrón en cascada que getValues() en populateFilters().
 function mapaFechasVpPp() {
     const user = getCurrentUser();
     const esAdmin = esRolSupervisorOAdmision(user.rol);
@@ -1547,7 +1460,7 @@ function mapaFechasVpPp() {
 
 function renderCalendarioFiltroVpPp() {
     const panel = document.getElementById('calVpPpPanel');
-    if (!panel || !panel.classList.contains('open')) return; // no perder tiempo si está cerrado
+    if (!panel || !panel.classList.contains('open')) return;
 
     const grid = document.getElementById('calVpPpGrid');
     const label = document.getElementById('calVpPpMesLabel');
@@ -1561,7 +1474,7 @@ function renderCalendarioFiltroVpPp() {
 
     const primerDia = new Date(mes.getFullYear(), mes.getMonth(), 1);
     const ultimoDia = new Date(mes.getFullYear(), mes.getMonth() + 1, 0);
-    const offset = (primerDia.getDay() + 6) % 7; // semana empieza en lunes
+    const offset = (primerDia.getDay() + 6) % 7;
 
     let html = '';
     for (let i = 0; i < offset; i++) html += '<div class="cal-vpp-day vacio"></div>';
@@ -1599,14 +1512,6 @@ function limpiarFiltroCalVpPp() {
 }
 window.limpiarFiltroCalVpPp = limpiarFiltroCalVpPp;
 
-// ================================================================
-// INDICADORES
-// ================================================================
-
-// Orden fijo pedido para la tabla de Status de Gestión (y reutilizado en
-// Cantidad de días para conversión, que también agrupa por status):
-// Blacklist, Perdido, Sin Contacto, Volver a llamar, VP Muerta, VP Viva,
-// PP Muerta, PP Viva, Pago Fraccionado, Pago Completo.
 const ORDEN_STATUS_IND = [
     STATUS.BLACK_LIST,
     STATUS.PERDIDO,
@@ -1630,10 +1535,6 @@ function ordenarStatusInd(statuses) {
     });
 }
 
-// Inserta la celda de Campaña con rowspan SOLO en la primera fila del grupo
-// (las demás filas del mismo grupo no llevan esa celda — el rowspan de la
-// primera fila ya cubre esa columna). Cada fila de `filasDeEstaCamp` debe
-// incluir el marcador {{CAMP_TD}} justo después de la apertura de <tr>.
 function emitirFilasConCampana(filasDeEstaCamp, campana) {
     return filasDeEstaCamp.map((tr, i) => {
         const celda = i === 0
@@ -1643,15 +1544,12 @@ function emitirFilasConCampana(filasDeEstaCamp, campana) {
     }).join('');
 }
 
-// Formatea un % SIN decimales (pedido explícito: "los porcentajes de todas
-// las tablas no deben tener decimales"). Devuelve algo como "37%".
 function pctInd(n, total) {
     if (!total) return '0%';
     return `${Math.round((n / total) * 100)}%`;
 }
 
 async function inicializarIndicadores() {
-    // Usar datos precargados de TODAS las campañas
     if (state.indicadores.leadsPorCampana && Object.keys(state.indicadores.leadsPorCampana).length > 0) {
         poblarFiltrosIndicadores();
         configurarTabsIndicadores();
@@ -1660,7 +1558,6 @@ async function inicializarIndicadores() {
         return;
     }
     
-    // Si no hay datos precargados, cargar ahora
     await cargarLeadsIndicadores();
     poblarFiltrosIndicadores();
     configurarTabsIndicadores();
@@ -1690,12 +1587,10 @@ async function cargarLeadsCampanaIndicadores(campana, forceRefresh = false) {
             return data;
         }
     } catch (error) {
-        // se ignora
     }
     return null;
 }
 
-// Carga los leads de TODAS las campañas activas del usuario
 async function cargarLeadsIndicadores(forceRefresh = false) {
     const user = getCurrentUser();
     if (!user) return;
@@ -1741,9 +1636,6 @@ function configurarTabsIndicadores() {
     state.indicadores.tabsListenerListo = true;
 }
 
-// Aplana state.indicadores.leadsPorCampana (TODAS las campañas activas del
-// usuario) en un solo array. Cada lead ya trae COLUMNAS.CAMPANA (agregada a
-// constants.js).
 function todosLosLeadsIndicadores() {
     return Object.values(state.indicadores.leadsPorCampana || {}).flat();
 }
@@ -1776,9 +1668,6 @@ function poblarFiltrosIndicadores() {
     createMultiSelect('indFilterIngreso', valoresUnicos(COLUMNAS.MODALIDAD_INGRESO, 'ingreso'), state.indicadores.filtros.ingreso, 'Todos');
     createMultiSelect('indFilterModalidad', valoresUnicos(COLUMNAS.MODALIDAD, 'modalidad'), state.indicadores.filtros.modalidad, 'Todas');
 
-    // Asesor: igual que en el Dashboard — value = Nombre crudo (identifica
-    // sin ambigüedad al asesor), label = Nombre corto (ASESOR ULT TIP DF SN
-    // CONTC), que es lo único que debe verse en pantalla.
     const leadsParaAsesor = leadsIndicadoresFiltradosExcluyendo('asesor');
     const nombresRawAsesor = [...new Set(leadsParaAsesor.map(l => String(l[COLUMNAS.ASESOR_NOMBRE_RAW] || '').trim()).filter(Boolean))].sort();
     const labelsAsesor = {};
@@ -1794,7 +1683,6 @@ function poblarFiltrosIndicadores() {
     const desdeLeads = todosLosLeadsIndicadores().map(l => String(l[COLUMNAS.CAMPANA] || '').trim()).filter(Boolean);
     const opcionesCampana = [...new Set([...state.campanasActivas, ...desdeLeads])].sort();
 
-    // Primera carga: solo las vigentes quedan marcadas; las vencidas están disponibles para marcar
     if (state.indicadores.filtros.campana.length === 0 && opcionesCampana.length > 0) {
         const porDefecto = state.campanasVigentes.filter(c => opcionesCampana.includes(c));
         state.indicadores.filtros.campana = porDefecto.length ? porDefecto : opcionesCampana.slice();
@@ -1802,16 +1690,6 @@ function poblarFiltrosIndicadores() {
     createMultiSelect('indFilterCampana', opcionesCampana, state.indicadores.filtros.campana, 'Todas', null, { permitirTodos: false });
 }
 
-// El filtro "Calendario" reemplaza al viejo rango de fechas: mismo estilo y
-// comportamiento que el calendario "Fecha VP/PP" del Dashboard (selección
-// de días puntuales, con conteo de leads por día), pero sobre FECHA HORA DE
-// REGISTRO — el único campo de fecha común a todos los leads sin importar
-// en qué sección de Indicadores caigan.
-// `excluirClave` deja de aplicar ese filtro puntual — se usa para calcular
-// las opciones disponibles de un filtro en función de TODOS LOS DEMÁS
-// (filtros interdependientes/cascada), sin que un filtro se autolimite a lo
-// que ya tiene marcado. Con excluirClave = null se aplican los 6 filtros +
-// el calendario tal como están, que es lo que necesitan las tablas/gráficos.
 function leadsIndicadoresFiltradosExcluyendo(excluirClave) {
     const f = state.indicadores.filtros;
     return todosLosLeadsIndicadores().filter(lead => {
@@ -1836,7 +1714,6 @@ function leadsIndicadoresFiltrados() {
     return leadsIndicadoresFiltradosExcluyendo(null);
 }
 
-// ---- Filtro Calendario (mismo patrón que calVpPp del Dashboard) ----
 function toggleIndCalPanel() {
     const panel = document.getElementById('indCalPanel');
     const btn = document.getElementById('indCalToggleBtn');
@@ -1881,7 +1758,7 @@ function mapaFechasIndCal() {
 
 function renderIndCalendarioFiltro() {
     const panel = document.getElementById('indCalPanel');
-    if (!panel || !panel.classList.contains('open')) return; // no perder tiempo si está cerrado
+    if (!panel || !panel.classList.contains('open')) return;
 
     const grid = document.getElementById('indCalGrid');
     const label = document.getElementById('indCalMesLabel');
@@ -1895,7 +1772,7 @@ function renderIndCalendarioFiltro() {
 
     const primerDia = new Date(mes.getFullYear(), mes.getMonth(), 1);
     const ultimoDia = new Date(mes.getFullYear(), mes.getMonth() + 1, 0);
-    const offset = (primerDia.getDay() + 6) % 7; // semana empieza en lunes
+    const offset = (primerDia.getDay() + 6) % 7;
 
     let html = '';
     for (let i = 0; i < offset; i++) html += '<div class="cal-vpp-day vacio"></div>';
@@ -1921,7 +1798,7 @@ function toggleFechaIndCal(clave) {
     const idx = state.indicadores.filtros.fechaCalendario.indexOf(clave);
     if (idx >= 0) state.indicadores.filtros.fechaCalendario.splice(idx, 1);
     else state.indicadores.filtros.fechaCalendario.push(clave);
-    poblarFiltrosIndicadores(); // cascada: el resto de filtros se recalcula
+    poblarFiltrosIndicadores();
     renderIndicadores();
     renderIndCalendarioFiltro();
 }
@@ -1935,7 +1812,6 @@ function limpiarFiltroIndCal() {
 }
 window.limpiarFiltroIndCal = limpiarFiltroIndCal;
 
-// ---- Utilidades de agrupación jerárquica de fechas (Mes → Semana → Día) ----
 function claveMesInd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 function labelMesInd(d) {
     return mesAnioCorto(d);
@@ -1962,7 +1838,6 @@ function labelSemanaInd(d) {
 }
 function labelDiaInd(d) { return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
 
-// Arma el árbol Mes > Semana > Día para un conjunto de items ya filtrados.
 function construirArbolFechasInd(items, getFecha) {
     const raiz = {};
     items.forEach(item => {
@@ -1986,16 +1861,10 @@ function toggleIndRow(tablaId, clave) {
 }
 window.toggleIndRow = toggleIndRow;
 
-// ---- Sección: Status de Gestión ----
-// "Fecha de status actual" = FECHA_ULT_MODIFICACION (columna real de
-// leads_bottom, expuesta en cada lead vía bottomToUpper en getLeads).
 function fechaStatusActual(lead) {
     return lead[COLUMNAS.FECHA_ULT_MODIFICACION];
 }
 
-// Columnas condicionales, igual que STATUS_CC_COLS en Condiciones Comerciales:
-// solo se muestran (con su cantidad y su %) si tienen al menos 1 lead > 0
-// en el conjunto actualmente filtrado.
 const COLS_PP_VP_PERFIL = [
     { status: STATUS.PP_VIVA, label: 'PPs Vivas' },
     { status: STATUS.VP_VIVA, label: 'VPs Vivas' },
@@ -2003,7 +1872,7 @@ const COLS_PP_VP_PERFIL = [
 
 function render0PerfilamientoResumen(leads) {
     const porCampana = {};
-    const totalesPorStatusPerfil = {}; // decide qué columnas PP/VP Viva mostrar
+    const totalesPorStatusPerfil = {};
 
     leads.forEach(l => {
         const camp = l[COLUMNAS.CAMPANA] || '-';
@@ -2022,8 +1891,6 @@ function render0PerfilamientoResumen(leads) {
         totalesPorStatusPerfil[statusGestion] = (totalesPorStatusPerfil[statusGestion] || 0) + 1;
     });
 
-    // Igual que en CC: se recalcula en cada render, así que las columnas
-    // PPs Vivas / VPs Vivas aparecen o desaparecen solas según los filtros.
     const columnasVisiblesPerfil = COLS_PP_VP_PERFIL.filter(c => (totalesPorStatusPerfil[c.status] || 0) > 0);
 
     function celdasPPVP(porStatus, totalCamp) {
@@ -2068,7 +1935,7 @@ function render0PerfilamientoResumen(leads) {
         filas += emitirFilasConCampana(filasDeEstaCamp, camp);
     });
 
-    const totalColumnas = 4 + columnasVisiblesPerfil.length * 2; // Campaña, Estado, #Leads, % + PP/VP
+    const totalColumnas = 4 + columnasVisiblesPerfil.length * 2;
     if (!filas) filas = `<tr><td colspan="${totalColumnas}" style="text-align:center;color:#888;">Sin datos</td></tr>`;
 
     const headerPPVP = columnasVisiblesPerfil.map(c => `<th>${escapeHtml(c.label)}</th><th>%</th>`).join('');
@@ -2131,7 +1998,7 @@ function render1_2DiasConversion(leads) {
     leads.forEach(l => {
         const fPrim = parsearFechaFlexible(l[COLUMNAS.FECHA_PRIM_VP_PP]);
         const fStatus = parsearFechaFlexible(fechaStatusActual(l));
-        if (!fPrim || !fStatus) return; // solo cuenta si ambas fechas existen
+        if (!fPrim || !fStatus) return;
         const dias = Math.round((fStatus - fPrim) / 86400000);
         if (dias < 0) return;
 
@@ -2180,15 +2047,8 @@ function render1_2DiasConversion(leads) {
         </div>`;
 }
 
-// ---- Sección: Ventas ----
-// Ventas = pagos reales (Pago Completo + Pago Fraccionado). Columnas
-// pedidas: Campaña, Fecha, # de Pagos, % (sobre el total de pagos de la
-// campaña). Agrupación Mes > Semana > Día, igual que el resto de tablas.
 const STATUS_PAGOS = [STATUS.PAGO_COMPLETO, STATUS.PAGO_FRACCIONADO];
 
-// Fecha relevante por lead: Pago Completo usa su fecha de pago, Pago
-// Fraccionado usa su fecha de promesa de pago; si falta, cae a la fecha del
-// status actual.
 function fechaVentaLead(lead) {
     if (lead[COLUMNAS.STATUS_GESTION] === STATUS.PAGO_COMPLETO) {
         return parsearFechaFlexible(lead[COLUMNAS.FECHA_PAGO_COMPLETO]) || parsearFechaFlexible(fechaStatusActual(lead));
@@ -2277,12 +2137,6 @@ function render2Ventas(leads) {
         </div>`;
 }
 
-// ---- Sección: Condiciones Comerciales ----
-// Cruza cada solicitud CC con el lead correspondiente (mismo ID_PROMETEO +
-// campaña) para sacar su status de venta actual. Una columna por cada
-// status del embudo comercial; cada columna trae su propia cantidad y %,
-// SIEMPRE calculado sobre el total de solicitudes de la campaña (no sobre
-// el total de esa columna).
 const STATUS_CC_COLS = [
     { status: STATUS.PAGO_COMPLETO, label: 'Pago Completo' },
     { status: STATUS.PAGO_FRACCIONADO, label: 'Pago Fraccionado' },
@@ -2302,10 +2156,10 @@ function render2CondicionesComerciales(leadsFiltrados) {
     leadsFiltrados.forEach(l => { mapaLeads[`${l[COLUMNAS.ID_PROMETEO]}|${l[COLUMNAS.CAMPANA]}`] = l; });
 
     const porCampana = {};
-    const totalesPorStatus = {}; // para decidir dinámicamente qué columnas mostrar
+    const totalesPorStatus = {};
     (state.solicitudesCC || []).forEach(sol => {
         const clave = `${sol.ID_PROMETEO}|${sol.CAMPANA}`;
-        if (!idsPermitidos.has(clave)) return; // respeta los filtros generales
+        if (!idsPermitidos.has(clave)) return;
         const leadCruzado = mapaLeads[clave];
         const camp = sol.CAMPANA || '-';
         const statusActual = leadCruzado ? (leadCruzado[COLUMNAS.STATUS_GESTION] || '-') : '-';
@@ -2314,17 +2168,10 @@ function render2CondicionesComerciales(leadsFiltrados) {
         totalesPorStatus[statusActual] = (totalesPorStatus[statusActual] || 0) + 1;
     });
 
-    // Columna dinámica: un status solo se muestra (con su "Categoría" y su
-    // "%") si tiene AL MENOS un valor > 0 dentro del conjunto actualmente
-    // filtrado. Se recalcula en cada render, así que aparecen/desaparecen
-    // solas según los filtros activos — Total y Total % siempre visibles.
     const columnasVisibles = STATUS_CC_COLS.filter(c => (totalesPorStatus[c.status] || 0) > 0);
 
     const set = state.indicadores.expandido['indCC'] = state.indicadores.expandido['indCC'] || new Set();
 
-    // Cada status aporta 2 <td>: cantidad y %. Al final siempre van Total y
-    // Total % (ambos calculados sobre totalCamp, igual que el resto de
-    // columnas — consistente con las demás tablas de Indicadores).
     function celdasStatus(items, totalCamp) {
         const celdasPorStatus = columnasVisibles.map(c => {
             const n = items.filter(it => it._statusActual === c.status).length;
@@ -2383,13 +2230,9 @@ function render2CondicionesComerciales(leadsFiltrados) {
 
         filas += emitirFilasConCampana(filasDeEstaCamp, camp);
     });
-    // 2 columnas fijas (Campaña, Fecha) + 2 por cada status visible + 2 de Total.
     const totalColumnas = 2 + columnasVisibles.length * 2 + 2;
     if (!filas) filas = `<tr><td colspan="${totalColumnas}" style="text-align:center;color:#888;">Sin datos</td></tr>`;
 
-    // Cada status visible aporta dos encabezados: su nombre y "%", igual que
-    // pide la estructura de la sección 5 (Campaña | Fecha | Pago Completo |
-    // % | Pago Fraccionado | % | ... | Total | %).
     const headerStatus = columnasVisibles.map(c => `<th>${escapeHtml(c.label)}</th><th>%</th>`).join('');
 
     return `
@@ -2402,41 +2245,27 @@ function render2CondicionesComerciales(leadsFiltrados) {
         </div>`;
 }
 
-// ---- Sección: Perfilamiento ----
-// NOTA: dejo fuera COMENTARIOS_PERFIL y ACCIONES_DEFINIDAS porque son texto
-// libre (no categorías con catálogo), así que no calzan en una tabla
-// Pregunta/#Leads/%. OTRAS_OPCIONES tampoco entra acá: tiene su propia
-// sección especial (tabla + gráfico) más abajo — ver render7OtrasOpciones.
 const PREGUNTAS_PERFIL_IND = [
     { columna: COLUMNAS.DOLOR_NECESIDAD, label: 'Dolor / Necesidad' },
     { columna: COLUMNAS.POR_QUE_ELIGIO_CARRERA, label: '¿Por qué eligió la carrera?' },
     { columna: COLUMNAS.QUE_BUSCA_UNIVERSIDAD, label: '¿Qué busca en una universidad?' },
     { columna: COLUMNAS.QUIEN_FINANCIARA, label: '¿Quién financiará la carrera?' },
-    { columna: COLUMNAS.QUE_LE_FALTA, label: '¿Qué le falta para tomar una decisión?' }, // admite varias opciones separadas por coma
+    { columna: COLUMNAS.QUE_LE_FALTA, label: '¿Qué le falta para tomar una decisión?' },
 ];
 
-// Valor de OTRAS_OPCIONES que dispara los campos dependientes
-// OPCION_INSTITUCION (Instituto/Universidad) y OPCION_NOMBRE_INSTITUCION —
-// mismo valor usado en lead-detail.js (VALOR_OTRAS_OPCIONES_INSTITUCION).
 const VALOR_OTRAS_OPCIONES_INSTITUCION_IND = 'Evaluando otras instituciones';
 const TOP_N_INSTITUCIONES = 5;
 
-// Tabla Pregunta/#Leads/% de "¿Cuáles son sus otras opciones?" (mismo
-// formato que el resto de Perfilamiento), reutilizando renderTablaPerfilInd.
 function renderTablaOtrasOpciones(leads) {
     return renderTablaPerfilInd({ columna: COLUMNAS.OTRAS_OPCIONES, label: '¿Cuáles son sus otras opciones?' }, leads);
 }
 
-// Cruza OPCION_INSTITUCION (tipo: INSTITUTO/UNIVERSIDAD) con
-// OPCION_NOMBRE_INSTITUCION para el gráfico de la sección 7. Solo entran los
-// leads cuya respuesta de OTRAS_OPCIONES es "Evaluando otras instituciones"
-// (los únicos que llenan estos dos campos dependientes).
 function datosInstitutoVsUniversidad(leads) {
     const relevantes = leads.filter(l => limpiarEspacios(l[COLUMNAS.OTRAS_OPCIONES]) === VALOR_OTRAS_OPCIONES_INSTITUCION_IND);
 
     const grupos = { instituto: {}, universidad: {} };
     let totalInstituto = 0, totalUniversidad = 0;
-    let sinNombreInstituto = 0, sinNombreUniversidad = 0; // NUEVO
+    let sinNombreInstituto = 0, sinNombreUniversidad = 0;
 
     relevantes.forEach(l => {
         const tipoCrudo = claveCategoriaLocal(l[COLUMNAS.OPCION_INSTITUCION]);
@@ -2444,11 +2273,11 @@ function datosInstitutoVsUniversidad(leads) {
         if (tipoCrudo.startsWith('instituto')) {
             totalInstituto++;
             if (nombre) sumarCategoria(grupos.instituto, nombre);
-            else sinNombreInstituto++; // NUEVO
+            else sinNombreInstituto++;
         } else if (tipoCrudo.startsWith('universidad')) {
             totalUniversidad++;
             if (nombre) sumarCategoria(grupos.universidad, nombre);
-            else sinNombreUniversidad++; // NUEVO
+            else sinNombreUniversidad++;
         }
     });
 
@@ -2464,9 +2293,6 @@ function datosInstitutoVsUniversidad(leads) {
 
 function claveCategoriaLocal(s) { return limpiarEspacios(s).toLowerCase(); }
 
-// Sección 7: tabla (izquierda) + gráfico Instituto vs. Universidad con su
-// Top 5 (derecha), lado a lado. Va aparte del grid de Perfilamiento (no
-// participa del empaquetado dinámico de la sección 4).
 function filasInstitutoVsUniversidad(topInstituto, topUniversidad, totalInstituto, totalUniversidad, sinNombreInstituto, sinNombreUniversidad) {
     const instFilas = [...topInstituto];
     if (sinNombreInstituto > 0) instFilas.push({ label: 'No seleccionó', total: sinNombreInstituto });
@@ -2526,7 +2352,7 @@ function renderTablaPerfilInd(pregunta, leads) {
     const porCampana = {};
     leads.forEach(l => {
         const valorCrudo = limpiarEspacios(l[pregunta.columna]);
-        if (!valorCrudo) return; // "solo las que se tienen por lo menos 1"
+        if (!valorCrudo) return;
         const camp = l[COLUMNAS.CAMPANA] || '-';
         porCampana[camp] = porCampana[camp] || { total: 0, porValor: {} };
         const valores = pregunta.columna === COLUMNAS.QUE_LE_FALTA
@@ -2539,7 +2365,6 @@ function renderTablaPerfilInd(pregunta, leads) {
     let filas = '';
     Object.keys(porCampana).sort().forEach(camp => {
         const info = porCampana[camp];
-        // Ordenado de mayor a menor por cantidad de leads.
         const valoresOrdenados = Object.values(info.porValor).sort((a, b) => b.total - a.total);
         const filasDeEstaCamp = valoresOrdenados.map(({ label, total: n }) => {
             return `
@@ -2557,7 +2382,7 @@ function renderTablaPerfilInd(pregunta, leads) {
             </tr>`);
         filas += emitirFilasConCampana(filasDeEstaCamp, camp);
     });
-    if (!filas) return ''; // la tabla entera desaparece si nadie respondió esta pregunta
+    if (!filas) return '';
 
     return `
         <div class="card ind-card">
@@ -2569,9 +2394,6 @@ function renderTablaPerfilInd(pregunta, leads) {
         </div>`;
 }
 
-// Distribución dinámica tipo masonry (columnas CSS) — ver .ind-perfil-grid
-// en ui-kit.css. "¿Cuáles son sus otras opciones?" queda afuera de este
-// grid: se arma aparte, como sección de ancho completo (tabla + gráfico).
 function render3Perfilamiento(leads) {
     const tablas = PREGUNTAS_PERFIL_IND.map(p => renderTablaPerfilInd(p, leads)).filter(Boolean);
     const otrasOpciones = render7OtrasOpciones(leads);
@@ -2579,7 +2401,6 @@ function render3Perfilamiento(leads) {
     return `<div class="ind-perfil-grid">${tablas.join('')}${otrasOpciones}</div>`;
 }
 
-// ---- Orquestador ----
 function renderIndicadores() {
     const contStatus = document.getElementById('indTab-status');
     const contVentas = document.getElementById('indTab-ventas');
@@ -2608,8 +2429,6 @@ function renderIndicadores() {
 }
 window.renderIndicadores = renderIndicadores;
 
-
-// ===== UTILITIES =====
 function mostrarUltimaActualizacion() {
     const el = document.getElementById('lastUpdate');
     if (!el || !state.ultimaActualizacion) return;
@@ -2619,7 +2438,6 @@ function mostrarUltimaActualizacion() {
     setTimeout(() => el.style.opacity = '0', 4000);
 }
 
-// ===== API =====
 async function callAPI(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {

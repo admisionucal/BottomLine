@@ -1,7 +1,3 @@
-// ================================================================
-// CC TEMPLATE - Construcción de datos y render del PDF de Condiciones Comerciales
-// ================================================================
-
 import { COLUMNAS } from '../core/constants.js';
 import { escapeHtml, parseNumero, normalizarTexto, getEspecializacionETU } from '../core/utils.js';
 
@@ -28,7 +24,6 @@ function logoSrcCC() {
     return logoDataUri || 'assets/LogoUCALDoc.png';
 }
 
-// Config por campaña
 export const CONFIG_CC = {};
 
 export function setConfigCampanas(porCampana) {
@@ -36,7 +31,6 @@ export function setConfigCampanas(porCampana) {
     Object.assign(CONFIG_CC, porCampana);
 }
 
-// Detecta si el beneficio de primera boleta corresponde a un caso de Referidos
 export function detectarTipoReferido(label) {
     const l = String(label || '').toLowerCase();
     if (l.indexOf('referente') !== -1) return 'REFERENTE';
@@ -44,7 +38,6 @@ export function detectarTipoReferido(label) {
     return null;
 }
 
-// Arma el objeto de datos para el PDF de Condiciones Comerciales
 export function construirDatosCC(lead, campana, overrides = {}) {
     const cfg = CONFIG_CC[campana] || { periodo: campana, perC: campana, inicioClases: '' };
 
@@ -57,16 +50,13 @@ export function construirDatosCC(lead, campana, overrides = {}) {
     d.carrera = overrides.carrera ?? (lead[COLUMNAS.CARRERA] || lead[COLUMNAS.PROGRAMA] || '');
     d.modalidadEstudio = overrides.modalidadEstudio ?? (lead[COLUMNAS.MODALIDAD] || '');
 
-    // ===== TIPO DE ALUMNO (ETU) =====
     d.tipoAlumno = overrides.tipoAlumno ?? (lead[COLUMNAS.TIPO_ALUMNO] || 'ALUMNO REGULAR');
     d.carreraETU = getEspecializacionETU(d.carrera);
     d.programaETU = d.tipoAlumno === 'ALUMNO ETU' && !!d.carreraETU;
 
-    // ===== NÚMERO DE CUOTAS =====
     d.numeroCuotas = overrides.cuotas ?? (lead[COLUMNAS.NUMERO_CUOTAS] || '5 cuotas');
     d.mostrar6Cuotas = d.numeroCuotas === '6 cuotas';
 
-    // Tipo de ingreso
     const modalidadIngresoOverride = overrides.tipoIngresoOverride;
     const modalidadIngreso = String(
         modalidadIngresoOverride !== undefined ? '' : (lead[COLUMNAS.MODALIDAD_INGRESO] || '')
@@ -86,7 +76,6 @@ export function construirDatosCC(lead, campana, overrides = {}) {
                 : 'regular';
     }
 
-    // ===== MATRÍCULA (editable) =====
     const montoMatricula = parseNumero(overrides.montoMatricula ?? lead['MATRICULA_FINAL'] ?? '') || 0;
     d.montoMatricula = montoMatricula;
     if (montoMatricula === 0) {
@@ -100,7 +89,6 @@ export function construirDatosCC(lead, campana, overrides = {}) {
         d.matriDescuentoDetalle = '';
     }
 
-    // ===== EXAMEN DE ADMISIÓN (editable) =====
     const montoExamen = parseNumero(overrides.montoExamen ?? lead['ADMISION_FINAL'] ?? '') || 0;
     d.montoExamen = montoExamen;
     if (montoExamen === 0) {
@@ -114,13 +102,11 @@ export function construirDatosCC(lead, campana, overrides = {}) {
         d.admiDescuentoDetalle = '';
     }
 
-    // ===== ESCALAS (editables) =====
     const escalaRegular = parseNumero(overrides.escalaRegular ?? lead[COLUMNAS.BOLETA] ?? '');
     const escalaFinal = parseNumero(overrides.escalaFinal ?? lead[COLUMNAS.BOLETA_CON_BECA] ?? '');
     d.escalaRegular = escalaRegular;
     d.escalaFinal = escalaFinal;
 
-    // ===== BECA (editable) =====
     const tipoBeca = String(overrides.tipoBeca ?? lead[COLUMNAS.BENEFICIO] ?? '').trim();
     d.tipoBeca = tipoBeca;
     const tipoBecaNormParaMostrar = tipoBeca.toUpperCase();
@@ -135,7 +121,6 @@ export function construirDatosCC(lead, campana, overrides = {}) {
         d.porcentajeBeca = (Math.round(((escalaRegular - escalaFinal) / escalaRegular) * 1000) / 10) + '%';
     }
 
-    // ===== BENEFICIO DE PRIMERA BOLETA (editable) =====
     const rawAdicional = String(overrides.beneficioPrimeraRaw ?? lead[COLUMNAS.BENEFICIO_ADICIONAL] ?? '').trim();
     const [adicValorStr, adicModo, adicLabel] = rawAdicional.split('||');
     const adicValor = Number(adicValorStr || 0);
@@ -144,7 +129,6 @@ export function construirDatosCC(lead, campana, overrides = {}) {
     d.beneficioPrimera = beneficioPrimera;
     const beneficioPrimeraLower = beneficioPrimera.toLowerCase();
 
-    // Comparación por palabras clave
     d.beneficioMostrar = !!beneficioPrimera &&
         beneficioPrimeraLower.indexOf('ninguno') === -1 &&
         beneficioPrimeraLower.indexOf('sin descuento') === -1 &&
@@ -163,7 +147,6 @@ export function construirDatosCC(lead, campana, overrides = {}) {
         d.beneficioTexto = textoDetalleBeneficio(adicValor, adicModo);
     }
 
-    // ===== FINANCIAMIENTO A NUMERO_CUOTAS =====
     d.boleta6C = '';
     d.boleta6CLabel = '';
     if (d.mostrar6Cuotas) {
@@ -182,7 +165,6 @@ export function construirDatosCC(lead, campana, overrides = {}) {
         }
     }
 
-    // ===== Helpers =====
     function calcularBeneficioValor(escalaFinalBase, valor, modo) {
         switch (String(modo || '').trim().toUpperCase()) {
             case 'PORCENTAJE':
@@ -210,22 +192,18 @@ export function construirDatosCC(lead, campana, overrides = {}) {
         return ' Beneficio aplicado por única vez.';
     }
 
-    // ===== CONSIDERACIONES (banderas) =====
     const tipoBecaNorm = tipoBeca.trim().toUpperCase();
     d.mostrarBecaImpacto = tipoBecaNorm === 'BECA IMPACTO';
     d.mostrarBecaPotencia = tipoBecaNorm === 'BECA POTENCIA';
     d.mostrarBecaColaborador = tipoBecaNorm === 'BECA COLABORADOR';
     d.mostrarConsidSP = d.modalidadEstudio === 'Semi-Presencial';
 
-    // Recalibrado contra las etiquetas reales
     d.mostrar50Primera = beneficioPrimeraLower.indexOf('50%') !== -1;
     d.mostrar100Primera = beneficioPrimeraLower.indexOf('reconocemos') !== -1;
     d.mostrarBeneficio500 = beneficioPrimeraLower.indexOf('500') !== -1;
 
-    // ===== HORARIOS (solo Semi-Presencial / Remoto) =====
     d.horarioHTML = construirHorarioHTML(d);
 
-    // ===== VALIDACIÓN MÍNIMA PARA HABILITAR "ENVIAR" =====
     d.datosCompletos = !!(d.nombreCompleto && d.carrera && d.modalidadEstudio && escalaRegular);
 
     return d;
@@ -317,7 +295,6 @@ const CC_ESTILOS_BASE = `
   .header-container img { height:80px; display:inline-block; margin-top:0; }
 `;
 
-// Devuelve el HTML completo del PDF 
 export function renderPlantillaCC(d) {
     return `<!DOCTYPE html>
 <html>
@@ -359,7 +336,6 @@ export function renderPlantillaCC(d) {
 </html>`;
 }
 
-// Devuelve el HTML para la VISTA PREVIA
 export function renderPlantillaCCPreview(d) {
     return `<!DOCTYPE html>
 <html>

@@ -1,23 +1,9 @@
-// ================================================================
-// ASISTENCIA - Módulo de control de asistencia
-// ================================================================
+import { API_URL, esRolSupervisorOAdmision } from '../core/constants.js';
 
-import {
-    API_URL, COLUMNAS, CACHE_KEYS, ROLES, esRolSupervisorOAdmision
-} from '../core/constants.js';
+import { getCurrentUser, getSessionToken, escapeHtml, minutosAHora, diffHoras, horasLabel, fechaDDMMYYYY, hoyDDMMYYYY, nowPeru, formato12h, normalizarUrlFoto, calcularDistanciaMetros } from '../core/utils.js';
 
-import {
-    getCurrentUser, getUserCampanas, getSessionToken,
-    cacheGet, cacheSet,
-    escapeHtml, normalizarTexto, parseNumero,
-    horaAMinutos, minutosAHora, diffHoras, horasLabel,
-    parsearFechaFlexible, fechaAClaveISO, fechaDDMMYYYY, hoyDDMMYYYY,
-    nowPeru, formato12h, normalizarUrlFoto, calcularDistanciaMetros
-} from '../core/utils.js';
+import { Sidebar, startClock, createMultiSelect } from '../core/components.js';
 
-import { Sidebar, Toast, Modal, startClock, createMultiSelect } from '../core/components.js';
-
-// ===== ESTADO =====
 const state = {
     user: null,
     todayRecord: null,
@@ -52,7 +38,6 @@ const state = {
 
 const SEDE = { lat: -12.085641188440665, lng: -76.90846848513861, radio: 100 };
 
-// ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     initAsistencia(urlParams.get('tab') || 'marcacion');
@@ -75,21 +60,14 @@ async function initAsistencia(tab) {
 
     state.user = user;
 
-    // Inyectar Sidebar y Header
     if (!document.querySelector('.sidebar-nav')) {
         new Sidebar({ active: 'asistencia' });
     }
 
-    // Cargar configuración de Asesores
     cargarConfigAsesores();
 
     const esAdmin = esRolSupervisorOAdmision(user.rol);
 
-    // Análisis/Mantenimiento son exclusivos de SUPERVISOR/ADMISION;
-    // Marcación es exclusiva de ASESOR. Calendario es de ambos — cada rol
-    // ve una versión distinta (el ASESOR ve su propio historial/faltas, el
-    // SUPERVISOR/ADMISION ve el resumen del equipo; la diferenciación ya
-    // vive dentro de initPanelCalendario/renderCalendarioAsis*).
     const tabsSoloAdmin = ['analisis', 'mantenimiento'];
     const tabsAsesor = ['marcacion', 'calendario'];
     let tabFinal = tab || (esAdmin ? 'calendario' : 'marcacion');
@@ -216,18 +194,15 @@ async function initPanelMarcacion() {
             </div>
         `;
 
-        // Configurar eventos
         document.getElementById('btnEntrada').addEventListener('click', () => marcar('entrada'));
         document.getElementById('btnAlmuerzo').addEventListener('click', () => marcar('almuerzo'));
         document.getElementById('btnRegreso').addEventListener('click', () => marcar('regreso'));
         document.getElementById('btnSalida').addEventListener('click', () => marcar('salida'));
         document.getElementById('locRow').addEventListener('click', getLocation);
 
-        // Modal
         document.getElementById('modalCancelBtn').addEventListener('click', closeModal);
         document.getElementById('modalConfirmBtn').addEventListener('click', confirmarMarca);
 
-        // Iniciar
         startClock('timeLive', () => {
             toggleLunchButtonsByDay();
             loadTodayRecord();
@@ -341,7 +316,6 @@ async function initPanelMantenimiento() {
     await renderColabCfgLista();
 }
 
-// ===== CONFIGURACIÓN AsesorES =====
 function cargarConfigAsesores() {
     try {
         state.configAsesores = JSON.parse(localStorage.getItem('asis_config_Asesores') || '{}');
@@ -364,7 +338,6 @@ function AsesorActivo(usuario) {
     return u ? u.activo !== false : true;
 }
 
-// ===== MARCACIÓN =====
 async function loadTodayRecord() {
     lockAllBtns();
     try {
@@ -502,7 +475,6 @@ async function ejecutarMarcacion(tipo) {
     btn.disabled = true;
 
     try {
-        // Solo la Entrada exige (y guarda) la ubicación activa.
         if (tipo === 'entrada') await refrescarUbicacion();
         if (tipo === 'entrada' && (!state.location.lat || !state.location.lng)) {
             showToast('Activa tu ubicación para poder marcar la Entrada. Permite el acceso a la ubicación en el navegador e inténtalo de nuevo.', 'err');
@@ -599,9 +571,6 @@ async function ejecutarMarcacion(tipo) {
     }
 }
 
-// ===== GEOLOCALIZACIÓN =====
-// Pide la posición actual antes de cada marcación (hasta 6 s). Sin ubicación
-// no se puede marcar: si el permiso fue denegado se borra la última conocida.
 function refrescarUbicacion() {
     if (!navigator.geolocation) return Promise.resolve();
     return new Promise(resolve => {
@@ -672,7 +641,6 @@ function setLoc(text) {
     if (el) el.textContent = text;
 }
 
-// ===== CALENDARIO =====
 async function cargarRegistrosCalendario() {
     const n = nowPeru();
     state.calAnio = n.getFullYear();
@@ -703,15 +671,13 @@ async function cargarRegistrosCalendario() {
 function normalizarFecha(f) {
     if (!f) return '';
     let s = String(f).trim();
-    if (s.indexOf('T') !== -1) s = s.split('T')[0]; // por si pg devuelve timestamp ISO
+    if (s.indexOf('T') !== -1) s = s.split('T')[0];
     const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`; // YYYY-MM-DD (Supabase) -> DD/MM/YYYY
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
     const p = s.split('/');
     return p.length === 3 ? p[0].padStart(2, '0') + '/' + p[1].padStart(2, '0') + '/' + p[2] : s;
 }
 
-// Color del día según puntualidad: verde = OK, naranja = tardanzas, rojo = mal.
-// Admin ve el promedio del equipo ese día; asesor ve su propio estado.
 function colorEstadoDia(pct) {
     return pct >= 90 ? '#2e7d32' : pct >= 70 ? '#FB923C' : '#d32f2f';
 }
@@ -879,8 +845,6 @@ function irAMesAsis(year, month) {
     cambiarVistaCalendarioAsis('mes');
 }
 
-// Panel lateral: leyenda de colores para admin, resumen mensual para asesor
-// (mismo espacio visual que la leyenda del Calendario de PPs, contenido distinto).
 function renderLeyendaAsis() {
     const cont = document.getElementById('calAsisLeyenda');
     if (!cont) return;
@@ -973,7 +937,6 @@ function verDetalleDia(dia, mes, anio) {
 
     let filas, encabezados;
     if (esAdmin) {
-        // Nombre más ancho; el resto a la mitad. Inicio/Fin/Tiempo en 2 líneas.
         encabezados = `<colgroup><col style="width:34%"><col style="width:13.2%"><col style="width:13.2%"><col style="width:13.2%"><col style="width:13.2%"><col style="width:13.2%"></colgroup>
             <tr><th>Nombre</th><th>Entrada</th><th>Inicio<br>Almuerzo</th><th>Fin de<br>Almuerzo</th><th>Tiempo<br>Almuerzo</th><th>Salida</th></tr>`;
         filas = registros.map((r, i) => {
@@ -1006,11 +969,6 @@ function verDetalleDia(dia, mes, anio) {
     }
     const colspan = esAdmin ? 6 : 5;
 
-    // Modal inyectado directamente al <body> (no a un elemento estático de
-    // asistencia.html): cuando este módulo corre embebido dentro del
-    // Dashboard, sidebar.js solo copia #toast/#confirmModal/#asisApp — cualquier
-    // otro elemento del HTML original se descarta y nunca llegaría al DOM real.
-    // Misma estructura .cal-modal-* que el popup del Calendario de PPs.
     const tablaHtml = `
                     <table>
                         <thead>${esAdmin ? encabezados : `<tr>${encabezados}</tr>`}</thead>
@@ -1060,12 +1018,9 @@ function cerrarDetalleDia() {
     state.diaAsisSeleccionado = null;
 }
 
-// ===== MAPA DE MARCACIONES (detalle del día, Supervisor/Admisión) =====
-// Se muestra la ubicación de la Entrada de cada persona (r.lat / r.lng).
 let mapaDiaAsis = null;
 let leafletCargando = null;
 
-// Solo se guarda la ubicación de la Entrada (r.lat / r.lng).
 const MARCAS_GEO = [
     { campo: 'entrada', etiqueta: 'Entrada', corto: 'E' },
 ];
@@ -1081,7 +1036,7 @@ function ubicacionesPersona(r) {
     const lista = [];
     MARCAS_GEO.forEach(mk => {
         const src = { lat: r.lat, lng: r.lng, direccion: r.direccion };
-        if (!r[mk.campo]) return; // solo marcaciones realizadas
+        if (!r[mk.campo]) return;
         const p = puntoGeo(src.lat, src.lng);
         if (p) lista.push({ ...p, ...mk, hora: r[mk.campo], direccion: src.direccion || '' });
     });
@@ -1150,7 +1105,7 @@ async function pintarMapaDia(registros) {
         cont.innerHTML = `<div class="loading" style="color:#d32f2f;">${escapeHtml(e.message)}</div>`;
         return;
     }
-    if (!document.getElementById('asisDiaMapa')) return; // se cerró el modal mientras cargaba
+    if (!document.getElementById('asisDiaMapa')) return;
     cont.innerHTML = '';
 
     if (mapaDiaAsis) { mapaDiaAsis.remove(); mapaDiaAsis = null; }
@@ -1161,7 +1116,6 @@ async function pintarMapaDia(registros) {
         attribution: '&copy; OpenStreetMap',
     }).addTo(mapa);
 
-    // Origen (sede) y radio de aceptación
     L.circle([SEDE.lat, SEDE.lng], { radius: SEDE.radio, color: '#0040A1', weight: 2, fillColor: '#0040A1', fillOpacity: 0.08 }).addTo(mapa);
     L.circleMarker([SEDE.lat, SEDE.lng], { radius: 7, color: '#ffffff', weight: 2, fillColor: '#0040A1', fillOpacity: 1 })
         .bindTooltip(`Sede UCAL · radio ${SEDE.radio} m`).addTo(mapa);
@@ -1188,7 +1142,6 @@ async function pintarMapaDia(registros) {
     else mapa.setView([SEDE.lat, SEDE.lng], 17);
     setTimeout(() => mapa.invalidateSize(), 50);
 
-    // Clic en una fila: centra el mapa en esa persona
     document.querySelectorAll('#calDetalleModal .asis-fila-geo').forEach(tr => {
         tr.addEventListener('click', () => {
             document.querySelectorAll('#calDetalleModal .asis-fila-geo').forEach(x => x.classList.remove('activa'));
@@ -1205,7 +1158,6 @@ async function pintarMapaDia(registros) {
 window.verDetalleDia = verDetalleDia;
 window.cerrarDetalleDia = cerrarDetalleDia;
 
-// ===== EXPORTAR CALENDARIO DE ASISTENCIA (mismo patrón que Calendario de PPs) =====
 function filasExportAsis(registros, esAdmin, incluirFecha) {
     return registros.map(({ registro, fecha }) => {
         const fila = {};
@@ -1241,7 +1193,7 @@ async function exportarDiaAsisExcel() {
 function recolectarRegistrosAsisPorPrefijo(mesNum, anio) {
     let items = [];
     Object.keys(state.registrosCalendario).forEach(fechaStr => {
-        const [d, m, y] = fechaStr.split('/');
+        const [, m, y] = fechaStr.split('/');
         if (Number(y) !== anio) return;
         if (mesNum !== null && Number(m) - 1 !== mesNum) return;
         (state.registrosCalendario[fechaStr] || []).filter(r => r.entrada && AsesorActivo(r.usuario)).forEach(registro => {
@@ -1320,7 +1272,6 @@ function estadoDiaAsesor(registro, fecha, esHoyOAnterior) {
     return null;
 }
 
-// ===== UTILITIES =====
 function showToast(msg, type = 'info') {
     const el = document.getElementById('toast');
     if (!el) return;
@@ -1337,7 +1288,6 @@ async function getIP() {
     } catch { return '0.0.0.0'; }
 }
 
-// ===== EMPLEADOS (cache compartido entre Análisis / Mantenimiento) =====
 async function ensureEmpleadosCache() {
     if (state.empleadosCache.length) return true;
     try {
@@ -1376,9 +1326,6 @@ function filtrarEmpleadosAnalisis() {
     target.innerHTML = opts;
 }
 
-// XLSX ya se carga siempre desde el <head> (tanto en dashboard.html embebido
-// como en asistencia.html standalone), pero se deja este resguardo por si
-// alguna vez se accede a este panel desde una página que no lo cargue.
 let xlsxCargando = null;
 function ensureXLSX() {
     if (typeof XLSX !== 'undefined') return Promise.resolve();
@@ -1394,10 +1341,6 @@ function ensureXLSX() {
     return xlsxCargando;
 }
 
-// ===== ANÁLISIS =====
-// Chart.js no llega gratis cuando este panel corre embebido en el Dashboard
-// SPA (dashboard.html no lo carga en el <head>, solo asistencia.html
-// standalone lo hace) — se carga on-demand la primera vez que se entra aquí.
 let chartJsCargando = null;
 function ensureChartJs() {
     if (typeof Chart !== 'undefined') return Promise.resolve();
@@ -1546,7 +1489,6 @@ async function cargarAnalisis(forzarRecarga = false) {
     }
 }
 
-// ===== MANTENIMIENTO =====
 const DIAS_CFG = [{ dow: 1, lbl: 'Lun' }, { dow: 2, lbl: 'Mar' }, { dow: 3, lbl: 'Mié' }, { dow: 4, lbl: 'Jue' }, { dow: 5, lbl: 'Vie' }, { dow: 6, lbl: 'Sáb' }];
 
 async function renderColabCfgLista() {
@@ -1585,7 +1527,7 @@ async function ensureCampanasDisponibles() {
         return true;
     } catch (e) {
         state.campanasDisponibles = [];
-        return true; // no bloquea el render de la tabla, solo el multiselect queda "Sin datos"
+        return true;
     }
 }
 
@@ -1657,10 +1599,8 @@ async function guardarCampanasAsesor(usuario, campanas) {
     }
 }
 
-// Exponer al scope global: se invocan desde onclick="" en HTML generado dinámicamente.
 window.toggleColabActivo = toggleColabActivo;
 
-// ===== API =====
 async function callAPI(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {

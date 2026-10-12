@@ -2,23 +2,6 @@ import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 import { exigirSesion } from '../lib/session';
 
-// ================================================================
-// EVALUACIONES
-// ================================================================
-//
-// Una evaluación puede estar "asignada a todos" (comportamiento de
-// siempre: cualquier ASESOR activo la ve y puede resolverla) o
-// "asignada a algunos" (solo los usuarios que aparecen en
-// evaluacion_asignaciones para esa evaluación).
-//
-// Regla: si evaluacion_asignaciones NO tiene ninguna fila para una
-// evaluación, se trata como "para todos" (compatibilidad con las
-// evaluaciones creadas antes de este cambio). En cuanto tiene 1+ filas,
-// queda restringida a esos usuarios exactos.
-
-// Fragmento SQL reutilizable: "esta evaluación (e.id) está abierta para
-// este usuario ($1)", ya sea porque no tiene restricción o porque está
-// explícitamente asignado.
 const SQL_ASIGNADA_A = (evalAlias: string, evaluacionIdExpr: string, usuarioParam: string) => `(
   not ${evalAlias}.asignado_a_nadie
   and (
@@ -30,13 +13,6 @@ const SQL_ASIGNADA_A = (evalAlias: string, evaluacionIdExpr: string, usuarioPara
   )
 )`;
 
-// ===== Listado para la pantalla "Evaluaciones" =====
-// ASESOR: ve solo las evaluaciones activas que le corresponden (sin
-// restricción, o asignadas explícitamente a él) con su propio estado
-// (Pendiente/Completado).
-// SUPERVISOR/ADMISION: ve TODAS las evaluaciones activas (asignadas o
-// no), con el avance del equipo calculado solo sobre los asesores a
-// quienes realmente les toca resolverla.
 export async function getEvaluaciones(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, null);
   if (!sesion) return jsonError(error!);
@@ -112,9 +88,6 @@ export async function getEvaluaciones(client: Client, body: JsonBody) {
   return jsonOk({ data, rol: sesion.rol });
 }
 
-// ===== Estado de una evaluación puntual, para el .html que la resuelve =====
-// Devuelve si el asesor ya tiene un intento guardado (para no dejarlo repetir
-// y mostrarle directamente su resultado, igual que hacía el localStorage).
 export async function getEstadoEvaluacion(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, null);
   if (!sesion) return jsonError(error!);
@@ -135,8 +108,6 @@ export async function getEstadoEvaluacion(client: Client, body: JsonBody) {
 
   const evaluacionId = ev.rows[0].id;
 
-  // La asignación solo restringe a los ASESOR (Supervisor/Admisión entran
-  // aquí normalmente para revisar, no para resolver).
   if (sesion.rol === 'ASESOR') {
     const asignada = await client.query(
       `select ${SQL_ASIGNADA_A('e', '$1', '$2')} as "leToca" from evaluaciones e where e.id = $1`,
@@ -182,7 +153,6 @@ export async function getEstadoEvaluacion(client: Client, body: JsonBody) {
   });
 }
 
-// ===== Guardar el intento (solo ASESOR, solo una vez) =====
 export async function guardarIntentoEvaluacion(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['ASESOR']);
   if (!sesion) return jsonError(error!);
@@ -203,9 +173,6 @@ export async function guardarIntentoEvaluacion(client: Client, body: JsonBody) {
   }
   const evaluacionId = ev.rows[0].id;
 
-  // Defensa en el servidor: aunque el .html ya no debería dejar llegar
-  // hasta acá a alguien no asignado (getEstadoEvaluacion lo bloquea antes),
-  // se revalida igual por si el envío llega sin pasar por esa pantalla.
   const asignada = await client.query(
     `select ${SQL_ASIGNADA_A('e', '$1', '$2')} as "leToca" from evaluaciones e where e.id = $1`,
     [evaluacionId, sesion.usuario]
@@ -246,7 +213,6 @@ export async function guardarIntentoEvaluacion(client: Client, body: JsonBody) {
   return jsonOk({ guardado: true, porcentaje });
 }
 
-// ===== Pantalla "Resultados" (solo SUPERVISOR/ADMISION) =====
 export async function getResultadosEvaluacion(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -257,10 +223,6 @@ export async function getResultadosEvaluacion(client: Client, body: JsonBody) {
   const ev = await client.query(`select id, titulo from evaluaciones where codigo = $1`, [codigo]);
   if (!ev.rowCount) return jsonError('La evaluación no existe.');
 
-  // Solo se listan los asesores a quienes de verdad les toca esta
-  // evaluación (sin restricción -> todos; con asignación -> solo esos).
-  // Left join contra evaluacion_intentos para que se vea también a
-  // quienes aún no la resuelven -> "Pendiente".
   const result = await client.query(
     `select u.usuario, coalesce(u.nombre_aux, u.nombre) as nombre, u.campana,
             i.puntaje_obtenido, i.puntaje_maximo, i.porcentaje, i.finalizado_en, i.duracion_segundos, i.por_tiempo
@@ -289,7 +251,6 @@ export async function getResultadosEvaluacion(client: Client, body: JsonBody) {
   return jsonOk({ evaluacion: ev.rows[0], data });
 }
 
-// ===== Detalle de un intento (respuesta por respuesta) para Resultados =====
 export async function getDetalleIntentoEvaluacion(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -313,9 +274,6 @@ export async function getDetalleIntentoEvaluacion(client: Client, body: JsonBody
   return jsonOk({ data: result.rows[0] });
 }
 
-// ===== Asignación de la evaluación a asesores concretos =====
-
-// Lectura (SUPERVISOR/ADMISION, para pintar el editor con lo ya guardado).
 export async function getAsignacionesEvaluacion(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -334,9 +292,6 @@ export async function getAsignacionesEvaluacion(client: Client, body: JsonBody) 
   return jsonOk({ usuarios: result.rows.map((r) => r.usuario), asignadoANadie: ev.rows[0].asignado_a_nadie });
 }
 
-// Escritura: reemplaza por completo la lista de asignados (solo ADMISION,
-// mismo criterio de permisos que guardarVentanaEvaluacion). Mandar un
-// arreglo vacío significa "sin restricción" -> vuelve a quedar para todos.
 export async function guardarAsignacionesEvaluacion(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -380,11 +335,6 @@ export async function guardarAsignacionesEvaluacion(client: Client, body: JsonBo
   });
 }
 
-// ===== Calificación asistida por IA (solo ASESOR, y solo mientras resuelve) =====
-// El .html arma el prompt (usa la misma rúbrica que la calificación local) y
-// aquí lo corremos contra Cloudflare Workers AI (binding "AI" del Worker,
-// sin API key ni cuenta aparte — entra en el tier gratis de 10,000
-// Neurons/día). Si algo falla, el frontend cae solo a la calificación local.
 const MODELO_IA = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 export async function calificarConIA(client: Client, body: JsonBody, env: Env) {
@@ -421,7 +371,6 @@ export async function calificarConIA(client: Client, body: JsonBody, env: Env) {
   }
 }
 
-// ===== Ventana de disponibilidad =====
 type EstadoVentana = 'disponible' | 'no_iniciada' | 'cerrada';
 
 function estadoVentana(activoDesde: Date | null, activoHasta: Date | null): EstadoVentana {
@@ -443,7 +392,6 @@ function parseFechaLima(valor: unknown): Date | null {
   return fecha;
 }
 
-// ===== Configurar ventana de disponibilidad (solo ADMISION) =====
 export async function guardarVentanaEvaluacion(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);

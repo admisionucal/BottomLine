@@ -1,7 +1,3 @@
-// ================================================================
-// CONDICIONES COMERCIALES - Módulo de solicitudes CC (Supervisor/Admisión)
-// ================================================================
-
 import { API_URL, esRolSupervisorOAdmision, COLUMNAS, CACHE_KEYS, BCC_DEFAULT_CC, SELECT_OPTIONS, setBccDefault } from '../core/constants.js';
 import {
     getCurrentUser, getUserCampanas, getSessionToken,
@@ -12,16 +8,6 @@ import { Sidebar, renderTable, Toast, createMultiSelect } from '../core/componen
 import { construirDatosCC, renderPlantillaCC, renderPlantillaCCPreview, detectarTipoReferido, precargarLogoCC, setConfigCampanas } from './cc-template.js';
 import { buscarDuplicados, limpiarCacheDuplicados } from './duplicados-sugeridos.js';
 import { unificarLeads } from './unificar-core.js';
-
-// PDFs servidos como assets estáticos del proyecto (carpeta assets/), con
-// el nombre real del archivo tal como se guarda cada semestre — incluye el
-// periodo (ej. "2026-2") porque cambia de campaña en campaña.
-// nombrePdf() da el nombre "plano" (el que se manda al backend para que el
-// adjunto del correo salga con el nombre real, no uno genérico); rutaAsset()
-// lo codifica para poder hacer fetch() de ese archivo.
-function nombrePdf(nombreBase) {
-    return `${nombreBase}.pdf`;
-}
 
 async function obtenerArchivoCampana(campana, tipo) {
     const result = await callAPI('obtenerArchivoCampanaBase64', { campana, tipo });
@@ -39,7 +25,6 @@ function campoHTML(label, value) {
     `;
 }
 
-// ===== ESTADO =====
 const state = {
     solicitudes: [],
     solicitudesFiltradas: [],
@@ -50,7 +35,6 @@ const state = {
     pagesPerBlock: 20,
     ultimaActualizacion: null,
     cargandoResueltas: false,
-    // Vista 2
     solicitudActual: null,
     leadActual: null,
     catalogoBeneficios: [],
@@ -60,24 +44,12 @@ const state = {
     tipoReferidoActual: null
 };
 
-// true cuando esta vista vive embebida dentro de dashboard.html: en ese
-// caso no tocamos la URL del navegador (nada de pushState/history), a
-// diferencia del modo standalone donde sí queremos URLs compartibles.
 let modoEmbebido = false;
 
-// detectarTipoReferido se importa de cc-template.js (antes había una copia
-// local aquí que comparaba contra los strings exactos del script viejo de
-// Cargos y nunca hacía match con el LABEL real del catálogo de BENEFICIOS
-// — ej. el catálogo real usa "Referido - 50% dscto. 1ra boleta", no
-// "Descuento referido - 50% dscto. 1ra boleta". Ahora ambos archivos usan
-// el mismo detector por palabras clave, para que no se desincronicen).
-
-// ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', () => {
     initCC();
 });
 
-// ===== PUNTO DE ENTRADA (para embebido en dashboard) =====
 window.initCCEmbebido = function() {
     initCC();
 };
@@ -102,15 +74,11 @@ function initCC() {
         return;
     }
 
-    // Si el sidebar ya existe (venimos embebidos dentro de dashboard.html)
-    // no creamos uno nuevo; si es la página standalone, sí.
     modoEmbebido = !!document.querySelector('.sidebar-nav');
     if (!modoEmbebido) {
         new Sidebar({ active: 'cargos', activeSubitem: 'navCondicionesCC' });
     }
 
-    // Los listeners solo se atan una vez: los elementos del DOM persisten
-    // entre reingresos a esta vista (embebida o standalone).
     if (!__ccListenersAtados) {
         document.getElementById('btnActualizarCC')?.addEventListener('click', () => cargarSolicitudesCC(true));
         document.getElementById('btnExportarCC')?.addEventListener('click', exportarSolicitudesCCExcel);
@@ -132,8 +100,6 @@ function initCC() {
         __ccListenersAtados = true;
     }
 
-    // El id de solicitud en la URL (para abrir directo en el detalle) solo
-    // aplica en modo standalone: embebido, la URL es la de dashboard.html.
     const idSolicitud = !modoEmbebido
         ? new URLSearchParams(window.location.search).get('id')
         : null;
@@ -141,14 +107,10 @@ function initCC() {
     if (idSolicitud) {
         mostrarVistaDetalle(idSolicitud);
     } else {
-        // mostrarVistaLista() (y no solo cargarSolicitudesCC()) porque al
-        // reingresar embebido puede haber quedado la vista de detalle
-        // abierta de una visita anterior.
         mostrarVistaLista();
     }
 }
 
-// ===== VISTA 1: LISTADO =====
 async function cargarSolicitudesCC(forceRefresh = false) {
     const user = getCurrentUser();
     const wrap = document.getElementById('tablaCCWrap');
@@ -169,7 +131,6 @@ async function cargarSolicitudesCC(forceRefresh = false) {
     wrap.innerHTML = '<div class="loading">Cargando solicitudes...</div>';
 
     try {
-        // FASE 1: solo las pendientes (lo que el usuario necesita ver ya)
         const result = await callAPI('getSolicitudesCC', {
             campanas: getUserCampanas(),
             estados: ['PENDIENTE', 'PROCESANDO']
@@ -186,7 +147,6 @@ async function cargarSolicitudesCC(forceRefresh = false) {
         state.cargandoResueltas = true;
         aplicarFiltrosCC();
 
-        // FASE 2: enviadas y rechazadas en segundo plano (sin await)
         cargarResueltasCC(cargaId, cacheKey);
     } catch (e) {
         wrap.innerHTML = `<div class="loading">Error de conexión: ${escapeHtml(e.message)}</div>`;
@@ -199,21 +159,19 @@ async function cargarResueltasCC(cargaId, cacheKey) {
             campanas: getUserCampanas(),
             estados: ['ENVIADO', 'RECHAZADO']
         });
-        if (cargaId !== __cargaCCId) return; // el usuario ya pidió otra carga
+        if (cargaId !== __cargaCCId) return;
 
         if (result.success) {
             const ids = new Set(state.solicitudes.map(s => s.ID_SOLICITUD));
             const nuevas = (result.data || []).filter(s => !ids.has(s.ID_SOLICITUD));
             state.solicitudes = state.solicitudes.concat(nuevas);
-            // La caché se guarda solo cuando ya está todo completo
             cacheSet(cacheKey, { data: state.solicitudes, timestamp: state.ultimaActualizacion });
         }
     } catch (e) {
-        // silencioso: la lista de pendientes ya está visible
     } finally {
         if (cargaId === __cargaCCId) {
             state.cargandoResueltas = false;
-            aplicarFiltrosCC(true); // mantiene la página actual
+            aplicarFiltrosCC(true);
         }
     }
 }
@@ -238,8 +196,6 @@ function aplicarFiltrosCC(mantenerPagina = false) {
         return true;
     });
 
-    // Orden fijo: Pendiente/Procesando primero, luego Enviado, luego
-    // Rechazado; dentro de cada grupo, más reciente primero.
     state.solicitudesFiltradas.sort((a, b) => {
         const ordenA = ORDEN_ESTADO_CC[a.STATUS] ?? 3;
         const ordenB = ORDEN_ESTADO_CC[b.STATUS] ?? 3;
@@ -279,9 +235,6 @@ function renderTablaCC() {
     const start = (state.currentPage - 1) * state.pageSize;
     const pageItems = state.solicitudesFiltradas.slice(start, start + state.pageSize);
 
-    // Mismas clases de badge que el resto de la app (STATUS_CLASES /
-    // .status-badge en ui-kit.css) en vez de un badge propio — así el
-    // color/estilo de "estado" es consistente en toda la app.
     const ESTADO_INFO = {
         PENDIENTE: { clase: 'status-pp', label: 'Pendiente' },
         PROCESANDO: { clase: 'status-pp', label: 'Enviando…' },
@@ -310,8 +263,6 @@ function renderTablaCC() {
     revisarDuplicadosVisibles(pageItems);
     renderPaginacionCC(totalPages);
 
-    // window.irADetalleCC se registra una sola vez más abajo (fuera de este
-    // render) para que el onclick inline del HTML generado lo encuentre.
 }
 
 function renderPaginacionCC(totalPages) {
@@ -342,9 +293,6 @@ function renderPaginacionCC(totalPages) {
     addBtn('›', state.currentPage + 1, state.currentPage === totalPages);
 }
 
-// window.irADetalleCC — registrado a nivel de módulo (no dentro de
-// renderTablaCC) porque el HTML se regenera en cada render/página y el
-// onclick inline necesita encontrar la función en window de forma estable.
 window.irADetalleCC = function (idSolicitud) {
     const solicitud = state.solicitudes.find(s => s.ID_SOLICITUD === idSolicitud);
     irADetalle(solicitud || { ID_SOLICITUD: idSolicitud });
@@ -385,15 +333,12 @@ function mostrarVistaLista() {
     cargarSolicitudesCC();
 }
 
-// Se llama tras enviar/rechazar: la fila cambió de STATUS, así que el
-// caché de sessionStorage queda desactualizado hasta el próximo forceRefresh.
 function invalidarCacheSolicitudesCC() {
     const user = getCurrentUser();
     cacheRemove(CACHE_KEYS.SOLICITUDES_CC(user.email, user.rol, true));
     cacheRemove(CACHE_KEYS.SOLICITUDES_CC(user.email, user.rol, false));
 }
 
-// ===== VISTA 2: DETALLE =====
 async function mostrarVistaDetalle(idSolicitud, solicitudPrecargada) {
     document.getElementById('vistaListaCC').style.display = 'none';
     document.getElementById('vistaDetalleCC').style.display = 'block';
@@ -452,8 +397,6 @@ async function mostrarVistaDetalle(idSolicitud, solicitudPrecargada) {
 function opcionesBeneficioAdicional() {
     return state.catalogoBeneficios
         .filter(f => String(f.TIPO || '').trim().toUpperCase() === 'ADICIONAL')
-        // "Sin descuento adicional" es redundante con "-- Ninguno --" — se
-        // oculta de este dropdown a pedido explícito.
         .filter(f => String(f.LABEL || '').trim().toLowerCase() !== 'sin descuento adicional')
         .map(f => ({
             value: `${f.VALOR}||${f.MODO || ''}||${f.LABEL || ''}`,
@@ -468,11 +411,6 @@ function renderDetalleCC() {
 
     const carreraActual = state.overrides.carrera ?? (lead[COLUMNAS.CARRERA] || lead[COLUMNAS.PROGRAMA] || '');
     const modalidadActual = state.overrides.modalidadEstudio ?? (lead[COLUMNAS.MODALIDAD] || '');
-    // Si el valor real del lead no calza con ninguna de las dos opciones
-    // estándar (por capitalización distinta, espacios, u otra modalidad),
-    // se agrega igual como opción seleccionable en vez de perderlo o
-    // disfrazarlo con el "Semi-Presencial" que el navegador marca por
-    // defecto cuando ningún <option> trae "selected".
     const modalidadOpcionesCC = ['Semi-Presencial', 'Remoto'];
     if (modalidadActual && !modalidadOpcionesCC.includes(modalidadActual)) modalidadOpcionesCC.push(modalidadActual);
     const matriculaActual = state.overrides.montoMatricula ?? (lead['MATRICULA_FINAL'] ?? '');
@@ -500,9 +438,6 @@ function renderDetalleCC() {
         || opcionesBenef.find(o => o.value.split('||')[0] === String(beneficioRawActual))?.value
         || '';
 
-    // Editables: solo ID_PROMETEO y CAMPANA quedan fijos (identifican la
-    // fila real en el backend); todo lo demás, incluido nombre y asesor,
-    // se puede ajustar como override local de esta solicitud.
     const nombreActual = state.overrides.nombreCompleto ?? (lead[COLUMNAS.NOMBRES] || '');
     const asesorActual = state.overrides.asesorNombre ?? (sol.ASESOR_NOMBRE || sol.ASESOR_EMAIL || '');
 
@@ -510,9 +445,6 @@ function renderDetalleCC() {
         { label: 'DNI', id: sol.DNI_FILE_ID, nombre: sol.DNI_FILE_NOMBRE },
         { label: 'Certificado de Estudios', id: sol.CERTIFICADO_FILE_ID, nombre: sol.CERTIFICADO_FILE_NOMBRE }
     ];
-    // Boleta de Procedencia: mismo criterio que en lead-detail.js (solo aplica
-    // a Traslado con o sin convalidación) — para Ordinario ni se pide al
-    // solicitar ni debe listarse acá como documento pendiente.
     if (tipoIngresoActual !== 'regular') {
         adjuntos.push({ label: 'Boleta de Procedencia', id: sol.BOLETA_PROCEDENCIA_FILE_ID, nombre: sol.BOLETA_PROCEDENCIA_FILE_NOMBRE });
     }
@@ -712,7 +644,6 @@ function renderDetalleCC() {
         </div>
     `;
 
-    // Eventos: cada cambio actualiza overrides y refresca el iframe en vivo
     const bind = (id, campo, transform = v => v) => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -743,8 +674,6 @@ function renderDetalleCC() {
     document.getElementById('btnRechazarCC')?.addEventListener('click', rechazarCC);
     document.getElementById('btnDescargarPreviewPDF')?.addEventListener('click', descargarPreviewPDF);
 
-    // REFERIDO: una sola persona — se sincroniza directo con state en cada
-    // tecleo, sin botón "Agregar" ni lista (a diferencia de REFERENTE).
     ['ccRefUnicoNombre', 'ccRefUnicoDni', 'ccRefUnicoEmail'].forEach(id => {
         document.getElementById(id)?.addEventListener('input', actualizarPersonaReferidoUnica);
     });
@@ -807,9 +736,6 @@ function actualizarPreviewCC() {
 
     const btnEnviar = document.getElementById('btnEnviarCC');
     const msg = document.getElementById('ccEnviarMsg');
-    // REFERIDO: la única persona (índice 0) debe ser válida (nombre + DNI de
-    // 8 dígitos + email). REFERENTE: basta con que la lista no esté vacía
-    // (cada entrada ya se validó al agregarla).
     const faltanPersonas = tipoRef === 'REFERIDO'
         ? !personaReferidoValida(state.personasReferido[0])
         : tipoRef === 'REFERENTE'
@@ -836,10 +762,6 @@ function personaReferidoValida(p) {
     return !!p && !!p.nombre && /^\d{8}$/.test(p.dni || '') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email || '');
 }
 
-// Pinta los checkboxes de BCC por defecto según campaña, tomados del
-// catálogo único en core/constants.js (BCC_DEFAULT_CC) — incluye
-// onboarding como uno más de la lista, marcado por defecto pero
-// desmarcable como cualquier otro.
 function renderCopiaCheckboxes(campana) {
     const cont = document.getElementById('ccCopiaCheckboxes');
     if (!cont) return;
@@ -907,15 +829,9 @@ function agregarPersonaReferidoVista2() {
     dniInput.value = '';
     emailInput.value = '';
     renderPersonasReferidoListaVista2();
-    actualizarPreviewCC(); // recalcula si ya se puede habilitar "Enviar"
+    actualizarPreviewCC();
 }
 
-// Exporta la vista previa como PDF real, generado por el MISMO motor que
-// usa el correo real (Apps Script: Utilities.newBlob(html).getAs(PDF)) —
-// antes usaba window.print() del navegador, que es un motor de impresión
-// DISTINTO y podía verse ligeramente distinto al PDF que realmente se
-// envía. No toca STATUS ni la hoja, no envía correo — solo genera y
-// descarga el archivo.
 async function descargarPreviewPDF() {
     const btn = document.getElementById('btnDescargarPreviewPDF');
     const labelOriginal = btn ? btn.innerHTML : '';
@@ -957,25 +873,6 @@ async function descargarPreviewPDF() {
     }
 }
 
-// Convierte un asset estático (ej. PDF de Lineamientos) a base64 para
-// mandarlo al backend como adjunto — evita depender del CONFIG del otro
-// Apps Script, que no es accesible desde este backend.
-async function fetchAssetBase64(path) {
-    try {
-        const res = await fetch(path);
-        if (!res.ok) return null;
-        const buffer = await res.arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-        return btoa(binary);
-    } catch (e) {
-        console.warn('No se pudo cargar el asset de Lineamientos:', e);
-        return null;
-    }
-}
-
-// ===== ENVIAR (Parte 6 — pendiente de backend `enviarCC`) =====
 async function enviarCC() {
     const btn = document.getElementById('btnEnviarCC');
     const msg = document.getElementById('ccEnviarMsg');
@@ -996,16 +893,6 @@ async function enviarCC() {
         const tipoLineamientos = datosCC.mostrar6Cuotas ? 'lineamientos_6c' : 'lineamientos_5c';
         const { nombre: lineamientosNombre, base64: lineamientosBase64 } = await obtenerArchivoCampana(state.solicitudActual.CAMPANA, tipoLineamientos);
 
-        // Referidos/Referentes: se captura recién aquí (Vista 2), no en el
-        // modal del asesor — el backend necesita el PDF correcto según el
-        // caso, cargado como asset estático igual que Lineamientos.
-        // - tipoReferido REFERIDO: el lead fue referido -> él recibe "T&C - REFERIDO"
-        //   y el referente que lo trajo recibe "T&C - REFERENTE ALUMNO" (stock) o
-        //   "T&C - REFERENTE INGRESANTE" (nuevo), según tipoReferente.
-        // - tipoReferido REFERENTE: el lead refirió a otros -> cada persona de
-        //   la lista recibe "T&C - REFERIDO".
-        // Se manda también el nombre "plano" de cada PDF para que el backend
-        // arme el adjunto con el nombre real del archivo, no uno genérico.
         let terminosReferidoBase64 = null;
         let terminosReferidoNombre = null;
         let terminosReferenteBase64 = null;
@@ -1059,10 +946,9 @@ async function enviarCC() {
     }
 }
 
-// ===== RECHAZAR =====
 async function rechazarCC() {
     const motivo = prompt('Motivo del rechazo (se guardará en la solicitud):');
-    if (motivo === null) return; // canceló el prompt
+    if (motivo === null) return;
     if (!motivo.trim()) {
         alert('Debes indicar un motivo para rechazar la solicitud.');
         return;
@@ -1098,7 +984,6 @@ async function rechazarCC() {
     }
 }
 
-// ===== API =====
 async function callAPI(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {

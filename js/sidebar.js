@@ -1,11 +1,6 @@
-// ================================================================
-// SIDEBAR / NAVEGACIÓN - Manejo del menú lateral
-// ================================================================
-
 import { getCurrentUser } from '../core/utils.js';
 import { esRolSupervisorOAdmision } from '../core/constants.js';
 
-// ===== VARIABLES DE ESTADO =====
 let __usuarioModuloCargado = false;
 let __usuarioCargaEnCurso = null;
 let __asistenciaModuloCargado = false;
@@ -16,13 +11,6 @@ let __ccModuloCargado = false;
 let __ccCargaEnCurso = null;
 let __configModuloCargado = false;
 let __configCargaEnCurso = null;
-
-// ===== FUNCIONES DEL SIDEBAR =====
-function toggleSidebar() {
-    if (window.__sidebarInstance) {
-        window.__sidebarInstance.toggle();
-    }
-}
 
 function expandirSidebar() {
     if (window.__sidebarInstance) {
@@ -57,19 +45,15 @@ function ocultarTodasLasVistas() {
             if (el) el.style.display = 'none'; });
 }
 
-// ===== VISTA: USUARIO =====
 function mostrarUsuario() {
-    // Verificar si estamos en dashboard.html (tiene las vistas)
     const viewUsuario = document.getElementById('view-usuario');
     const viewBottomline = document.getElementById('view-bottomline');
     
-    // Si NO estamos en dashboard.html, redirigir a usuario.html
     if (!viewUsuario && !viewBottomline) {
         window.location.href = 'usuario.html';
         return;
     }
     
-    // Si estamos en dashboard.html, mostrar la vista embebida
     ocultarTodasLasVistas();
     if (viewUsuario) viewUsuario.style.display = 'block';
     
@@ -168,19 +152,15 @@ function irAMarcarAsistenciaDesdeUsuario() {
     marcarSubitemActivo(document.getElementById('navAsistenciaMarcacion'));
 }
 
-// ===== VISTA: BOTTOM LINE =====
 function mostrarBottomLine() {
-    // Verificar si estamos en dashboard.html (tiene las vistas)
     const viewUsuario = document.getElementById('view-usuario');
     const viewBottomline = document.getElementById('view-bottomline');
     
-    // Si NO estamos en dashboard.html, redirigir a dashboard.html
     if (!viewUsuario && !viewBottomline) {
         window.location.href = 'dashboard.html?view=bottomline';
         return;
     }
     
-    // Si estamos en dashboard.html, mostrar la vista embebida
     ocultarTodasLasVistas();
     if (viewBottomline) viewBottomline.style.display = 'block';
     
@@ -193,7 +173,6 @@ function mostrarBottomLine() {
     if (navDash) navDash.classList.add('active');
 }
 
-// ===== VISTA: INDICADORES =====
 function mostrarIndicadores() {
     const viewUsuario = document.getElementById('view-usuario');
     const viewBottomline = document.getElementById('view-bottomline');
@@ -218,20 +197,16 @@ function mostrarIndicadores() {
     if (typeof window.inicializarIndicadores === 'function') window.inicializarIndicadores();
 }
 
-// ===== VISTA: ASISTENCIA =====
 function mostrarAsistencia(tab) {
-    // Verificar si estamos en dashboard.html (tiene las vistas)
     const viewUsuario = document.getElementById('view-usuario');
     const viewBottomline = document.getElementById('view-bottomline');
     const viewAsistencia = document.getElementById('view-asistencia');
     
-    // Si NO estamos en dashboard.html, redirigir a asistencia.html
     if (!viewUsuario && !viewBottomline) {
         window.location.href = 'asistencia.html?tab=' + (tab || 'marcacion');
         return;
     }
     
-    // Si estamos en dashboard.html, mostrar la vista embebida
     ocultarTodasLasVistas();
     if (viewAsistencia) viewAsistencia.style.display = 'block';
     
@@ -320,20 +295,16 @@ function asegurarScriptAsistencia() {
     return __asistenciaScriptPromise;
 }
 
-// ===== VISTA: CALENDARIO DE PPs =====
 function mostrarCalendario() {
-    // Verificar si estamos en dashboard.html (tiene las vistas)
     const viewUsuario = document.getElementById('view-usuario');
     const viewBottomline = document.getElementById('view-bottomline');
     const viewCalendario = document.getElementById('view-calendario');
     
-    // Si NO estamos en dashboard.html, redirigir a dashboard.html
     if (!viewUsuario && !viewBottomline) {
         window.location.href = 'dashboard.html?view=calendario';
         return;
     }
     
-    // Si estamos en dashboard.html, mostrar la vista embebida
     ocultarTodasLasVistas();
     if (viewCalendario) viewCalendario.style.display = 'block';
     
@@ -358,20 +329,16 @@ function mostrarCalendario() {
     if (typeof renderCalendarioPP === 'function') renderCalendarioPP();
 }
 
-// ===== VISTA: UNIFICAR IDS =====
 function mostrarUnificar() {
-    // Verificar si estamos en dashboard.html (tiene las vistas)
     const viewUsuario = document.getElementById('view-usuario');
     const viewBottomline = document.getElementById('view-bottomline');
     const viewUnificar = document.getElementById('view-unificar');
 
-    // Si NO estamos en dashboard.html, redirigir a dashboard.html
     if (!viewUsuario && !viewBottomline) {
         window.location.href = 'dashboard.html?view=unificar';
         return;
     }
 
-    // Si estamos en dashboard.html, mostrar la vista embebida
     ocultarTodasLasVistas();
     if (viewUnificar) viewUnificar.style.display = 'block';
 
@@ -456,20 +423,16 @@ function asegurarScriptUnificar() {
     return __unifScriptPromise;
 }
 
-// ===== VISTA: CONDICIONES COMERCIALES =====
 function mostrarCC() {
-    // Verificar si estamos en dashboard.html (tiene las vistas)
     const viewUsuario = document.getElementById('view-usuario');
     const viewBottomline = document.getElementById('view-bottomline');
     const viewCC = document.getElementById('view-cc');
 
-    // Si NO estamos en dashboard.html, redirigir a dashboard.html
     if (!viewUsuario && !viewBottomline) {
         window.location.href = 'dashboard.html?view=cc';
         return;
     }
 
-    // Si estamos en dashboard.html, mostrar la vista embebida
     ocultarTodasLasVistas();
     if (viewCC) viewCC.style.display = 'block';
 
@@ -554,7 +517,6 @@ function asegurarScriptCC() {
     return __ccScriptPromise;
 }
 
-// ===== VISTA: EVALUACIONES =====
 let __evalModuloCargado = false;
 let __evalCargaEnCurso = null;
 
@@ -643,7 +605,6 @@ function asegurarScriptEvaluaciones() {
     return __evalScriptPromise;
 }
 
-// ===== VISTA: RESULTADOS =====
 let __resModuloCargado = false;
 let __resCargaEnCurso = null;
 
@@ -732,7 +693,6 @@ function asegurarScriptResultados() {
     return __resScriptPromise;
 }
 
-// ===== VISTA: CAPACITACIÓN IA =====
 let __capModuloCargado = false;
 let __capCargaEnCurso = null;
 
@@ -742,7 +702,6 @@ function mostrarCapacitacion() {
     const viewCap = document.getElementById('view-capacitacion');
 
     if (!viewUsuario && !viewBottomline) {
-        // Página independiente: si ya estamos en ella no se recarga.
         if (!document.getElementById('capacitacionApp')) window.location.href = 'capacitacion-chat.html';
         return;
     }
@@ -909,12 +868,6 @@ function logout() {
     sessionStorage.removeItem('bl_user');
     window.location.href = 'index.html';
 }
-
-// ================================================================
-// REGISTRAR FUNCIONES EN WINDOW
-// ================================================================
-
-window.toggleSidebar = toggleSidebar;
 window.toggleNavGroup = toggleNavGroup;
 window.marcarSubitemActivo = marcarSubitemActivo;
 window.mostrarUsuario = mostrarUsuario;

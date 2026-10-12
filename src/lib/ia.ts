@@ -1,19 +1,5 @@
 import type { Env } from '../types';
 
-// ================================================================
-// CAPA DE IA INTERCAMBIABLE
-// ================================================================
-//
-// Hoy: Cloudflare Workers AI (binding "AI", ya configurado).
-// Mañana: Claude (API de Anthropic) sin tocar el resto del código.
-//
-// Cómo pasar a Claude:
-//   1) npx wrangler secret put ANTHROPIC_API_KEY
-//   2) (opcional) var CLAUDE_MODEL en wrangler.jsonc con el modelo que
-//      se quiera usar (ver https://docs.claude.com/en/docs/about-claude/models).
-// Con la key presente se usa Claude automáticamente. Para forzar
-// Workers AI aunque exista la key: var IA_PROVEEDOR = "workers".
-
 export const MODELO_WORKERS = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const MODELO_CLAUDE_DEFAULT = 'claude-sonnet-4-5';
 
@@ -44,8 +30,6 @@ export function proveedorActivo(env: Env): Proveedor {
   return 'workers';
 }
 
-// Límite aproximado de caracteres de historial que se manda a cada
-// proveedor (Llama 3.3 fp8-fast tiene ~24k tokens de contexto en total).
 export function limiteHistorial(env: Env): number {
   return proveedorActivo(env) === 'claude' ? 400_000 : 28_000;
 }
@@ -56,8 +40,6 @@ export async function generar(env: Env, op: OpcionesIA): Promise<RespuestaIA> {
   return generarWorkers(env, op, mensajes);
 }
 
-// Une turnos consecutivos del mismo rol y garantiza que el primero sea "user"
-// (requisito de la API de Claude; Llama lo tolera igual).
 function normalizarTurnos(mensajes: MensajeIA[]): MensajeIA[] {
   const out: MensajeIA[] = [];
   for (const m of mensajes) {
@@ -96,8 +78,6 @@ async function generarClaude(env: Env, op: OpcionesIA, mensajes: MensajeIA[]): P
       model: modelo,
       max_tokens: op.maxTokens ?? 800,
       temperature: op.temperatura ?? 0.7,
-      // El system (rúbrica, perfil, ejemplos) se repite en cada turno:
-      // se marca para caché y así solo se cobra completo la primera vez.
       system: [{ type: 'text', text: op.system, cache_control: { type: 'ephemeral' } }],
       messages: mensajes,
     }),
@@ -115,8 +95,6 @@ async function generarClaude(env: Env, op: OpcionesIA, mensajes: MensajeIA[]): P
   return { texto, proveedor: 'claude', modelo };
 }
 
-// Extrae el primer objeto JSON de un texto (tolera ```json ... ``` y texto
-// alrededor, que Llama a veces agrega aunque se le pida solo JSON).
 export function extraerJSON<T = any>(texto: string): T {
   const limpio = String(texto || '').replace(/```json\s*|```/g, '').trim();
   try {
@@ -129,7 +107,6 @@ export function extraerJSON<T = any>(texto: string): T {
   }
 }
 
-// Pide JSON y, si falla el parseo, reintenta una vez recordándole el formato.
 export async function generarJSON<T = any>(env: Env, op: OpcionesIA): Promise<{ data: T; proveedor: Proveedor; modelo: string }> {
   const r1 = await generar(env, op);
   try {

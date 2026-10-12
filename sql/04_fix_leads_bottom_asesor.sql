@@ -1,10 +1,3 @@
--- ============================================================
--- CORRECCIÓN: leads_bottom ahora se identifica por
--- (id_prometeo, campana, asesor_email) — puede haber MÁS DE UNA
--- fila bottom por lead, una por cada asesor que lo ha tenido.
--- Esto reemplaza la tabla anterior (llave incorrecta).
--- ============================================================
-
 drop table if exists leads_bottom cascade;
 
 create table leads_bottom (
@@ -12,9 +5,6 @@ create table leads_bottom (
   campana         text not null,
   asesor_email    text not null,
 
-  -- Identidad "snapshot" del lead al momento de guardar (igual que
-  -- capturarIdentidadBase en code.gs) — sobrevive aunque el lead
-  -- luego desaparezca de la base o cambie de datos.
   nombre_lead     text default '',
   dni_lead        text default '',
   celular_lead    text default '',
@@ -37,13 +27,11 @@ create table leads_bottom (
   metodo_pago         text default '',
   rinde_examen_suficiencia text default '',
 
-  -- Cálculo financiero (nuevo)
   descuento_matricula numeric,
   matricula_final      numeric,
   descuento_admision   numeric,
   admision_final       numeric,
 
-  -- Perfilamiento
   por_que_eligio_carrera text default '',
   que_busca_universidad  text default '',
   quien_financiara       text default '',

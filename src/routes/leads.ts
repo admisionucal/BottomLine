@@ -9,7 +9,7 @@ export async function getLeads(client: Client, body: JsonBody) {
   if (!sesion) return jsonError(error!);
 
   const esAdmin = sesion.rol === 'SUPERVISOR' || sesion.rol === 'ADMISION';
-  const requiereRestriccionCampana = sesion.rol !== 'ADMISION'; // aplica a SUPERVISOR y ASESOR
+  const requiereRestriccionCampana = sesion.rol !== 'ADMISION';
   const campana = body.campana;
   if (!campana) return jsonError('Falta especificar la campaña.');
 
@@ -26,7 +26,6 @@ export async function getLeads(client: Client, body: JsonBody) {
     nombreAsesor = usuarioRow?.nombre || null;
   }
 
-  // ----- Restricción por campaña activa (todos los roles excepto ADMISION) -----
   if (requiereRestriccionCampana) {
     const rawCampana = String(usuarioRow?.campana || '');
     const tieneTodas = rawCampana.trim().toLowerCase() === 'todas';

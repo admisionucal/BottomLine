@@ -1,11 +1,4 @@
-// ================================================================
-// USUARIO - Módulo de perfil y KPIs
-// ================================================================
-
-import {
-    API_URL, COLUMNAS, STATUS, CACHE_KEYS,
-    esRolSupervisorOAdmision
-} from '../core/constants.js';
+import { API_URL, CACHE_KEYS, esRolSupervisorOAdmision } from '../core/constants.js';
 
 import {
     getCurrentUser, getUserCampanas, getSessionToken,
@@ -16,7 +9,6 @@ import {
 
 import { Sidebar } from '../core/components.js';
 
-// ===== CAMPAÑAS VIGENTES =====
 let __vigentesPromise = null;
 
 async function obtenerCampanasVigentes() {
@@ -32,19 +24,17 @@ async function obtenerCampanasVigentes() {
             const c = porCodigo[cod];
             return c && c.activa && (!c.fechaFinPeriodo || String(c.fechaFinPeriodo).slice(0, 10) >= hoy);
         });
-        return vigentes.length ? vigentes : todas; // si ninguna está vigente, no dejar vacío
+        return vigentes.length ? vigentes : todas;
     } catch (e) {
         return todas;
     }
 }
 
-// Una sola llamada a la API por visita al perfil, compartida por las 3 secciones
 function campanasVigentesUsuario() {
     if (!__vigentesPromise) __vigentesPromise = obtenerCampanasVigentes();
     return __vigentesPromise;
 }
 
-// ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', () => {
     const user = getCurrentUser();
     if (!user) {
@@ -56,7 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initUsuario();
 });
 
-// ===== PUNTO DE ENTRADA (para embebido en dashboard) =====
 window.initUsuarioEmbebido = function() {
     initUsuario();
 };
@@ -65,17 +54,15 @@ function initUsuario() {
     const user = getCurrentUser();
     if (!user) return;
 
-    // Perfil
     document.getElementById('userProfileNombre').textContent = user.nombre || '—';
     document.getElementById('userProfileCargo').textContent = user.cargo || '—';
     document.getElementById('userProfileRol').textContent = user.rol || '—';
     document.getElementById('userProfileDni').textContent = user.dni || '—';
     document.getElementById('userProfileEmail').textContent = user.email || '—';
 
-    // Campañas
     const contCampanas = document.getElementById('userProfileCampanas');
     if (contCampanas) contCampanas.textContent = '…';
-    __vigentesPromise = null; // fuerza a releer la config en cada visita al perfil
+    __vigentesPromise = null;
     campanasVigentesUsuario().then(campanas => {
         if (!contCampanas) return;
         contCampanas.innerHTML = campanas.length
@@ -83,11 +70,9 @@ function initUsuario() {
             : '—';
     });
 
-    // Foto
     const fotoEl = document.getElementById('userProfileFoto');
     if (fotoEl) fotoEl.src = normalizarUrlFoto(user.foto) || 'assets/logo.png';
 
-    // Asistencia: ocultar/mostrar según rol
     const esAdmin = esRolSupervisorOAdmision(user.rol);
     const cardMarcar = document.getElementById('kpiMarcarAsistencia');
     const cardHora = document.getElementById('kpiHoraEntrada');
@@ -97,7 +82,6 @@ function initUsuario() {
     if (cardHora) cardHora.style.display = esAdmin ? 'none' : '';
     if (cardAdmin) cardAdmin.style.display = esAdmin ? '' : 'none';
 
-    // Evento para Marcar Asistencia
     const marcarBtn = document.getElementById('kpiMarcarAsistencia');
     if (marcarBtn) {
         marcarBtn.addEventListener('click', () => {
@@ -109,7 +93,6 @@ function initUsuario() {
         });
     }
 
-    // Cargar datos
     if (esAdmin) {
         cargarResumenAsistenciaAdmin();
         cargarVpPpPorCampanaAdmin(user);
@@ -119,7 +102,6 @@ function initUsuario() {
     }
 }
 
-// ===== ASISTENCIA ADMIN =====
 async function cargarResumenAsistenciaAdmin() {
     const valorEl = document.getElementById('userKpiAsistenciaHoyValor');
     const subEl = document.getElementById('userKpiAsistenciaHoySub');
@@ -150,7 +132,6 @@ async function cargarResumenAsistenciaAdmin() {
     }
 }
 
-// ===== HORA ENTRADA PROMEDIO =====
 async function cargarHoraEntradaPromedio() {
     const valorEl = document.getElementById('userKpiHoraEntradaValor');
     if (!valorEl) return;
@@ -173,7 +154,6 @@ async function cargarHoraEntradaPromedio() {
     }
 }
 
-// ===== VP/PP ASESOR =====
 async function cargarVpPpAsesor(user) {
     const cont = document.getElementById('userKpiVpPpContainer');
     if (!cont) return;
@@ -199,7 +179,6 @@ async function cargarVpPpAsesor(user) {
                     renderTarjetaVpPp('Promesas de Pago (PP)', ppTotal, ppCompletos, 'handshake');
 }
 
-// ===== VP/PP ADMIN (por campaña) =====
 async function cargarVpPpPorCampanaAdmin(user) {
     const cont = document.getElementById('userKpiVpPpContainer');
     if (!cont) return;
@@ -222,7 +201,6 @@ async function cargarVpPpPorCampanaAdmin(user) {
     cont.innerHTML = html;
 }
 
-// ===== HELPER =====
 async function obtenerResumenVpPpCacheado(user, campanas) {
     const cacheKey = CACHE_KEYS.VPPP_RESUMEN(user.email, user.rol, campanas);
     const cached = cacheGet(cacheKey);
@@ -280,7 +258,6 @@ function renderTarjetaCampana(campana, r) {
     `;
 }
 
-// ===== API =====
 async function callAPI(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {

@@ -1,15 +1,6 @@
-// ================================================================
-// CONSTANTS - Configuración global y mapeo de columnas
-// ================================================================
-
-// ----- URL DE LA API (Google Apps Script) -----
-//export const API_URL = 'https://script.google.com/macros/s/AKfycby7szo4sq4-ZG4yngiQmZ7wN9g3tuM5bmh2kNb5GAgAfhAAwGBtat8tsQke_qub6PAAwg/exec';
 export const API_URL = '/api';
 
-// ----- MAPEO DE COLUMNAS DE GOOGLE SHEETS -----
-// Centraliza todos los nombres de columnas para evitar strings mágicos.
 export const COLUMNAS = {
-    // Leads / Campañas
     ID_PROMETEO: 'ID PROMETEO',
     CAMPANA: 'CAMPAÑA',
     NOMBRES: 'NOMBRES',
@@ -55,7 +46,6 @@ export const COLUMNAS = {
     RINDE_EXAMEN_SUFICIENCIA: 'RINDE_EXAMEN_SUFICIENCIA',
     DOLOR_NECESIDAD: 'DOLOR_NECESIDAD',
 
-    // Perfilamiento
     POR_QUE_ELIGIO_CARRERA: 'POR_QUE_ELIGIO_CARRERA',
     QUE_BUSCA_UNIVERSIDAD: 'QUE_BUSCA_UNIVERSIDAD',
     QUIEN_FINANCIARA: 'QUIEN_FINANCIARA',
@@ -67,14 +57,12 @@ export const COLUMNAS = {
     ACCIONES_DEFINIDAS: 'ACCIONES_DEFINIDAS',
     PROPUESTA_ACCION_IA: 'PROPUESTA_ACCION_IA',
 
-    // Contacto
     TELEFONO_2: 'TELEFONO 2',
     TELEFONO_3: 'TELEFONO 3',
     EMAIL: 'EMAIL',
-    DNI: 'NUMERO DE DOCUMENTO', // O 'DNI' dependiendo de la hoja
+    DNI: 'NUMERO DE DOCUMENTO',
 };
 
-// ----- ESTADOS DE GESTIÓN (MAPEO Y ETIQUETAS) -----
 export const STATUS = {
     VP_VIVA: 'VALORES_VALORACIONES_POSITIVAS_VIVA',
     VP_MUERTA: 'VALORES_VALORACIONES_POSITIVAS_MUERTA',
@@ -114,18 +102,15 @@ export const STATUS_LABELS = {
     [STATUS.PAGO_FRACCIONADO]: 'Pago Fraccionado',
 };
 
-// ----- PRECIOS BASE -----
 export const PRECIOS_BASE = {
     MATRICULA: 475,
     ADMISION: 250,
 };
 
-// ----- ROLES -----
 export const ROLES = {
     ASESOR: 'ASESOR',
     SUPERVISOR: 'SUPERVISOR',
     ADMISION: 'ADMISION',
-    // Perfil de pruebas: todo lo de ADMISION + funciones que aún no se liberan.
     SISTEMAS: 'SISTEMAS',
 };
 
@@ -137,28 +122,18 @@ export function esRolAdmision(rol) {
     return rol === ROLES.ADMISION || rol === ROLES.SISTEMAS;
 }
 
-export function esRolSistemas(rol) {
-    return rol === ROLES.SISTEMAS;
-}
-
-// ETAPA DE PRUEBAS: perfiles que ven Capacitación IA. Para liberarla,
-// agregar perfiles aquí y en ROLES_CAPACITACION de src/routes/simulador.ts.
 export const ROLES_CAPACITACION_IA = [ROLES.SISTEMAS];
 
 export function puedeVerCapacitacionIA(rol) {
     return ROLES_CAPACITACION_IA.includes(rol);
 }
 
-// ETAPA DE PRUEBAS: perfiles que ven la pestaña Propuesta (Bottom Line >
-// Análisis). Para liberarla, agregar perfiles aquí y en ROLES_VER de
-// src/routes/propuestas.ts.
 export const ROLES_PROPUESTA_IA = [ROLES.SISTEMAS];
 
 export function puedeVerPropuestaIA(rol) {
     return ROLES_PROPUESTA_IA.includes(rol);
 }
 
-// ----- OPCIONES PARA SELECTORES (Catálogos estáticos) -----
 export const SELECT_OPTIONS = {
     beneficio: ['Beca Impacto', 'Beca Potencia'],
     descuentoPrecios: [
@@ -175,8 +150,6 @@ export const SELECT_OPTIONS = {
 
 export const TIPOS_INSTITUCION_PROCEDENCIA = ['UNIVERSIDAD', 'INSTITUTO'];
 
-// ----- MAPEO CARRERA -> ESPECIALIZACIÓN ETU -----
-// este objeto directamente.
 export const CARRERAS_ETU = {
     'Diseño Digital de Interiores': 'Diseño Digital e Interiorismo',
     'Diseño Gráfico Publicitario': 'Diseño y Gestión Publicitaria',
@@ -186,7 +159,6 @@ export const CARRERAS_ETU = {
     'Comunicación y Publicidad Transmedia': 'Comunicación y Gestión Publicitaria'
 };
 
-// ----- COPIA OCULTA (BCC) POR DEFECTO PARA ENVÍO DE CC, POR CAMPAÑA -----
 export const BCC_DEFAULT_CC = {};
 
 export function setBccDefault(porCampana) {
@@ -194,7 +166,6 @@ export function setBccDefault(porCampana) {
     Object.assign(BCC_DEFAULT_CC, porCampana);
 }
 
-// ----- CLAVES DE CACHÉ (sessionStorage) -----
 export const CACHE_KEYS = {
     USER: 'bl_user',
     LEADS_RAW: (email, rol, campana) => `bl_leads_raw_${email}_${rol}_${campana}`,
