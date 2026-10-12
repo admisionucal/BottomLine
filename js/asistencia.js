@@ -1115,15 +1115,15 @@ function asegurarEstilosMapaAsis() {
     st.id = 'asisMapaEstilos';
     st.textContent = `
         .cal-modal.cal-modal-mapa { max-width: 1280px; width: 96%; }
-        .cal-modal-mapa .cal-modal-body { padding: 12px 20px 20px; }
+        .cal-modal-mapa .cal-modal-body { padding: 0 20px 20px; }
         .asis-dia-layout { display: flex; gap: 16px; align-items: flex-start; }
         .asis-dia-tabla { flex: 0 0 52%; min-width: 0; }
-        .asis-dia-tabla th { line-height: 1.25; vertical-align: bottom; }
+        .asis-dia-tabla th { line-height: 1.25; vertical-align: bottom; position: sticky; top: 0; z-index: 2; background: #fff; box-shadow: inset 0 -1px 0 #e8eaf6; }
         .asis-dia-tabla th, .asis-dia-tabla td { padding: 8px 8px !important; }
         .asis-fila-geo { cursor: pointer; }
         .asis-fila-geo:hover td, .asis-fila-geo.activa td { background: #EEF5FF; }
-        .asis-dia-mapa-wrap { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; }
-        .asis-dia-mapa { flex: 1 1 auto; min-height: 252px; height: calc((85vh - 190px) * 0.7); border-radius: 8px; border: 1px solid #e0e0e0; overflow: hidden; }
+        .asis-dia-mapa-wrap { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; position: sticky; top: 12px; margin-top: 12px; }
+        .asis-dia-mapa { flex: 1 1 auto; min-height: 302px; height: calc((85vh - 190px) * 0.84); border-radius: 8px; border: 1px solid #e0e0e0; overflow: hidden; }
         .asis-mapa-leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: #555; }
         .asis-geo-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
         .asis-geo-dot.dentro { background: #2e7d32; }
@@ -1136,7 +1136,7 @@ function asegurarEstilosMapaAsis() {
             .asis-dia-layout { flex-direction: column; }
             .asis-dia-tabla { flex: none; }
             .asis-dia-mapa-wrap { position: static; }
-            .asis-dia-mapa { height: 238px; min-height: 238px; }
+            .asis-dia-mapa { height: 286px; min-height: 286px; }
         }`;
     document.head.appendChild(st);
 }
