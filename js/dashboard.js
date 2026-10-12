@@ -31,7 +31,7 @@ let state = {
     pagesPerBlock: 20,
     terminoBusqueda: '',
     filtros: {
-        carrera: [], ingreso: [], beneficio: [], modalidad: [], asesor: [], perfil: [], dolorNecesidad: [],
+        carrera: [], canal: [], ingreso: [], beneficio: [], modalidad: [], asesor: [], perfil: [], dolorNecesidad: [],
         fechaPrimVpPp: [],
         status: [STATUS.VP_VIVA, STATUS.PP_VIVA]
     },
