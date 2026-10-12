@@ -109,9 +109,9 @@ export class Sidebar {
                         <button type="button" class="nav-subitem ${esSub('navDashboardBL')}" id="navDashboardBL" title="Dashboard" onclick="window.mostrarBottomLine && mostrarBottomLine(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">dashboard</span> Dashboard
                         </button>
-                        <button type="button" class="nav-subitem ${esSub('navIndicadoresBL')}" id="navIndicadoresBL" title="Indicadores" style="display:none;" onclick="window.mostrarIndicadores && mostrarIndicadores(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
+                        <button type="button" class="nav-subitem ${esSub('navIndicadoresBL')}" id="navIndicadoresBL" title="Análisis" style="display:none;" onclick="window.mostrarIndicadores && mostrarIndicadores(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">insights</span>
-                            <span style="flex:1;">Indicadores</span>
+                            <span style="flex:1;">Análisis</span>
                         </button>
                         <button type="button" class="nav-subitem ${esSub('navUnificarIds')}" id="navUnificarIds" title="Unificar IDs" style="display:none;" onclick="window.mostrarUnificar && mostrarUnificar(); window.marcarSubitemActivo && marcarSubitemActivo(this);">
                             <span class="material-symbols-outlined">merge</span> Unificar IDs
