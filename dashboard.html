@@ -26,6 +26,13 @@
             transform: translateY(-100%);
         }
 
+        /* Campaña + Actualizar + Exportar (barra del Bottom Line) */
+        .bl-acciones { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .bl-campana { min-width: 90px; }
+        .bl-campana .multiselect-btn { font-size: 12px; padding: 4px 26px 4px 10px; }
+        .btn-compacto { padding: 4px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+        .btn-compacto .material-symbols-outlined { font-size: 15px; }
+
         .table-toolbar {
             padding: 12px 20px;
             display: flex;
@@ -172,8 +179,8 @@
                         <div class="cal-page-header">
                             <strong><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">calendar_today</span> Calendario</strong>
                             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                                <div class="cal-campana-filter" id="calCanalFilterGroup">
-                                    <div class="multiselect" id="calFilterCanal"></div>
+                                <div class="cal-campana-filter" id="calCampanaFilterGroup" style="display:none;">
+                                    <div class="multiselect" id="calFilterCampana"></div>
                                 </div>
                                 <div class="cal-view-toggle" id="calViewToggle">
                                     <button type="button" data-vista="mes" class="activo" onclick="cambiarVistaCalendario('mes')">Mes</button>
@@ -255,9 +262,11 @@
                                 <div class="toolbar-search" id="toolbarSearchWrap">
                                     <input type="text" id="dashboardSearchInput" placeholder="Buscar por ID Prometeo, Nombre o Celular">
                                 </div>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                                    <button class="btn-export" id="btnActualizar"><span class="material-symbols-outlined" style="font-size:16px;">refresh</span> Actualizar</button>
-                                    <button class="btn-export" id="btnExportar"><span class="material-symbols-outlined" style="font-size:16px;">download</span> Exportar</button>
+                                <div class="bl-acciones">
+                                    <div class="multiselect bl-campana" id="campanaOptions" title="Campaña"></div>
+                                    <select id="selectCampana" style="display:none;"></select>
+                                    <button class="btn-export btn-compacto" id="btnActualizar"><span class="material-symbols-outlined">refresh</span> Actualizar</button>
+                                    <button class="btn-export btn-compacto" id="btnExportar"><span class="material-symbols-outlined">download</span> Exportar</button>
                                 </div>
                             </div>
                         </div>
@@ -294,9 +303,8 @@
                                     <div class="multiselect" id="filterStatus"></div>
                                 </div>
                                 <div class="filter-group">
-                                    <label class="filter-label">CAMPAÑA</label>
-                                    <div class="multiselect" id="campanaOptions"></div>
-                                    <select id="selectCampana" style="display:none;"></select>
+                                    <label class="filter-label">CANAL</label>
+                                    <div class="multiselect" id="filterCanal"></div>
                                 </div>
                                 <div class="filter-group" id="filterPerfilGroup">
                                     <label class="filter-label">PERFILAMIENTO</label>
