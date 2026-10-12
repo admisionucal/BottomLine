@@ -63,6 +63,8 @@ import {
   simGuardarAsignaciones,
   simEstadoIA,
 } from './routes/simulador';
+import { getPropuestaAbordaje, generarPropuestaAbordajeAhora } from './routes/propuestas';
+import { generarPropuestasProgramadas } from './lib/propuestaAbordaje';
 
 // Igual que getLeadsConAprobacion(body) en code.gs: mismo getLeads, pero
 // solo accesible para SUPERVISOR/ADMISION.
@@ -138,9 +140,30 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   simGetAsignaciones,
   simGuardarAsignaciones,
   simEstadoIA,
+  // Propuesta de abordaje (Bottom Line > Análisis > Propuesta)
+  getPropuestaAbordaje,
+  generarPropuestaAbordajeAhora,
 };
 
 export default {
+  // Cron Triggers (wrangler.jsonc > triggers.crons): cada 4 horas en horario
+  // laboral de Lima se genera la Propuesta de abordaje de cada campaña activa.
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      (async () => {
+        const client = await getClient(env);
+        try {
+          const r = await generarPropuestasProgramadas(client as any, env);
+          console.log('Propuestas de abordaje generadas:', JSON.stringify(r));
+        } catch (err: any) {
+          console.error('Error generando propuestas de abordaje:', err?.message || err);
+        } finally {
+          await client.end();
+        }
+      })()
+    );
+  },
+
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 

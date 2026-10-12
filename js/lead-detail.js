@@ -1490,7 +1490,7 @@ function renderVista2() {
         `;
     });
 
-    if (esRolAdmision(user.rol)) {
+    if (esRolSupervisorOAdmision(user.rol)) {
         html += `
             <div style="grid-column: 1 / -1;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; gap:8px; flex-wrap:wrap;">

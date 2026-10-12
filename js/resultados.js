@@ -123,12 +123,12 @@ async function cargarResultados(codigo) {
         infoEl.textContent = '';
     }
 
-    const headers = ['Asesor', 'Campaña', 'Estado', 'Puntaje', 'Fecha', 'Duración'];
+    const headers = ['Asesor', 'Campaña', 'Estado', 'Nota', 'Fecha', 'Duración'];
     const rows = state.filas.map((f) => {
         const badgeClass = f.estado === 'Completado' ? 'completado' : 'pendiente';
         const scoreClass = f.porcentaje >= 80 ? 'sc-alta' : f.porcentaje >= 60 ? 'sc-media' : 'sc-baja';
         const score = f.estado === 'Completado'
-            ? `<span class="res-link" onclick="window.__verDetalleResultado('${escapeHtml(f.usuario)}')"><span class="res-score ${scoreClass}">${Number(f.porcentaje).toFixed(0)}%</span></span>`
+            ? `<span class="res-score ${scoreClass}">${formatoNota(f.puntajeObtenido, f.puntajeMaximo)}</span>`
             : '—';
         return [
             escapeHtml(f.nombre || f.usuario),
@@ -141,6 +141,25 @@ async function cargarResultados(codigo) {
     });
 
     renderTable('resTabla', headers, rows);
+
+    // Toda la fila abre el detalle (solo si el asesor ya resolvió la evaluación).
+    document.querySelectorAll('#resTabla tbody tr').forEach((tr, i) => {
+        const f = state.filas[i];
+        if (!f || f.estado !== 'Completado') return;
+        tr.classList.add('res-fila-click');
+        tr.title = 'Ver detalle';
+        tr.addEventListener('click', () => window.__verDetalleResultado(f.usuario));
+    });
+}
+
+// Nota en número: "16 / 20" (sin decimales innecesarios).
+function formatoNota(obtenido, maximo) {
+    const fmt = (v) => {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return '—';
+        return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+    };
+    return `${fmt(obtenido)} / ${fmt(maximo)}`;
 }
 
 // ================================================================
@@ -220,7 +239,7 @@ window.__verDetalleResultado = async function (usuario) {
 
     const data = result.data;
     titulo.textContent = data.nombre || usuario;
-    sub.textContent = `${Number(data.porcentaje).toFixed(0)}% (${data.puntaje_obtenido}/${data.puntaje_maximo})`
+    sub.textContent = `Nota: ${formatoNota(data.puntaje_obtenido, data.puntaje_maximo)}`
         + (data.finalizado_en ? ` · ${formatearFecha(data.finalizado_en)}` : '');
 
     const filas = construirFilasDetalle(data.detalle);
@@ -258,7 +277,9 @@ function construirFilasDetalle(detalle) {
                     respuesta: `Marcó: ${marcado}` + (sub.justification ? ` — "${sub.justification}"` : ''),
                     nota: sub.ok ? 'Correcto' : 'Incorrecto',
                     notaClass: sub.ok ? 'full' : 'none',
-                    consejo: sub.why || '',
+                    // El "why" empieza con "Verdadero." / "Falso." (la respuesta
+                    // correcta); se quita para dejar solo la explicación.
+                    consejo: String(sub.why || '').replace(/^\s*(verdadero|falso)\s*[.:,;-]?\s*/i, ''),
                 });
             });
         } else {
@@ -267,7 +288,6 @@ function construirFilasDetalle(detalle) {
             const notaClass = points > 0 && earned >= points ? 'full' : (earned > 0 ? 'part' : 'none');
             const consejoPartes = [];
             if (item.advice) consejoPartes.push(item.advice);
-            if (item.miss && item.miss.length) consejoPartes.push('Le faltó: ' + item.miss.join('; ') + '.');
 
             filas.push({
                 // `prompt` viaja en el detalle desde evaluacion-marca-ucal.html;
@@ -291,7 +311,7 @@ function exportarExcel() {
         Asesor: f.nombre || f.usuario,
         Campaña: f.campana || '',
         Estado: f.estado,
-        'Puntaje (%)': f.porcentaje ?? '',
+        Nota: f.estado === 'Completado' ? formatoNota(f.puntajeObtenido, f.puntajeMaximo) : '',
         Fecha: f.finalizadoEn ? formatearFecha(f.finalizadoEn) : '',
         'Duración (min)': f.duracionSegundos ? Math.round(f.duracionSegundos / 60) : '',
     }));

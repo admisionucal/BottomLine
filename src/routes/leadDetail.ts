@@ -135,7 +135,7 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
 const MODELO_IA_PROPUESTA = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 export async function generarPropuestaIA(client: Client, body: JsonBody, env: Env) {
-  const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
+  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
 
   const idTarget = String(body.id || '').trim();

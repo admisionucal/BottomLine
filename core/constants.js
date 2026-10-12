@@ -149,6 +149,15 @@ export function puedeVerCapacitacionIA(rol) {
     return ROLES_CAPACITACION_IA.includes(rol);
 }
 
+// ETAPA DE PRUEBAS: perfiles que ven la pestaña Propuesta (Bottom Line >
+// Análisis). Para liberarla, agregar perfiles aquí y en ROLES_VER de
+// src/routes/propuestas.ts.
+export const ROLES_PROPUESTA_IA = [ROLES.SISTEMAS];
+
+export function puedeVerPropuestaIA(rol) {
+    return ROLES_PROPUESTA_IA.includes(rol);
+}
+
 // ----- OPCIONES PARA SELECTORES (Catálogos estáticos) -----
 export const SELECT_OPTIONS = {
     beneficio: ['Beca Impacto', 'Beca Potencia'],
