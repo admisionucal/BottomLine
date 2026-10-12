@@ -145,6 +145,12 @@ function determinarCasoIngreso(lead) {
     return 1;
 }
 
+const TIEMPO_OFRECIDO_MAS2 = '2 años';
+
+function esModalidadMas2(lead) {
+    return String(obtenerCampo(lead, COLUMNAS.MODALIDAD_INGRESO) || '').indexOf('+2') !== -1;
+}
+
 function esLeadNoOrdinario(lead) {
     return determinarCasoIngreso(lead) !== 1;
 }
@@ -435,7 +441,13 @@ function renderVista1() {
         html += campoEditableHTML('Boleta de Procedencia', `<input type="number" id="inputBoletaProcedencia" class="campo-editable-input" value="${escapeHtml(boletaProcedenciaActual)}" ${bloqueado ? 'disabled' : ''}>`);
         if (caso === 2) {
             html += campoEditableHTML('¿En qué ciclo se quedó?', selectSimpleHTML('selectCicloQuedo', opcionesCicloPorTipoInstitucion(tipoInstitucionProcedenciaActual), cicloQuedoActual, bloqueado || !tipoInstitucionProcedenciaActual));
-            html += campoEditableHTML('Tiempo Ofrecido', selectSimpleHTML('selectTiempoOfrecido', SELECT_OPTIONS.tiempo, tiempoOfrecidoActual, bloqueado));
+            const esMas2 = esModalidadMas2(lead);
+            const opcionesTiempo = esMas2
+                ? [TIEMPO_OFRECIDO_MAS2]
+                : (tiempoOfrecidoActual && !SELECT_OPTIONS.tiempo.includes(tiempoOfrecidoActual)
+                    ? [tiempoOfrecidoActual, ...SELECT_OPTIONS.tiempo]
+                    : SELECT_OPTIONS.tiempo);
+            html += campoEditableHTML('Tiempo Ofrecido', selectSimpleHTML('selectTiempoOfrecido', opcionesTiempo, esMas2 ? TIEMPO_OFRECIDO_MAS2 : tiempoOfrecidoActual, bloqueado || esMas2));
         }
     }
 
@@ -1309,7 +1321,9 @@ async function guardarFicha(idPrometeo) {
     if (getVal('selectCarreraProcedencia') !== undefined) data[COLUMNAS.CARRERA_PROCEDENCIA] = getVal('selectCarreraProcedencia').trim().toUpperCase();
     if (getVal('inputBoletaProcedencia') !== undefined) data[COLUMNAS.BOLETA_PROCEDENCIA] = getVal('inputBoletaProcedencia');
     if (getVal('selectCicloQuedo') !== undefined) data[COLUMNAS.CICLO_QUEDO] = getVal('selectCicloQuedo');
-    if (getVal('selectTiempoOfrecido') !== undefined) data[COLUMNAS.TIEMPO_OFRECIDO] = getVal('selectTiempoOfrecido');
+    if (getVal('selectTiempoOfrecido') !== undefined) {
+        data[COLUMNAS.TIEMPO_OFRECIDO] = esModalidadMas2(state.lead) ? TIEMPO_OFRECIDO_MAS2 : getVal('selectTiempoOfrecido');
+    }
 
     if (state.ultimoCalculo.total !== undefined) {
         data[COLUMNAS.BOLETA_FINAL] = state.ultimoCalculo.total;
