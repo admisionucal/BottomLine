@@ -1123,7 +1123,7 @@ function asegurarEstilosMapaAsis() {
         .asis-fila-geo { cursor: pointer; }
         .asis-fila-geo:hover td, .asis-fila-geo.activa td { background: #EEF5FF; }
         .asis-dia-mapa-wrap { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; }
-        .asis-dia-mapa { flex: 1 1 auto; min-height: 360px; height: calc(85vh - 190px); border-radius: 8px; border: 1px solid #e0e0e0; overflow: hidden; }
+        .asis-dia-mapa { flex: 1 1 auto; min-height: 252px; height: calc((85vh - 190px) * 0.7); border-radius: 8px; border: 1px solid #e0e0e0; overflow: hidden; }
         .asis-mapa-leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: #555; }
         .asis-geo-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
         .asis-geo-dot.dentro { background: #2e7d32; }
@@ -1136,7 +1136,7 @@ function asegurarEstilosMapaAsis() {
             .asis-dia-layout { flex-direction: column; }
             .asis-dia-tabla { flex: none; }
             .asis-dia-mapa-wrap { position: static; }
-            .asis-dia-mapa { height: 340px; min-height: 340px; }
+            .asis-dia-mapa { height: 238px; min-height: 238px; }
         }`;
     document.head.appendChild(st);
 }

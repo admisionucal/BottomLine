@@ -51,10 +51,10 @@ export async function marcarAsistencia(client: Client, body: JsonBody) {
   const fecha = normalizarFecha(body.fecha);
   if (!fecha) return jsonError('Fecha inválida.');
 
-  // Sin ubicación activa no se registra la marcación.
+  // La Entrada exige ubicación activa; las demás marcaciones no.
   const lat = parseFloat(String(body.lat ?? ''));
   const lng = parseFloat(String(body.lng ?? ''));
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+  if (campo === 'entrada' && (!Number.isFinite(lat) || !Number.isFinite(lng))) {
     return jsonError('Activa tu ubicación para poder marcar.');
   }
 
@@ -70,8 +70,7 @@ export async function marcarAsistencia(client: Client, body: JsonBody) {
   // UPDATE atómico: solo escribe si el campo todavía está vacío.
   // Esto reemplaza por completo tu conLockAsistencia() manual — Postgres
   // ya garantiza que dos marcaciones simultáneas no se pisen entre sí.
-  // Solo se guarda la ubicación de la Entrada. Las demás marcaciones exigen
-  // ubicación activa (validado arriba) pero no la almacenan.
+  // Solo se guarda la ubicación de la Entrada.
   const esEntrada = campo === 'entrada';
   const result = await client.query(
     `update asistencia set
