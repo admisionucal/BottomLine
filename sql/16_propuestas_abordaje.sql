@@ -1,7 +1,7 @@
 -- ================================================================
 -- PROPUESTA DE ABORDAJE (Bottom Line > Análisis > Propuesta)
 -- Correr una vez en el SQL Editor de Supabase.
--- La genera el Worker cada 4 horas (7:00, 11:00, 15:00 y 19:00, hora de
+-- La genera el Worker a las 10:10, 12:00, 15:00 y 17:00 (hora de
 -- Lima) para cada campaña activa, o a demanda con "Generar ahora".
 -- Se guardan 30 días de historial.
 -- ================================================================

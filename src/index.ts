@@ -146,7 +146,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
 };
 
 export default {
-  // Cron Triggers (wrangler.jsonc > triggers.crons): cada 4 horas en horario
+  // Cron Triggers (wrangler.jsonc > triggers.crons): 10:10, 12:00, 15:00 y 17:00 en horario
   // laboral de Lima se genera la Propuesta de abordaje de cada campaña activa.
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(

@@ -1,7 +1,7 @@
 // ================================================================
 // PROPUESTA DE ABORDAJE — Bottom Line > Análisis > pestaña "Propuesta"
 // ================================================================
-// La genera el Worker cada 4 horas (7:00, 11:00, 15:00 y 19:00 Lima).
+// La genera el Worker a las 10:10, 12:00, 15:00 y 17:00 (hora de Lima).
 // Aquí solo se muestra la última y, si el perfil puede, se regenera.
 
 import { API_URL, puedeVerPropuestaIA } from '../core/constants.js';
@@ -109,7 +109,7 @@ function pintar(p, puedeGenerar) {
             <span class="prop-meta">${p ? `Generada el ${escapeHtml(fechaHora(p.generadoEn))} · ${p.origen === 'manual' ? 'a demanda' + (p.generadoPor ? ' por ' + escapeHtml(p.generadoPor) : '') : 'automática'}` : ''}</span>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
-            <span class="prop-meta">Se actualiza a las 7:00, 11:00, 15:00 y 19:00</span>
+            <span class="prop-meta">Se actualiza a las 10:10, 12:00, 15:00 y 17:00</span>
             ${puedeGenerar ? `<button class="btn-export" id="propGenerar"><span class="material-symbols-outlined" style="font-size:16px;">auto_awesome</span> Generar ahora</button>` : ''}
         </div>
     </div>`;

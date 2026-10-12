@@ -12,7 +12,7 @@ import {
     escapeHtml, normalizarTexto, parseNumero,
     horaAMinutos, minutosAHora, diffHoras, horasLabel,
     parsearFechaFlexible, fechaAClaveISO, fechaDDMMYYYY, hoyDDMMYYYY,
-    nowPeru, formato12h, normalizarUrlFoto
+    nowPeru, formato12h, normalizarUrlFoto, calcularDistanciaMetros
 } from '../core/utils.js';
 
 import { Sidebar, Toast, Modal, startClock, createMultiSelect } from '../core/components.js';
@@ -502,15 +502,8 @@ async function ejecutarMarcacion(tipo) {
     btn.disabled = true;
 
     try {
-        // Validar ubicación para entrada
-        if (tipo === 'entrada' && !state.location.lat) {
-            getLocation();
-            await new Promise(resolve => {
-                const check = () => state.location.lat ? resolve() : setTimeout(check, 250);
-                check();
-                setTimeout(resolve, 3000);
-            });
-        }
+        // Ubicación del momento de esta marcación (todas, no solo la entrada).
+        await refrescarUbicacion();
 
         const m = state.todayRecord || {};
         if (m[tipo] && String(m[tipo]).trim() !== '') {
@@ -566,9 +559,9 @@ async function ejecutarMarcacion(tipo) {
             dni: state.user.dni || '',
             campo: tipo,
             valor: hora,
-            lat: tipo === 'entrada' ? state.location.lat : '',
-            lng: tipo === 'entrada' ? state.location.lng : '',
-            direccion: tipo === 'entrada' ? state.location.direccion : '',
+            lat: state.location.lat || '',
+            lng: state.location.lng || '',
+            direccion: state.location.lat ? (state.location.direccion || '') : '',
             horasTrab: (Math.max(0, hTrab - hAlm)).toFixed(2),
             horasAlm: hAlm.toFixed(2),
             estado,
@@ -601,6 +594,30 @@ async function ejecutarMarcacion(tipo) {
 }
 
 // ===== GEOLOCALIZACIÓN =====
+// Pide la posición actual antes de cada marcación (hasta 6 s). Si falla,
+// se queda con la última conocida para no bloquear la marcación.
+function refrescarUbicacion() {
+    if (!navigator.geolocation) return Promise.resolve();
+    return new Promise(resolve => {
+        let listo = false;
+        const fin = () => { if (!listo) { listo = true; resolve(); } };
+        setTimeout(fin, 6500);
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                const lat = String(parseFloat(pos.coords.latitude).toFixed(6));
+                const lng = String(parseFloat(pos.coords.longitude).toFixed(6));
+                if (lat !== state.location.lat || lng !== state.location.lng) {
+                    state.location = { lat, lng, direccion: `${lat}, ${lng}` };
+                    setLoc(state.location.direccion);
+                }
+                fin();
+            },
+            () => fin(),
+            { enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 }
+        );
+    });
+}
+
 function getLocation() {
     if (!navigator.geolocation) {
         state.location = { lat: '', lng: '', direccion: 'NO_AUTORIZADO' };
@@ -944,16 +961,26 @@ function verDetalleDia(dia, mes, anio) {
 
     let filas, encabezados;
     if (esAdmin) {
-        encabezados = '<th>Nombre</th><th>Entrada</th><th>Inicio Almuerzo</th><th>Fin de Almuerzo</th><th>Tiempo Almuerzo</th><th>Salida</th>';
-        filas = registros.map(r => `
-            <tr>
-                <td>${escapeHtml(r.nombre || '—')}</td>
+        // Nombre más ancho; el resto a la mitad. Inicio/Fin/Tiempo en 2 líneas.
+        encabezados = `<colgroup><col style="width:34%"><col style="width:13.2%"><col style="width:13.2%"><col style="width:13.2%"><col style="width:13.2%"><col style="width:13.2%"></colgroup>
+            <tr><th>Nombre</th><th>Entrada</th><th>Inicio<br>Almuerzo</th><th>Fin de<br>Almuerzo</th><th>Tiempo<br>Almuerzo</th><th>Salida</th></tr>`;
+        filas = registros.map((r, i) => {
+            const marcas = ubicacionesPersona(r);
+            const fuera = marcas.filter(m => !m.dentro);
+            const punto = !marcas.length ? '<span class="asis-geo-dot sin" title="Sin ubicación registrada"></span>'
+                : fuera.length
+                    ? `<span class="asis-geo-dot fuera" title="Fuera del radio en: ${escapeHtml(fuera.map(m => m.etiqueta).join(', '))}"></span>`
+                    : '<span class="asis-geo-dot dentro" title="Todas sus marcaciones dentro del radio"></span>';
+            return `
+            <tr class="asis-fila-geo" data-idx="${i}">
+                <td>${punto}${escapeHtml(r.nombre || '—')}</td>
                 <td>${escapeHtml(r.entrada || '—')}</td>
                 <td>${escapeHtml(r.almuerzo || '—')}</td>
                 <td>${escapeHtml(r.regreso || '—')}</td>
                 <td>${tiempoAlmuerzoMin(r)}</td>
                 <td>${escapeHtml(r.salida || '—')}</td>
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
     } else {
         encabezados = '<th>Entrada</th><th>Inicio Almuerzo</th><th>Fin de Almuerzo</th><th>Tiempo Almuerzo</th><th>Salida</th>';
         filas = registros.map(r => `
@@ -972,9 +999,15 @@ function verDetalleDia(dia, mes, anio) {
     // Dashboard, sidebar.js solo copia #toast/#confirmModal/#asisApp — cualquier
     // otro elemento del HTML original se descarta y nunca llegaría al DOM real.
     // Misma estructura .cal-modal-* que el popup del Calendario de PPs.
+    const tablaHtml = `
+                    <table>
+                        <thead>${esAdmin ? encabezados : `<tr>${encabezados}</tr>`}</thead>
+                        <tbody>${filas || `<tr><td colspan="${colspan}" style="text-align:center;color:#888;padding:20px;">Sin registros ese día</td></tr>`}</tbody>
+                    </table>`;
+    if (esAdmin) asegurarEstilosMapaAsis();
     const modalHtml = `
         <div class="cal-modal-overlay cal-modal-overlay-top" id="calDetalleModal">
-            <div class="cal-modal" onclick="event.stopPropagation()">
+            <div class="cal-modal${esAdmin ? ' cal-modal-mapa' : ''}" onclick="event.stopPropagation()">
                 <div class="cal-modal-header">
                     <strong><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">calendar_today</span> ${escapeHtml(tituloFecha)}</strong>
                     <button class="cal-modal-close" id="calDetalleCloseBtn"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
@@ -984,10 +1017,19 @@ function verDetalleDia(dia, mes, anio) {
                     <button class="btn-export" id="calDetalleExportBtn"><span class="material-symbols-outlined" style="font-size:16px;">download</span> Exportar</button>
                 </div>
                 <div class="cal-modal-body">
-                    <table>
-                        <thead><tr>${encabezados}</tr></thead>
-                        <tbody>${filas || `<tr><td colspan="${colspan}" style="text-align:center;color:#888;padding:20px;">Sin registros ese día</td></tr>`}</tbody>
-                    </table>
+                    ${esAdmin ? `
+                    <div class="asis-dia-layout">
+                        <div class="asis-dia-tabla">${tablaHtml}</div>
+                        <div class="asis-dia-mapa-wrap">
+                            <div id="asisDiaMapa" class="asis-dia-mapa"><div class="loading">Cargando mapa…</div></div>
+                            <div class="asis-mapa-leyenda">
+                                <span><span class="asis-geo-dot dentro"></span>Dentro del radio (${SEDE.radio} m)</span>
+                                <span><span class="asis-geo-dot fuera"></span>Fuera del radio</span>
+                                <span><span class="asis-geo-dot sede"></span>Sede UCAL</span>
+                            </div>
+                            <div class="asis-mapa-nota">Cada punto es una marcación: <b>E</b> entrada · <b>IA</b> inicio de almuerzo · <b>FA</b> fin de almuerzo · <b>S</b> salida. En días anteriores a este cambio solo existe la ubicación de la entrada.</div>
+                        </div>
+                    </div>` : tablaHtml}
                 </div>
             </div>
         </div>`;
@@ -997,11 +1039,161 @@ function verDetalleDia(dia, mes, anio) {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) cerrarDetalleDia(); });
     document.getElementById('calDetalleCloseBtn').addEventListener('click', cerrarDetalleDia);
     document.getElementById('calDetalleExportBtn').addEventListener('click', exportarDiaAsisExcel);
+
+    if (esAdmin) pintarMapaDia(registros);
 }
 
 function cerrarDetalleDia() {
+    if (mapaDiaAsis) { mapaDiaAsis.remove(); mapaDiaAsis = null; }
     document.getElementById('calDetalleModal')?.remove();
     state.diaAsisSeleccionado = null;
+}
+
+// ===== MAPA DE MARCACIONES (detalle del día, Supervisor/Admisión) =====
+// Cada marcación guarda su propia ubicación (sql/17). En días anteriores a
+// ese cambio solo existe la de la entrada (r.lat / r.lng).
+let mapaDiaAsis = null;
+let leafletCargando = null;
+
+const MARCAS_GEO = [
+    { campo: 'entrada', etiqueta: 'Entrada', corto: 'E' },
+    { campo: 'almuerzo', etiqueta: 'Inicio de almuerzo', corto: 'IA' },
+    { campo: 'regreso', etiqueta: 'Fin de almuerzo', corto: 'FA' },
+    { campo: 'salida', etiqueta: 'Salida', corto: 'S' },
+];
+
+function puntoGeo(latRaw, lngRaw) {
+    const lat = parseFloat(latRaw), lng = parseFloat(lngRaw);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return null;
+    const distancia = Math.round(calcularDistanciaMetros(SEDE.lat, SEDE.lng, lat, lng));
+    return { lat, lng, distancia, dentro: distancia <= SEDE.radio };
+}
+
+function ubicacionesPersona(r) {
+    const u = r.ubicaciones || {};
+    const lista = [];
+    MARCAS_GEO.forEach(mk => {
+        let src = u[mk.campo];
+        if (!src && mk.campo === 'entrada' && !r.ubicaciones) src = { lat: r.lat, lng: r.lng, direccion: r.direccion };
+        if (!src || !r[mk.campo]) return; // solo marcaciones realizadas
+        const p = puntoGeo(src.lat, src.lng);
+        if (p) lista.push({ ...p, ...mk, hora: r[mk.campo], direccion: src.direccion || '' });
+    });
+    return lista;
+}
+
+function ensureLeaflet() {
+    if (typeof L !== 'undefined') return Promise.resolve();
+    if (!leafletCargando) {
+        leafletCargando = new Promise((resolve, reject) => {
+            if (!document.querySelector('link[data-leaflet]')) {
+                const css = document.createElement('link');
+                css.rel = 'stylesheet';
+                css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+                css.setAttribute('data-leaflet', '');
+                document.head.appendChild(css);
+            }
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+            script.onload = resolve;
+            script.onerror = () => { leafletCargando = null; reject(new Error('No se pudo cargar el mapa')); };
+            document.body.appendChild(script);
+        });
+    }
+    return leafletCargando;
+}
+
+function asegurarEstilosMapaAsis() {
+    if (document.getElementById('asisMapaEstilos')) return;
+    const st = document.createElement('style');
+    st.id = 'asisMapaEstilos';
+    st.textContent = `
+        .cal-modal.cal-modal-mapa { max-width: 1280px; width: 96%; }
+        .cal-modal-mapa .cal-modal-body { padding: 12px 20px 20px; }
+        .asis-dia-layout { display: flex; gap: 16px; align-items: stretch; }
+        .asis-dia-tabla { flex: 0 0 52%; min-width: 0; overflow-y: auto; max-height: 64vh; }
+        .asis-dia-tabla th { line-height: 1.25; vertical-align: bottom; }
+        .asis-dia-tabla th, .asis-dia-tabla td { padding: 8px 8px !important; }
+        .asis-fila-geo { cursor: pointer; }
+        .asis-fila-geo:hover td, .asis-fila-geo.activa td { background: #EEF5FF; }
+        .asis-dia-mapa-wrap { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+        .asis-dia-mapa { flex: 1 1 auto; min-height: 420px; height: 58vh; border-radius: 8px; border: 1px solid #e0e0e0; overflow: hidden; }
+        .asis-mapa-leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: #555; }
+        .asis-mapa-nota { font-size: 11px; color: #8a8fa3; }
+        .asis-geo-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+        .asis-geo-dot.dentro { background: #2e7d32; }
+        .asis-geo-dot.fuera { background: #d32f2f; }
+        .asis-geo-dot.sin { background: #c4c4c4; }
+        .asis-geo-dot.sede { background: #0040A1; box-shadow: 0 0 0 3px rgba(0,64,161,0.25); }
+        .asis-mk span { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%;
+            color: #fff; font: 700 9.5px/1 Inter, sans-serif; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+        @media (max-width: 900px) {
+            .asis-dia-layout { flex-direction: column; }
+            .asis-dia-tabla { flex: none; max-height: none; }
+            .asis-dia-mapa { height: 340px; min-height: 340px; }
+        }`;
+    document.head.appendChild(st);
+}
+
+async function pintarMapaDia(registros) {
+    const cont = document.getElementById('asisDiaMapa');
+    if (!cont) return;
+    try {
+        await ensureLeaflet();
+    } catch (e) {
+        cont.innerHTML = `<div class="loading" style="color:#d32f2f;">${escapeHtml(e.message)}</div>`;
+        return;
+    }
+    if (!document.getElementById('asisDiaMapa')) return; // se cerró el modal mientras cargaba
+    cont.innerHTML = '';
+
+    if (mapaDiaAsis) { mapaDiaAsis.remove(); mapaDiaAsis = null; }
+    const mapa = L.map(cont, { scrollWheelZoom: true });
+    mapaDiaAsis = mapa;
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap',
+    }).addTo(mapa);
+
+    // Origen (sede) y radio de aceptación
+    L.circle([SEDE.lat, SEDE.lng], { radius: SEDE.radio, color: '#0040A1', weight: 2, fillColor: '#0040A1', fillOpacity: 0.08 }).addTo(mapa);
+    L.circleMarker([SEDE.lat, SEDE.lng], { radius: 7, color: '#ffffff', weight: 2, fillColor: '#0040A1', fillOpacity: 1 })
+        .bindTooltip(`Sede UCAL · radio ${SEDE.radio} m`).addTo(mapa);
+
+    const puntos = [[SEDE.lat, SEDE.lng]];
+    const marcadores = {};
+    registros.forEach((r, i) => {
+        const marcas = ubicacionesPersona(r);
+        if (!marcas.length) return;
+        marcadores[i] = marcas.map(u => {
+            const color = u.dentro ? '#2e7d32' : '#d32f2f';
+            const icono = L.divIcon({ className: 'asis-mk', html: `<span style="background:${color}">${u.corto}</span>`, iconSize: [24, 24], iconAnchor: [12, 12] });
+            puntos.push([u.lat, u.lng]);
+            return L.marker([u.lat, u.lng], { icon: icono })
+                .bindTooltip(`${escapeHtml(r.nombre || '—')} · ${u.etiqueta}`)
+                .bindPopup(`<b>${escapeHtml(r.nombre || '—')}</b><br>${u.etiqueta}: ${escapeHtml(u.hora || '—')}<br>`
+                    + `${u.distancia} m de la sede · <b style="color:${color}">${u.dentro ? 'dentro' : 'fuera'} del radio</b>`
+                    + (u.direccion && u.direccion !== 'NO_AUTORIZADO' ? `<br><span style="color:#666">${escapeHtml(u.direccion)}</span>` : ''))
+                .addTo(mapa);
+        });
+    });
+
+    if (puntos.length > 1) mapa.fitBounds(puntos, { padding: [30, 30], maxZoom: 18 });
+    else mapa.setView([SEDE.lat, SEDE.lng], 17);
+    setTimeout(() => mapa.invalidateSize(), 50);
+
+    // Clic en una fila: centra el mapa en esa persona
+    document.querySelectorAll('#calDetalleModal .asis-fila-geo').forEach(tr => {
+        tr.addEventListener('click', () => {
+            document.querySelectorAll('#calDetalleModal .asis-fila-geo').forEach(x => x.classList.remove('activa'));
+            tr.classList.add('activa');
+            const ms = marcadores[tr.dataset.idx];
+            if (!ms || !ms.length) { showToast('Esta persona no tiene ubicación registrada ese día', 'err'); return; }
+            if (ms.length === 1) mapa.setView(ms[0].getLatLng(), 18);
+            else mapa.fitBounds(ms.map(m => m.getLatLng()), { padding: [40, 40], maxZoom: 18 });
+            ms[0].openPopup();
+        });
+    });
 }
 
 window.verDetalleDia = verDetalleDia;

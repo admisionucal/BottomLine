@@ -231,7 +231,7 @@ export function armarGrupos(leads: LeadMin[], ahora = new Date()) {
 
 // ---------- Prompt ----------
 function promptPropuesta(campana: string, datos: ReturnType<typeof armarGrupos>) {
-  const system = `Eres el jefe comercial de Admisión de UCAL (universidad en Lima, Perú). Cada 4 horas revisas la bandeja de leads de telemarketing y propones cómo abordarla.
+  const system = `Eres el jefe comercial de Admisión de UCAL (universidad en Lima, Perú). Varias veces al día (10:10, 12:00, 15:00 y 17:00) revisas la bandeja de leads de telemarketing y propones cómo abordarla.
 Escribes en español, directo y accionable, para supervisores y asesores. Usa el vocabulario de UCAL: "cuotas educativas" o "inversión", nunca "pensión" para pagos en UCAL.
 Reglas comerciales que respetas: el seguimiento a un lead no debe superar 3 días sin contacto; las becas solo se ofrecen si el lead las pide o hay un problema económico; antes de cotizar se perfila (colegio, modalidad, quién decide, quién paga).
 No inventes datos: usa solo las cifras que te doy. Respondes ÚNICAMENTE con JSON válido.`;
@@ -253,7 +253,7 @@ ${JSON.stringify(datos.porAsesor.map((a) => ({ asesor: a.asesor, ...a.conteos })
 
 Devuelve este JSON:
 {
- "macro": "3 a 5 frases: prioridades para todo el equipo en las próximas 4 horas, en orden",
+ "macro": "3 a 5 frases: prioridades para todo el equipo hasta la próxima revisión, en orden",
  "grupos": { "<clave del grupo>": "qué hacer con ESTOS leads: acción concreta, mensaje o pregunta sugerida, en 2 a 3 frases" },
  "asesores": { "<nombre exacto del asesor>": "1 a 2 frases: qué debe hacer primero con sus leads" }
 }

@@ -17,10 +17,10 @@
 	"ai": {
 		"binding": "AI"
 	},
-	// Propuesta de abordaje: 7:00, 11:00, 15:00 y 19:00 hora de Lima (UTC-5).
-	// Los cron de Cloudflare van en UTC: 12:00, 16:00, 20:00 y 00:00.
+	// Propuesta de abordaje: 10:10, 12:00, 15:00 y 17:00 hora de Lima (UTC-5).
+	// Los cron de Cloudflare van en UTC: 15:10, 17:00, 20:00 y 22:00.
 	"triggers": {
-		"crons": ["0 0,12,16,20 * * *"]
+		"crons": ["10 15 * * *", "0 17,20,22 * * *"]
 	},
 	// Secretos (no van aquí): IMPORT_SECRET, SUPABASE_SERVICE_ROLE_KEY y,
 	// para la Capacitación IA, ANTHROPIC_API_KEY. Se cargan con:
