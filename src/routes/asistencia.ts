@@ -51,6 +51,13 @@ export async function marcarAsistencia(client: Client, body: JsonBody) {
   const fecha = normalizarFecha(body.fecha);
   if (!fecha) return jsonError('Fecha inválida.');
 
+  // Sin ubicación activa no se registra la marcación.
+  const lat = parseFloat(String(body.lat ?? ''));
+  const lng = parseFloat(String(body.lng ?? ''));
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return jsonError('Activa tu ubicación para poder marcar.');
+  }
+
   // Aseguramos que exista la fila del día (equivalente a sh.appendRow si no existía),
   // sin pisar campos ya registrados.
   await client.query(
@@ -63,17 +70,12 @@ export async function marcarAsistencia(client: Client, body: JsonBody) {
   // UPDATE atómico: solo escribe si el campo todavía está vacío.
   // Esto reemplaza por completo tu conLockAsistencia() manual — Postgres
   // ya garantiza que dos marcaciones simultáneas no se pisen entre sí.
-  // Ubicación propia de cada marcación (lat_entrada, lat_almuerzo, ...).
-  // `campo` ya viene validado contra CAMPOS_VALIDOS, así que es seguro
-  // usarlo en el nombre de la columna. Las columnas generales latitud /
-  // longitud / direccion siguen guardando solo la de la entrada, como antes.
+  // Solo se guarda la ubicación de la Entrada. Las demás marcaciones exigen
+  // ubicación activa (validado arriba) pero no la almacenan.
   const esEntrada = campo === 'entrada';
   const result = await client.query(
     `update asistencia set
         ${campo} = $1,
-        lat_${campo} = coalesce(nullif($2, ''), lat_${campo}),
-        lng_${campo} = coalesce(nullif($3, ''), lng_${campo}),
-        dir_${campo} = coalesce(nullif($4, ''), dir_${campo}),
         latitud = case when ${esEntrada} then coalesce(nullif($2, ''), latitud) else latitud end,
         longitud = case when ${esEntrada} then coalesce(nullif($3, ''), longitud) else longitud end,
         direccion = case when ${esEntrada} then coalesce(nullif($4, ''), direccion) else direccion end,
@@ -232,22 +234,7 @@ function filaAObjeto(r: any) {
     lat: r.latitud,
     lng: r.longitud,
     direccion: r.direccion,
-    // Ubicación de cada marcación (sql/17). Antes de ese cambio solo existe
-    // la de la entrada (latitud/longitud), que se usa como respaldo.
-    ubicaciones: {
-      entrada: ubic(r.lat_entrada ?? r.latitud, r.lng_entrada ?? r.longitud, r.dir_entrada ?? r.direccion),
-      almuerzo: ubic(r.lat_almuerzo, r.lng_almuerzo, r.dir_almuerzo),
-      regreso: ubic(r.lat_regreso, r.lng_regreso, r.dir_regreso),
-      salida: ubic(r.lat_salida, r.lng_salida, r.dir_salida),
-    },
     estado: r.estado,
     tipo: r.tipo || '',
   };
-}
-
-function ubic(lat: any, lng: any, dir: any) {
-  const la = String(lat ?? '').trim();
-  const lo = String(lng ?? '').trim();
-  if (!la || !lo) return null;
-  return { lat: la, lng: lo, direccion: String(dir ?? '') };
 }

@@ -502,8 +502,14 @@ async function ejecutarMarcacion(tipo) {
     btn.disabled = true;
 
     try {
-        // Ubicación del momento de esta marcación (todas, no solo la entrada).
-        await refrescarUbicacion();
+        // Solo la Entrada exige (y guarda) la ubicación activa.
+        if (tipo === 'entrada') await refrescarUbicacion();
+        if (tipo === 'entrada' && (!state.location.lat || !state.location.lng)) {
+            showToast('Activa tu ubicación para poder marcar la Entrada. Permite el acceso a la ubicación en el navegador e inténtalo de nuevo.', 'err');
+            getLocation();
+            liberar();
+            return;
+        }
 
         const m = state.todayRecord || {};
         if (m[tipo] && String(m[tipo]).trim() !== '') {
@@ -594,8 +600,8 @@ async function ejecutarMarcacion(tipo) {
 }
 
 // ===== GEOLOCALIZACIÓN =====
-// Pide la posición actual antes de cada marcación (hasta 6 s). Si falla,
-// se queda con la última conocida para no bloquear la marcación.
+// Pide la posición actual antes de cada marcación (hasta 6 s). Sin ubicación
+// no se puede marcar: si el permiso fue denegado se borra la última conocida.
 function refrescarUbicacion() {
     if (!navigator.geolocation) return Promise.resolve();
     return new Promise(resolve => {
@@ -612,7 +618,13 @@ function refrescarUbicacion() {
                 }
                 fin();
             },
-            () => fin(),
+            err => {
+                if (err && err.code === 1) {
+                    state.location = { lat: '', lng: '', direccion: 'NO_AUTORIZADO' };
+                    setLoc('Error de ubicación: Permiso denegado — click para reintentar');
+                }
+                fin();
+            },
             { enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 }
         );
     });
@@ -969,8 +981,8 @@ function verDetalleDia(dia, mes, anio) {
             const fuera = marcas.filter(m => !m.dentro);
             const punto = !marcas.length ? '<span class="asis-geo-dot sin" title="Sin ubicación registrada"></span>'
                 : fuera.length
-                    ? `<span class="asis-geo-dot fuera" title="Fuera del radio en: ${escapeHtml(fuera.map(m => m.etiqueta).join(', '))}"></span>`
-                    : '<span class="asis-geo-dot dentro" title="Todas sus marcaciones dentro del radio"></span>';
+                    ? `<span class="asis-geo-dot fuera" title="Entrada fuera del radio"></span>`
+                    : '<span class="asis-geo-dot dentro" title="Entrada dentro del radio"></span>';
             return `
             <tr class="asis-fila-geo" data-idx="${i}">
                 <td>${punto}${escapeHtml(r.nombre || '—')}</td>
@@ -1027,7 +1039,6 @@ function verDetalleDia(dia, mes, anio) {
                                 <span><span class="asis-geo-dot fuera"></span>Fuera del radio</span>
                                 <span><span class="asis-geo-dot sede"></span>Sede UCAL</span>
                             </div>
-                            <div class="asis-mapa-nota">Cada punto es una marcación: <b>E</b> entrada · <b>IA</b> inicio de almuerzo · <b>FA</b> fin de almuerzo · <b>S</b> salida. En días anteriores a este cambio solo existe la ubicación de la entrada.</div>
                         </div>
                     </div>` : tablaHtml}
                 </div>
@@ -1050,16 +1061,13 @@ function cerrarDetalleDia() {
 }
 
 // ===== MAPA DE MARCACIONES (detalle del día, Supervisor/Admisión) =====
-// Cada marcación guarda su propia ubicación (sql/17). En días anteriores a
-// ese cambio solo existe la de la entrada (r.lat / r.lng).
+// Se muestra la ubicación de la Entrada de cada persona (r.lat / r.lng).
 let mapaDiaAsis = null;
 let leafletCargando = null;
 
+// Solo se guarda la ubicación de la Entrada (r.lat / r.lng).
 const MARCAS_GEO = [
     { campo: 'entrada', etiqueta: 'Entrada', corto: 'E' },
-    { campo: 'almuerzo', etiqueta: 'Inicio de almuerzo', corto: 'IA' },
-    { campo: 'regreso', etiqueta: 'Fin de almuerzo', corto: 'FA' },
-    { campo: 'salida', etiqueta: 'Salida', corto: 'S' },
 ];
 
 function puntoGeo(latRaw, lngRaw) {
@@ -1070,12 +1078,10 @@ function puntoGeo(latRaw, lngRaw) {
 }
 
 function ubicacionesPersona(r) {
-    const u = r.ubicaciones || {};
     const lista = [];
     MARCAS_GEO.forEach(mk => {
-        let src = u[mk.campo];
-        if (!src && mk.campo === 'entrada' && !r.ubicaciones) src = { lat: r.lat, lng: r.lng, direccion: r.direccion };
-        if (!src || !r[mk.campo]) return; // solo marcaciones realizadas
+        const src = { lat: r.lat, lng: r.lng, direccion: r.direccion };
+        if (!r[mk.campo]) return; // solo marcaciones realizadas
         const p = puntoGeo(src.lat, src.lng);
         if (p) lista.push({ ...p, ...mk, hora: r[mk.campo], direccion: src.direccion || '' });
     });
@@ -1110,16 +1116,15 @@ function asegurarEstilosMapaAsis() {
     st.textContent = `
         .cal-modal.cal-modal-mapa { max-width: 1280px; width: 96%; }
         .cal-modal-mapa .cal-modal-body { padding: 12px 20px 20px; }
-        .asis-dia-layout { display: flex; gap: 16px; align-items: stretch; }
-        .asis-dia-tabla { flex: 0 0 52%; min-width: 0; overflow-y: auto; max-height: 64vh; }
+        .asis-dia-layout { display: flex; gap: 16px; align-items: flex-start; }
+        .asis-dia-tabla { flex: 0 0 52%; min-width: 0; }
         .asis-dia-tabla th { line-height: 1.25; vertical-align: bottom; }
         .asis-dia-tabla th, .asis-dia-tabla td { padding: 8px 8px !important; }
         .asis-fila-geo { cursor: pointer; }
         .asis-fila-geo:hover td, .asis-fila-geo.activa td { background: #EEF5FF; }
-        .asis-dia-mapa-wrap { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-        .asis-dia-mapa { flex: 1 1 auto; min-height: 420px; height: 58vh; border-radius: 8px; border: 1px solid #e0e0e0; overflow: hidden; }
+        .asis-dia-mapa-wrap { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; }
+        .asis-dia-mapa { flex: 1 1 auto; min-height: 360px; height: calc(85vh - 190px); border-radius: 8px; border: 1px solid #e0e0e0; overflow: hidden; }
         .asis-mapa-leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: #555; }
-        .asis-mapa-nota { font-size: 11px; color: #8a8fa3; }
         .asis-geo-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
         .asis-geo-dot.dentro { background: #2e7d32; }
         .asis-geo-dot.fuera { background: #d32f2f; }
@@ -1129,7 +1134,8 @@ function asegurarEstilosMapaAsis() {
             color: #fff; font: 700 9.5px/1 Inter, sans-serif; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
         @media (max-width: 900px) {
             .asis-dia-layout { flex-direction: column; }
-            .asis-dia-tabla { flex: none; max-height: none; }
+            .asis-dia-tabla { flex: none; }
+            .asis-dia-mapa-wrap { position: static; }
             .asis-dia-mapa { height: 340px; min-height: 340px; }
         }`;
     document.head.appendChild(st);
