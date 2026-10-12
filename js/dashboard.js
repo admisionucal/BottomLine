@@ -37,6 +37,7 @@ let state = {
     },
     campana: '',
     calCampanas: [],
+    calCanales: [],
     campanasVigentes: [],
     campanasActivas: [],
     calLeadsPorCampana: {},
@@ -326,32 +327,38 @@ function renderCampanaOptions(campanas) {
     }
 }
 
-// ===== FILTRO DE CAMPAÑA DEL CALENDARIO =====
+// ===== CAMPAÑAS Y FILTRO DE CANAL DEL CALENDARIO =====
+// El calendario muestra todas las campañas vigentes del usuario; el filtro
+// que se ofrece es el de CANAL.
 function setupCalendarioCampanaFiltro(user) {
-    const campanas = getCampanasCalendario();
-    const grupo = document.getElementById('calCampanaFilterGroup');
-    if (!grupo) return;
+    state.calCampanas = getCampanasCalendario().slice();
+}
 
-    // Si el usuario solo tiene una campaña, no hay nada que filtrar.
-    if (campanas.length <= 1) {
-        grupo.style.display = 'none';
-        state.calCampanas = campanas.slice();
-        return;
-    }
-    grupo.style.display = '';
+function canalDeLead(lead) {
+    return String(lead[COLUMNAS.CANAL] || '').trim();
+}
 
-    const saved = cacheGet(CACHE_KEYS.CAL_CAMPANAS);
-    const seleccionGuardada = Array.isArray(saved) ? saved.filter(c => campanas.includes(c)) : [];
-    state.calCampanas = seleccionGuardada.length > 0 ? seleccionGuardada : [state.campana].filter(Boolean);
+function pasaFiltroCanalCalendario(lead) {
+    if (!state.calCanales || state.calCanales.length === 0) return true;
+    return state.calCanales.includes(canalDeLead(lead));
+}
 
-    createMultiSelect('calFilterCampana', campanas, state.calCampanas, 'Todas');
+function renderFiltroCanalCalendario() {
+    const valores = [];
+    Object.values(state.calLeadsPorCampana || {}).forEach(leads => {
+        (leads || []).forEach(lead => { const c = canalDeLead(lead); if (c) valores.push(c); });
+    });
+    const unicos = [...new Set(valores)];
+    state.calCanales = (state.calCanales || []).filter(c => unicos.includes(c));
+    createMultiSelect('calFilterCanal', unicos, state.calCanales, 'Todos los canales');
 }
 
 window.addEventListener('multiselect-change', (e) => {
-    if (e.detail.containerId !== 'calFilterCampana') return;
-    state.calCampanas = e.detail.values;
-    cacheSet(CACHE_KEYS.CAL_CAMPANAS, state.calCampanas);
-    cargarLeadsCalendario();
+    if (e.detail.containerId !== 'calFilterCanal') return;
+    state.calCanales = e.detail.values;
+    actualizarCalendario();
+    renderCalendarioPP();
+    renderLeyendaCalendario();
 });
 
 function getCampanasCalendario() {
@@ -373,6 +380,7 @@ async function cargarLeadsCalendario(forceRefresh = false) {
 
     if (campanasActivas.length === 0) {
         state.calLeadsPorCampana = {};
+        renderFiltroCanalCalendario();
         actualizarCalendario();
         renderCalendarioPP();
         renderLeyendaCalendario();
@@ -406,6 +414,7 @@ async function cargarLeadsCalendario(forceRefresh = false) {
     state.calLeadsPorCampana = {};
     resultados.forEach(({ campana, leads }) => { state.calLeadsPorCampana[campana] = leads; });
 
+    renderFiltroCanalCalendario();
     actualizarCalendario();
     renderCalendarioPP();
     renderLeyendaCalendario();
@@ -892,6 +901,7 @@ function construirMapaAsesor() {
 
     Object.keys(state.calLeadsPorCampana).forEach(campana => {
         (state.calLeadsPorCampana[campana] || []).forEach(lead => {
+            if (!pasaFiltroCanalCalendario(lead)) return;
             const status = lead[COLUMNAS.STATUS_GESTION] || '';
             if (status === STATUS.PP_VIVA) {
                 const fecha = parsearFechaFlexible(lead[COLUMNAS.FECHA_COMPROMISO_PAGO]);
@@ -927,6 +937,7 @@ function construirMapaAdmin() {
 
     Object.keys(state.calLeadsPorCampana).forEach(campana => {
         (state.calLeadsPorCampana[campana] || []).forEach(lead => {
+            if (!pasaFiltroCanalCalendario(lead)) return;
             const status = lead[COLUMNAS.STATUS_GESTION] || '';
 
             // Categorías por status: siguen siendo excluyentes entre sí, como antes.
@@ -1222,6 +1233,7 @@ function abrirDetalleDia(claveDia) {
     items.forEach(({ lead, categoria, campana }) => {
         const id = lead[COLUMNAS.ID_PROMETEO] || '-';
         const carrera = lead['CARRERA'] || lead['PROGRAMA'] || '-';
+        const canal = canalDeLead(lead) || '-';
         const modalidadIngreso = lead['MODALIDAD INGRESO'] || '-';
         const modalidad = lead['MODALIDAD'] || '-';
         const { boleta, boletaConMatricula } = calcularColumnasBoleta(lead);
@@ -1231,6 +1243,7 @@ function abrirDetalleDia(claveDia) {
             <tr>
                 <td><span class="cal-dot" style="background:${colorParaItem(categoria, campana)};"></span> ${escapeHtml(cat.label)}</td>
                 ${mostrarCampana ? `<td>${escapeHtml(campana)}</td>` : ''}
+                <td>${escapeHtml(canal)}</td>
                 <td><a href="#" class="id-link" onclick="verDetalleDesdeCalendario('${escapeHtml(id)}'); return false;">${escapeHtml(id)}</a></td>
                 <td>${escapeHtml(carrera)}</td>
                 <td>${escapeHtml(modalidadIngreso)}</td>
@@ -1241,11 +1254,17 @@ function abrirDetalleDia(claveDia) {
             </tr>`;
     });
 
-    const colspan = (esAdmin ? 8 : 7) + (mostrarCampana ? 1 : 0);
+    const colspan = (esAdmin ? 9 : 8) + (mostrarCampana ? 1 : 0);
+
+    // Anchos: CARRERA un 10% más ancha que las demás columnas.
+    const pesos = ['cat', ...(mostrarCampana ? ['camp'] : []), 'canal', 'id', 'carrera', 'mi', 'mod', 'bol', 'bolm', ...(esAdmin ? ['ase'] : [])]
+        .map(k => (k === 'carrera' ? 1.1 : 1));
+    const totalPesos = pesos.reduce((a, b) => a + b, 0);
+    const colgroup = `<colgroup>${pesos.map(p => `<col style="width:${(p / totalPesos * 100).toFixed(2)}%">`).join('')}</colgroup>`;
 
     const modalHtml = `
         <div class="cal-modal-overlay cal-modal-overlay-top" id="calModalOverlay" onclick="cerrarDetalleDia(event)">
-            <div class="cal-modal" onclick="event.stopPropagation()">
+            <div class="cal-modal" style="max-width:1200px; width:96%;" onclick="event.stopPropagation()">
                 <div class="cal-modal-header">
                     <strong><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">calendar_today</span> ${fechaLegible}</strong>
                     <button class="cal-modal-close" onclick="cerrarDetalleDia()"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
@@ -1256,8 +1275,9 @@ function abrirDetalleDia(claveDia) {
                 </div>
                 <div class="cal-modal-body">
                     <table>
+                        ${colgroup}
                         <thead><tr>
-                            <th>CATEGORÍA</th>${mostrarCampana ? '<th>CAMPAÑA</th>' : ''}<th>ID</th><th>CARRERA</th><th>MODALIDAD INGRESO</th><th>MODALIDAD</th><th>BOLETA</th><th>BOLETA CON CONCEPTOS DE MATRÍCULA</th>${esAdmin ? '<th>ASESOR</th>' : ''}
+                            <th>CATEGORÍA</th>${mostrarCampana ? '<th>CAMPAÑA</th>' : ''}<th>CANAL</th><th>ID</th><th>CARRERA</th><th>MODALIDAD INGRESO</th><th>MODALIDAD</th><th>BOLETA</th><th>BOLETA CON CONCEPTOS DE MATRÍCULA</th>${esAdmin ? '<th>ASESOR</th>' : ''}
                         </tr></thead>
                         <tbody>${filas || `<tr><td colspan="${colspan}" style="text-align:center;color:#888;padding:20px;">Sin registros</td></tr>`}</tbody>
                     </table>
@@ -1352,6 +1372,7 @@ function construirFilasExportCalendario(items, esAdmin, incluirFecha) {
         if (incluirFecha && fecha) fila['FECHA'] = fecha.split('-').reverse().join('/');
         fila['CATEGORÍA'] = CATEGORIAS_CALENDARIO[categoria].label;
         if (mostrarCampana) fila['CAMPAÑA'] = campana || '';
+        fila['CANAL'] = canalDeLead(lead);
         fila['ID PROMETEO'] = lead[COLUMNAS.ID_PROMETEO] || '';
         fila['CARRERA'] = lead['CARRERA'] || lead['PROGRAMA'] || '';
         fila['MODALIDAD INGRESO'] = lead['MODALIDAD INGRESO'] || '';
