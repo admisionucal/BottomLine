@@ -37,7 +37,6 @@ let state = {
     },
     campana: '',
     calCampanas: [],
-    calCanales: [],
     campanasVigentes: [],
     campanasActivas: [],
     calLeadsPorCampana: {},
@@ -327,39 +326,37 @@ function renderCampanaOptions(campanas) {
     }
 }
 
-// ===== CAMPAÑAS Y FILTRO DE CANAL DEL CALENDARIO =====
-// El calendario muestra todas las campañas vigentes del usuario; el filtro
-// que se ofrece es el de CANAL.
+// ===== FILTRO DE CAMPAÑA DEL CALENDARIO =====
 function setupCalendarioCampanaFiltro(user) {
-    state.calCampanas = getCampanasCalendario().slice();
+    const campanas = getCampanasCalendario();
+    const grupo = document.getElementById('calCampanaFilterGroup');
+    if (!grupo) return;
+
+    // Si el usuario solo tiene una campaña, no hay nada que filtrar.
+    if (campanas.length <= 1) {
+        grupo.style.display = 'none';
+        state.calCampanas = campanas.slice();
+        return;
+    }
+    grupo.style.display = '';
+
+    const saved = cacheGet(CACHE_KEYS.CAL_CAMPANAS);
+    const seleccionGuardada = Array.isArray(saved) ? saved.filter(c => campanas.includes(c)) : [];
+    state.calCampanas = seleccionGuardada.length > 0 ? seleccionGuardada : [state.campana].filter(Boolean);
+
+    createMultiSelect('calFilterCampana', campanas, state.calCampanas, 'Todas');
 }
+
+window.addEventListener('multiselect-change', (e) => {
+    if (e.detail.containerId !== 'calFilterCampana') return;
+    state.calCampanas = e.detail.values;
+    cacheSet(CACHE_KEYS.CAL_CAMPANAS, state.calCampanas);
+    cargarLeadsCalendario();
+});
 
 function canalDeLead(lead) {
     return String(lead[COLUMNAS.CANAL] || '').trim();
 }
-
-function pasaFiltroCanalCalendario(lead) {
-    if (!state.calCanales || state.calCanales.length === 0) return true;
-    return state.calCanales.includes(canalDeLead(lead));
-}
-
-function renderFiltroCanalCalendario() {
-    const valores = [];
-    Object.values(state.calLeadsPorCampana || {}).forEach(leads => {
-        (leads || []).forEach(lead => { const c = canalDeLead(lead); if (c) valores.push(c); });
-    });
-    const unicos = [...new Set(valores)];
-    state.calCanales = (state.calCanales || []).filter(c => unicos.includes(c));
-    createMultiSelect('calFilterCanal', unicos, state.calCanales, 'Todos los canales');
-}
-
-window.addEventListener('multiselect-change', (e) => {
-    if (e.detail.containerId !== 'calFilterCanal') return;
-    state.calCanales = e.detail.values;
-    actualizarCalendario();
-    renderCalendarioPP();
-    renderLeyendaCalendario();
-});
 
 function getCampanasCalendario() {
     const todas = getUserCampanas();
@@ -380,7 +377,6 @@ async function cargarLeadsCalendario(forceRefresh = false) {
 
     if (campanasActivas.length === 0) {
         state.calLeadsPorCampana = {};
-        renderFiltroCanalCalendario();
         actualizarCalendario();
         renderCalendarioPP();
         renderLeyendaCalendario();
@@ -414,7 +410,6 @@ async function cargarLeadsCalendario(forceRefresh = false) {
     state.calLeadsPorCampana = {};
     resultados.forEach(({ campana, leads }) => { state.calLeadsPorCampana[campana] = leads; });
 
-    renderFiltroCanalCalendario();
     actualizarCalendario();
     renderCalendarioPP();
     renderLeyendaCalendario();
@@ -487,10 +482,12 @@ function applyFilters() {
     const user = getCurrentUser();
     const esAdmin = esRolSupervisorOAdmision(user.rol);
     const { carrera, ingreso, beneficio, modalidad, asesor, status, perfil, dolorNecesidad, fechaPrimVpPp } = state.filtros;
+    const canal = state.filtros.canal || [];
 
     state.leadsFiltered = state.leadsRaw.filter(lead => {
         // Filtros multi-select
         if (carrera.length > 0 && !carrera.includes(lead[COLUMNAS.CARRERA] || lead[COLUMNAS.PROGRAMA] || '')) return false;
+        if (canal.length > 0 && !canal.includes(canalDeLead(lead))) return false;
         if (ingreso.length > 0 && !ingreso.includes(lead[COLUMNAS.MODALIDAD_INGRESO] || '')) return false;
         if (beneficio.length > 0 && !beneficio.includes(lead[COLUMNAS.BENEFICIO] || '')) return false;
         if (modalidad.length > 0 && !modalidad.includes(lead[COLUMNAS.MODALIDAD] || '')) return false;
@@ -540,6 +537,7 @@ function populateFilters() {
     };
 
     createMultiSelect('filterCarrera', getValues(COLUMNAS.CARRERA, 'carrera'), state.filtros.carrera, 'Todas');
+    createMultiSelect('filterCanal', getValues(COLUMNAS.CANAL, 'canal'), state.filtros.canal || [], 'Todos');
     createMultiSelect('filterIngreso', getValues(COLUMNAS.MODALIDAD_INGRESO, 'ingreso'), state.filtros.ingreso, 'Todos');
     createMultiSelect('filterBeneficio', getValues(COLUMNAS.BENEFICIO, 'beneficio'), state.filtros.beneficio, 'Todos');
     createMultiSelect('filterModalidad', getValues(COLUMNAS.MODALIDAD, 'modalidad'), state.filtros.modalidad, 'Todas');
@@ -574,7 +572,9 @@ function leadPasaFiltrosSin(lead, filtroExcluido, esAdmin) {
     if (!esAdmin) filtros.asesor = [];
 
     const { carrera, ingreso, beneficio, modalidad, asesor, status, perfil, dolorNecesidad, fechaPrimVpPp } = filtros;
+    const canal = filtros.canal || [];
 
+    if (canal.length > 0 && !canal.includes(canalDeLead(lead))) return false;
     if (carrera.length > 0 && !carrera.includes(lead[COLUMNAS.CARRERA] || lead[COLUMNAS.PROGRAMA] || '')) return false;
     if (ingreso.length > 0 && !ingreso.includes(lead[COLUMNAS.MODALIDAD_INGRESO] || '')) return false;
     if (beneficio.length > 0 && !beneficio.includes(lead[COLUMNAS.BENEFICIO] || '')) return false;
@@ -901,7 +901,6 @@ function construirMapaAsesor() {
 
     Object.keys(state.calLeadsPorCampana).forEach(campana => {
         (state.calLeadsPorCampana[campana] || []).forEach(lead => {
-            if (!pasaFiltroCanalCalendario(lead)) return;
             const status = lead[COLUMNAS.STATUS_GESTION] || '';
             if (status === STATUS.PP_VIVA) {
                 const fecha = parsearFechaFlexible(lead[COLUMNAS.FECHA_COMPROMISO_PAGO]);
@@ -937,7 +936,6 @@ function construirMapaAdmin() {
 
     Object.keys(state.calLeadsPorCampana).forEach(campana => {
         (state.calLeadsPorCampana[campana] || []).forEach(lead => {
-            if (!pasaFiltroCanalCalendario(lead)) return;
             const status = lead[COLUMNAS.STATUS_GESTION] || '';
 
             // Categorías por status: siguen siendo excluyentes entre sí, como antes.
