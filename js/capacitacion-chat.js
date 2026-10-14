@@ -3,6 +3,11 @@ import { getCurrentUser, getSessionToken, escapeHtml, formatearFecha } from '../
 import { Sidebar, renderTable, Toast } from '../core/components.js';
 
 const ESPERA_ANTES_DE_RESPONDER_MS = 2500;
+const SILENCIO_FIN_TURNO_MS = 1300;
+const Reconocedor = window.SpeechRecognition || window.webkitSpeechRecognition;
+const VOZ_SOPORTADA = !!Reconocedor && 'speechSynthesis' in window;
+const HINT_CHAT = 'También puedes escribir <b>FINALIZAR SIMULACIÓN</b> en el chat. Tú inicias la conversación, como en la bandeja real.';
+const HINT_LLAMADA = 'Habla con normalidad: cuando haces una pausa, el cliente te responde. Usa audífonos para que el micrófono no capte su voz. También puedes decir <b>FINALIZAR SIMULACIÓN</b>.';
 const FRASE_FIN = 'FINALIZAR SIMULACION';
 
 const state = {
@@ -16,12 +21,15 @@ const state = {
     timer: null,
     esperando: false,
     finalizando: false,
+    canal: 'chat',
     ultimaSesion: null,
     escenarios: [],
     asignacion: { escenarioId: null, asesores: [], marcados: new Set() },
 };
 
 let toast = null;
+
+const voz = { activa: false, rec: null, escuchando: false, pausado: false, hablando: false, bloqueado: false, buffer: '', parcial: '', timer: null, voz: null };
 
 async function callAPI(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
@@ -107,6 +115,10 @@ async function init(embebido) {
     $('asigTodos').addEventListener('click', () => { filtrarAsesores().forEach((a) => state.asignacion.marcados.add(a.usuario)); pintarListaAsignacion(); });
     $('asigNinguno').addEventListener('click', () => { state.asignacion.marcados.clear(); pintarListaAsignacion(); });
 
+    $('llamadaListo').addEventListener('click', cerrarTurnoVoz);
+    $('llamadaMic').addEventListener('click', alternarMicrofono);
+    if (VOZ_SOPORTADA) speechSynthesis.addEventListener?.('voiceschanged', () => { if (voz.activa) elegirVoz(state.ficha?.nombre); });
+
     window.addEventListener('beforeunload', (e) => {
         if (state.sesionId && (state.cola.length || state.esperando)) { e.preventDefault(); e.returnValue = ''; }
     });
@@ -115,6 +127,7 @@ async function init(embebido) {
 }
 
 function mostrarVista(v) {
+    if (v !== 'chat') detenerLlamada();
     $('vistaInicio').style.display = v === 'inicio' ? '' : 'none';
     $('vistaChat').style.display = v === 'chat' ? '' : 'none';
     $('vistaFeedback').style.display = v === 'feedback' ? '' : 'none';
@@ -172,6 +185,7 @@ function pintarPracticar() {
                    ${hecho ? `<br><small>Último resultado: Conversación ${Number(a.conversacion).toFixed(0)} · Precisión ${Number(a.precision).toFixed(0)}</small>` : ''}</p>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                     <button class="btn-primary" data-asignacion="${a.id}">${hecho ? 'Practicar de nuevo' : 'Empezar'}</button>
+                    ${botonLlamada(`data-asignacion-llamada="${a.id}"`)}
                     ${hecho ? `<button class="btn-secundario" data-ver="${escapeHtml(a.sesionId)}">Ver feedback</button>` : ''}
                 </div>
             </div>`;
@@ -184,13 +198,18 @@ function pintarPracticar() {
             <span class="cap-nivel">Nivel ${e.nivel} · ${escapeHtml(p.niveles[e.nivel]?.nombre || '')}</span>
             <h4>${escapeHtml(e.titulo)}</h4>
             <p>${escapeHtml(e.objetivo || p.niveles[e.nivel]?.detalle || '')}</p>
-            <button class="btn-primary" data-escenario="${e.id}">Practicar</button>
+            <div class="cap-acciones">
+                <button class="btn-primary" data-escenario="${e.id}">Practicar</button>
+                ${botonLlamada(`data-escenario-llamada="${e.id}"`)}
+            </div>
         </div>`).join('') + '</div>';
 
     const cont = $('tabPracticar');
     cont.innerHTML = html;
     cont.querySelectorAll('[data-escenario]').forEach((b) => b.addEventListener('click', () => iniciar({ escenarioId: Number(b.dataset.escenario) })));
     cont.querySelectorAll('[data-asignacion]').forEach((b) => b.addEventListener('click', () => iniciar({ asignacionId: Number(b.dataset.asignacion) })));
+    cont.querySelectorAll('[data-escenario-llamada]').forEach((b) => b.addEventListener('click', () => iniciar({ escenarioId: Number(b.dataset.escenarioLlamada) }, 'llamada')));
+    cont.querySelectorAll('[data-asignacion-llamada]').forEach((b) => b.addEventListener('click', () => iniciar({ asignacionId: Number(b.dataset.asignacionLlamada) }, 'llamada')));
     cont.querySelectorAll('[data-ver]').forEach((b) => b.addEventListener('click', () => verFeedback(b.dataset.ver)));
     cont.querySelectorAll('[data-continuar]').forEach((b) => b.addEventListener('click', () => continuar(b.dataset.continuar)));
     cont.querySelectorAll('[data-descartar]').forEach((b) => b.addEventListener('click', async () => {
@@ -215,27 +234,34 @@ function pintarHistorial() {
     cont.querySelectorAll('[data-ver]').forEach((b) => b.addEventListener('click', () => verFeedback(b.dataset.ver)));
 }
 
-async function iniciar(params) {
+function botonLlamada(atributo) {
+    if (!VOZ_SOPORTADA) return '';
+    return `<button class="btn-secundario" ${atributo} title="Practicar hablando, como en una llamada"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">call</span> Llamada</button>`;
+}
+
+async function iniciar(params, canal = 'chat') {
     mostrarVista('feedback');
     $('vistaFeedback').innerHTML = `<div class="loading-ia"><div class="spinner"></div>Preparando a tu cliente simulado…</div>`;
-    const r = await callAPI('simIniciar', { ...params, canal: 'chat' });
+    const r = await callAPI('simIniciar', { ...params, canal });
     if (!r.success) {
         toast.show(r.error || 'No se pudo iniciar la práctica', 'err');
         mostrarVista('inicio');
         return;
     }
     state.ultimaSesion = params;
-    abrirChat(r.sesionId, r.encabezado, r.ficha, []);
+    abrirChat(r.sesionId, r.encabezado, r.ficha, [], canal);
 }
 
 async function continuar(sesionId) {
     const r = await callAPI('simDetalle', { sesionId });
     if (!r.success) { toast.show(r.error, 'err'); return; }
     const d = r.data;
-    abrirChat(d.id, { escenario: d.escenarioPublico, nivel: d.nivel, nivelNombre: d.nivelNombre, objetivo: d.objetivo }, d.ficha, d.mensajes);
+    abrirChat(d.id, { escenario: d.escenarioPublico, nivel: d.nivel, nivelNombre: d.nivelNombre, objetivo: d.objetivo }, d.ficha, d.mensajes, d.canal);
 }
 
-function abrirChat(sesionId, encabezado, ficha, mensajes) {
+function abrirChat(sesionId, encabezado, ficha, mensajes, canal = 'chat') {
+    detenerLlamada();
+    state.canal = canal === 'llamada' ? 'llamada' : 'chat';
     state.sesionId = sesionId;
     state.encabezado = encabezado;
     state.ficha = ficha;
@@ -262,8 +288,193 @@ function abrirChat(sesionId, encabezado, ficha, mensajes) {
         if (m.sinRespuesta) agregarSistema('El cliente vio tu mensaje y no respondió.');
         else agregarBurbuja(m.r, m.t, '');
     });
+    const esLlamada = state.canal === 'llamada';
+    $('chatInput').style.display = esLlamada ? 'none' : '';
+    $('llamadaBar').style.display = esLlamada ? '' : 'none';
+    $('sideHint').innerHTML = esLlamada ? HINT_LLAMADA : HINT_CHAT;
+    $('chatFinalizar').innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;">${esLlamada ? 'call_end' : 'flag'}</span> ${esLlamada ? 'Colgar y evaluar' : 'Finalizar simulación'}`;
     mostrarVista('chat');
-    $('chatTexto').focus();
+    if (esLlamada) {
+        box.querySelector('.msg-sistema').textContent = 'Llamada en curso. Tú inicias: saluda al cliente. El cliente no sabe que es una práctica.';
+        iniciarLlamada();
+    } else {
+        $('chatTexto').focus();
+    }
+}
+
+function iniciarLlamada() {
+    if (!VOZ_SOPORTADA) {
+        estadoLlamada('Tu navegador no permite llamadas de práctica. Usa Google Chrome o Microsoft Edge.', 'error');
+        return;
+    }
+    voz.activa = true;
+    voz.pausado = false;
+    voz.bloqueado = false;
+    voz.buffer = '';
+    voz.parcial = '';
+    elegirVoz(state.ficha?.nombre);
+    escuchar();
+}
+
+function detenerLlamada() {
+    voz.activa = false;
+    dejarDeEscuchar();
+    if (VOZ_SOPORTADA) speechSynthesis.cancel();
+    voz.hablando = false;
+}
+
+function estadoLlamada(texto, clase = '') {
+    $('llamadaEstado').textContent = texto;
+    $('llamadaInd').className = 'llamada-ind' + (clase ? ' ' + clase : '');
+    const icono = { escuchando: 'mic', hablando: 'volume_up', pensando: 'hourglass_top', error: 'error' }[clase] || 'mic_off';
+    $('llamadaInd').innerHTML = `<span class="material-symbols-outlined">${icono}</span>`;
+    $('llamadaListo').disabled = clase !== 'escuchando';
+    $('llamadaMic').innerHTML = voz.pausado
+        ? '<span class="material-symbols-outlined">mic</span> Reanudar'
+        : '<span class="material-symbols-outlined">mic_off</span> Pausar';
+}
+
+function puedeEscuchar() {
+    return voz.activa && !voz.pausado && !voz.hablando && !voz.bloqueado && !state.esperando && !state.finalizando
+        && $('vistaChat')?.offsetParent !== null;
+}
+
+function crearReconocedor() {
+    const rec = new Reconocedor();
+    rec.lang = 'es-PE';
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    rec.onresult = (e) => {
+        if (!puedeEscuchar()) return;
+        let parcial = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            const res = e.results[i];
+            if (res.isFinal) voz.buffer += ' ' + res[0].transcript;
+            else parcial += res[0].transcript;
+        }
+        voz.parcial = parcial;
+        $('llamadaParcial').textContent = (voz.buffer + ' ' + voz.parcial).trim();
+        clearTimeout(voz.timer);
+        voz.timer = setTimeout(cerrarTurnoVoz, SILENCIO_FIN_TURNO_MS);
+    };
+    rec.onerror = (e) => {
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'audio-capture') {
+            voz.bloqueado = true;
+            estadoLlamada('No hay acceso al micrófono. Permítelo en el candado de la barra de direcciones y vuelve a entrar.', 'error');
+        }
+    };
+    rec.onend = () => {
+        voz.escuchando = false;
+        if (puedeEscuchar()) setTimeout(escuchar, 200);
+    };
+    return rec;
+}
+
+function escuchar() {
+    if (!puedeEscuchar()) return;
+    if (!voz.rec) voz.rec = crearReconocedor();
+    if (!voz.escuchando) {
+        try { voz.rec.start(); voz.escuchando = true; } catch (e) { voz.escuchando = true; }
+    }
+    estadoLlamada('Te escucho… habla con normalidad', 'escuchando');
+}
+
+function dejarDeEscuchar() {
+    clearTimeout(voz.timer);
+    if (voz.rec && voz.escuchando) {
+        try { voz.rec.abort(); } catch (e) { }
+    }
+    voz.escuchando = false;
+}
+
+function alternarMicrofono() {
+    if (!voz.activa) return;
+    voz.pausado = !voz.pausado;
+    if (voz.pausado) {
+        dejarDeEscuchar();
+        voz.buffer = '';
+        voz.parcial = '';
+        $('llamadaParcial').textContent = '';
+        estadoLlamada('Micrófono en pausa');
+    } else {
+        escuchar();
+    }
+}
+
+function cerrarTurnoVoz() {
+    clearTimeout(voz.timer);
+    if (!voz.activa || state.esperando || state.finalizando) return;
+    const texto = (voz.buffer + ' ' + voz.parcial).replace(/\s+/g, ' ').trim();
+    if (!texto) return;
+    voz.buffer = '';
+    voz.parcial = '';
+    $('llamadaParcial').textContent = '';
+    dejarDeEscuchar();
+    if (normalizar(texto).includes(FRASE_FIN)) { finalizar(); return; }
+    enviarTurnoVoz(texto);
+}
+
+async function enviarTurnoVoz(texto) {
+    const burbuja = agregarBurbuja('asesor', texto, horaAhora(), true);
+    state.esperando = true;
+    estadoLlamada('El cliente está pensando…', 'pensando');
+    const r = await callAPI('simEnviar', { sesionId: state.sesionId, textos: [texto] });
+    burbuja.classList.remove('pendiente');
+
+    if (!r.success) {
+        state.esperando = false;
+        agregarSistema(r.error || 'No se pudo enviar. Vuelve a decirlo.');
+        escuchar();
+        return;
+    }
+
+    const respuesta = (r.respuestas || []).join(' ').trim();
+    if (respuesta && voz.activa) {
+        agregarBurbuja('lead', respuesta, horaAhora());
+        await hablar(respuesta);
+    }
+    state.esperando = false;
+
+    if (r.colgo) {
+        agregarSistema('El cliente colgó la llamada.');
+        await esperar(800);
+        finalizar();
+        return;
+    }
+    escuchar();
+}
+
+function elegirVoz(nombre) {
+    const voces = speechSynthesis.getVoices().filter((v) => /^es([-_]|$)/i.test(v.lang));
+    if (!voces.length) { voz.voz = null; return; }
+    const primerNombre = String(nombre || '').trim().split(' ')[0].toLowerCase();
+    const esMujer = /a$/.test(primerNombre) && !/^(luca|nicola|joshua|garcia)$/.test(primerNombre);
+    const femeninas = /(sabina|helena|laura|paulina|dalia|elvira|elena|luc[ií]a|m[oó]nica|paloma|camila|ximena|valentina|catalina|estados unidos|female|mujer)/i;
+    const masculinas = /(ra[uú]l|pablo|jorge|[aá]lvaro|diego|juan|gonzalo|alonso|tom[aá]s|male|hombre)/i;
+    const prioridadIdioma = ['es-PE', 'es-MX', 'es-US', 'es-419', 'es-CO', 'es-AR', 'es-CL', 'es-ES'];
+    const rango = (v) => { const i = prioridadIdioma.indexOf(v.lang.replace('_', '-')); return i === -1 ? 99 : i; };
+    const genero = (v) => (esMujer ? femeninas.test(v.name) : masculinas.test(v.name)) ? 0 : (esMujer ? masculinas : femeninas).test(v.name) ? 2 : 1;
+    voces.sort((a, b) => genero(a) - genero(b) || rango(a) - rango(b) || (b.localService ? 0 : 1) - (a.localService ? 0 : 1));
+    voz.voz = voces[0];
+}
+
+function hablar(texto) {
+    return new Promise((resolve) => {
+        if (!VOZ_SOPORTADA || !voz.activa) { resolve(); return; }
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(texto);
+        if (voz.voz) { u.voice = voz.voz; u.lang = voz.voz.lang; } else { u.lang = 'es-PE'; }
+        u.rate = 1.05;
+        let listo = false;
+        const terminar = () => { if (listo) return; listo = true; voz.hablando = false; clearTimeout(t); resolve(); };
+        const t = setTimeout(terminar, Math.max(6000, texto.length * 110));
+        u.onend = terminar;
+        u.onerror = terminar;
+        voz.hablando = true;
+        estadoLlamada('El cliente está hablando…', 'hablando');
+        speechSynthesis.speak(u);
+    });
 }
 
 function agregarBurbuja(rol, texto, hora, pendiente = false) {
@@ -342,6 +553,7 @@ async function enviarCola() {
 async function salirSinEvaluar() {
     if (!confirm('¿Salir sin evaluar? La práctica se descartará.')) return;
     clearTimeout(state.timer);
+    detenerLlamada();
     await callAPI('simAbandonar', { sesionId: state.sesionId });
     state.sesionId = null;
     mostrarVista('inicio');
@@ -353,6 +565,8 @@ async function finalizar() {
     state.finalizando = true;
     clearTimeout(state.timer);
     $('chatFinalizar').disabled = true;
+    const eraLlamada = state.canal === 'llamada';
+    detenerLlamada();
 
     while (state.esperando) await esperar(300);
     const pendientes = state.cola.splice(0).map((m) => m.texto);
@@ -372,6 +586,7 @@ async function finalizar() {
         toast.show(r.error || 'No se pudo evaluar', 'err');
         mostrarVista('chat');
         $('chatFinalizar').disabled = false;
+        if (eraLlamada) iniciarLlamada();
         return;
     }
     state.sesionId = null;

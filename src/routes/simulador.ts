@@ -11,6 +11,7 @@ import {
   FEEDBACK_BASE,
   promptPerfil,
   promptLead,
+  FIN_LLAMADA,
   promptAuditor,
   mensajeAuditor,
   calcularPuntajes,
@@ -454,7 +455,8 @@ export async function simEnviar(client: Client, body: JsonBody, env: Env) {
 
   const perfil = s.perfil_oculto as PerfilLead & { _ejemplos?: string[] };
   const k = await conocimiento(client);
-  const system = promptLead(perfil, perfil._ejemplos || [], k.comportamiento);
+  const esLlamada = s.canal === 'llamada';
+  const system = promptLead(perfil, perfil._ejemplos || [], k.comportamiento, s.canal);
   const mensajesIA: MensajeIA[] = conversacion.map((m) => ({
     role: m.r === 'asesor' ? 'user' : 'assistant',
     content: m.t === SIN_RESPUESTA ? '(no respondiste)' : m.t,
@@ -469,14 +471,19 @@ export async function simEnviar(client: Client, body: JsonBody, env: Env) {
     return jsonError('El cliente no pudo responder (IA): ' + (e?.message || e));
   }
 
-  const respuestas = limpiarRespuestaLead(texto, perfil.nombre);
+  const colgo = esLlamada && texto.includes(FIN_LLAMADA);
+  if (esLlamada) texto = texto.split(FIN_LLAMADA).join(' ').replace(/\[\[SIN_RESPUESTA\]\]/g, '').replace(/\s*\|\|\|\s*/g, ' ').trim();
+  const respuestas = esLlamada
+    ? limpiarRespuestaLead(texto, perfil.nombre).slice(0, 1)
+    : limpiarRespuestaLead(texto, perfil.nombre);
+  if (esLlamada && !respuestas.length) respuestas.push(colgo ? 'Ya, gracias. Chau.' : '¿Aló? ¿Sigue ahí?');
   const nuevosLead = respuestas.length
     ? respuestas.map((t) => ({ r: 'lead', t, ts: new Date().toISOString() }))
     : [{ r: 'lead', t: SIN_RESPUESTA, ts: new Date().toISOString() }];
 
   await agregarMensajes(client, s.id, [...nuevosAsesor, ...nuevosLead]);
 
-  return jsonOk({ respuestas, sinRespuesta: respuestas.length === 0 });
+  return jsonOk({ respuestas, sinRespuesta: respuestas.length === 0, colgo });
 }
 
 function escaparRegex(s: string) {
@@ -558,6 +565,7 @@ export async function simFinalizar(client: Client, body: JsonBody, env: Env) {
             transcripcion,
             nivel: s.nivel,
             objetivo: escenario?.objetivo || s.enfoque || '',
+            canal: s.canal,
           }),
         },
       ],

@@ -56,6 +56,20 @@
         .btn-fin { background: var(--color-danger); color: #fff; border: none; border-radius: var(--radius); padding: 10px 14px; font-weight: 700; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; font-family: inherit; }
         .btn-fin:disabled { opacity: .6; cursor: not-allowed; }
         .side-hint { font-size: 11.5px; color: var(--color-text-muted); line-height: 1.4; }
+        .llamada-bar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #f0f2f5; border-top: 1px solid #e3e6ea; }
+        .llamada-ind { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; background: #9aa5b1; }
+        .llamada-ind.escuchando { background: #00a884; animation: llamadaPulso 1.4s ease-out infinite; }
+        .llamada-ind.hablando { background: #075e54; }
+        .llamada-ind.pensando { background: #f0a020; }
+        .llamada-ind.error { background: #d32f2f; }
+        @keyframes llamadaPulso { 0% { box-shadow: 0 0 0 0 rgba(0,168,132,.5); } 100% { box-shadow: 0 0 0 14px rgba(0,168,132,0); } }
+        .llamada-info { flex: 1; min-width: 0; }
+        .llamada-estado { font-size: 13px; font-weight: 600; color: #1f2c34; }
+        .llamada-parcial { font-size: 12.5px; color: #54656f; font-style: italic; min-height: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .llamada-btn { border: 1px solid #c9d1d9; background: #fff; border-radius: 20px; padding: 7px 12px; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; color: #1f2c34; }
+        .llamada-btn:disabled { opacity: .5; cursor: not-allowed; }
+        .llamada-btn .material-symbols-outlined { font-size: 17px; }
+        .cap-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
 
         .fb-wrap { max-width: 860px; }
         .fb-scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0; }
@@ -167,7 +181,16 @@
                                 </div>
                             </div>
                             <div class="chat-msgs" id="chatMsgs"></div>
-                            <div class="chat-input">
+                            <div class="llamada-bar" id="llamadaBar" style="display:none;">
+                                <div class="llamada-ind" id="llamadaInd"><span class="material-symbols-outlined">mic</span></div>
+                                <div class="llamada-info">
+                                    <div class="llamada-estado" id="llamadaEstado">Preparando llamada…</div>
+                                    <div class="llamada-parcial" id="llamadaParcial"></div>
+                                </div>
+                                <button class="llamada-btn" id="llamadaListo" title="Enviar ya lo que dijiste"><span class="material-symbols-outlined">send</span> Ya terminé</button>
+                                <button class="llamada-btn" id="llamadaMic" title="Pausar o reanudar el micrófono"><span class="material-symbols-outlined">mic_off</span> Pausar</button>
+                            </div>
+                            <div class="chat-input" id="chatInput">
                                 <textarea id="chatTexto" rows="1" placeholder="Escribe un mensaje (Enter para enviar, Shift+Enter para salto de línea)"></textarea>
                                 <button class="chat-send" id="chatEnviar" title="Enviar"><span class="material-symbols-outlined">send</span></button>
                             </div>
@@ -187,7 +210,7 @@
                                 <div class="side-row" id="fichaMsgRow"><b>Mensaje del formulario</b><span id="fichaMsg"></span></div>
                             </div>
                             <button class="btn-fin" id="chatFinalizar"><span class="material-symbols-outlined" style="font-size:18px;">flag</span> Finalizar simulación</button>
-                            <p class="side-hint">También puedes escribir <b>FINALIZAR SIMULACIÓN</b> en el chat. Tú inicias la conversación, como en la bandeja real.</p>
+                            <p class="side-hint" id="sideHint">También puedes escribir <b>FINALIZAR SIMULACIÓN</b> en el chat. Tú inicias la conversación, como en la bandeja real.</p>
                             <button class="btn-secundario" id="chatSalir">Salir sin evaluar</button>
                         </div>
                     </div>
