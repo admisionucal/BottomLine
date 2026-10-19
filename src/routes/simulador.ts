@@ -401,6 +401,7 @@ function fichaPublica(p: PerfilLead) {
     carrera: p.carrera_interes,
     canal: p.canal_origen,
     mensajeFormulario: p.primer_mensaje_formulario || '',
+    edad: Number(p.edad) || null,
   };
 }
 
@@ -455,7 +456,7 @@ export async function simEnviar(client: Client, body: JsonBody, env: Env) {
 
   const perfil = s.perfil_oculto as PerfilLead & { _ejemplos?: string[] };
   const k = await conocimiento(client);
-  const esLlamada = s.canal === 'llamada';
+  const esLlamada = s.canal === 'llamada' || s.canal === 'video';
   const system = promptLead(perfil, perfil._ejemplos || [], k.comportamiento, s.canal);
   const mensajesIA: MensajeIA[] = conversacion.map((m) => ({
     role: m.r === 'asesor' ? 'user' : 'assistant',

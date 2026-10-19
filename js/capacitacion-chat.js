@@ -1,11 +1,14 @@
 import { API_URL, esRolSupervisorOAdmision, puedeVerCapacitacionIA } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml, formatearFecha } from '../core/utils.js';
 import { Sidebar, renderTable, Toast } from '../core/components.js';
+import { crearAvatar } from './avatar-2d.js';
 
 const ESPERA_ANTES_DE_RESPONDER_MS = 2500;
 const SILENCIO_FIN_TURNO_MS = 1300;
 const Reconocedor = window.SpeechRecognition || window.webkitSpeechRecognition;
 const VOZ_SOPORTADA = !!Reconocedor && 'speechSynthesis' in window;
+const VIDEO_SOPORTADO = VOZ_SOPORTADA && !!navigator.mediaDevices?.getUserMedia;
+const HINT_VIDEO = 'Es una videollamada: el cliente te ve. Mira a la cámara, habla con normalidad y haz una pausa para que te responda. Usa audífonos. También puedes decir <b>FINALIZAR SIMULACIÓN</b>.';
 const HINT_CHAT = 'También puedes escribir <b>FINALIZAR SIMULACIÓN</b> en el chat. Tú inicias la conversación, como en la bandeja real.';
 const HINT_LLAMADA = 'Habla con normalidad: cuando haces una pausa, el cliente te responde. Usa audífonos para que el micrófono no capte su voz. También puedes decir <b>FINALIZAR SIMULACIÓN</b>.';
 const FRASE_FIN = 'FINALIZAR SIMULACION';
@@ -28,6 +31,8 @@ const state = {
 };
 
 let toast = null;
+
+const video = { avatar: null, stream: null, camaraEncendida: true };
 
 const voz = { activa: false, rec: null, escuchando: false, pausado: false, hablando: false, bloqueado: false, buffer: '', parcial: '', timer: null, voz: null };
 
@@ -117,6 +122,7 @@ async function init(embebido) {
 
     $('llamadaListo').addEventListener('click', cerrarTurnoVoz);
     $('llamadaMic').addEventListener('click', alternarMicrofono);
+    $('videoCam').addEventListener('click', alternarCamara);
     if (VOZ_SOPORTADA) speechSynthesis.addEventListener?.('voiceschanged', () => { if (voz.activa) elegirVoz(state.ficha?.nombre); });
 
     window.addEventListener('beforeunload', (e) => {
@@ -186,6 +192,7 @@ function pintarPracticar() {
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                     <button class="btn-primary" data-asignacion="${a.id}">${hecho ? 'Practicar de nuevo' : 'Empezar'}</button>
                     ${botonLlamada(`data-asignacion-llamada="${a.id}"`)}
+                    ${botonVideo(`data-asignacion-video="${a.id}"`)}
                     ${hecho ? `<button class="btn-secundario" data-ver="${escapeHtml(a.sesionId)}">Ver feedback</button>` : ''}
                 </div>
             </div>`;
@@ -201,6 +208,7 @@ function pintarPracticar() {
             <div class="cap-acciones">
                 <button class="btn-primary" data-escenario="${e.id}">Practicar</button>
                 ${botonLlamada(`data-escenario-llamada="${e.id}"`)}
+                ${botonVideo(`data-escenario-video="${e.id}"`)}
             </div>
         </div>`).join('') + '</div>';
 
@@ -210,6 +218,8 @@ function pintarPracticar() {
     cont.querySelectorAll('[data-asignacion]').forEach((b) => b.addEventListener('click', () => iniciar({ asignacionId: Number(b.dataset.asignacion) })));
     cont.querySelectorAll('[data-escenario-llamada]').forEach((b) => b.addEventListener('click', () => iniciar({ escenarioId: Number(b.dataset.escenarioLlamada) }, 'llamada')));
     cont.querySelectorAll('[data-asignacion-llamada]').forEach((b) => b.addEventListener('click', () => iniciar({ asignacionId: Number(b.dataset.asignacionLlamada) }, 'llamada')));
+    cont.querySelectorAll('[data-escenario-video]').forEach((b) => b.addEventListener('click', () => iniciar({ escenarioId: Number(b.dataset.escenarioVideo) }, 'video')));
+    cont.querySelectorAll('[data-asignacion-video]').forEach((b) => b.addEventListener('click', () => iniciar({ asignacionId: Number(b.dataset.asignacionVideo) }, 'video')));
     cont.querySelectorAll('[data-ver]').forEach((b) => b.addEventListener('click', () => verFeedback(b.dataset.ver)));
     cont.querySelectorAll('[data-continuar]').forEach((b) => b.addEventListener('click', () => continuar(b.dataset.continuar)));
     cont.querySelectorAll('[data-descartar]').forEach((b) => b.addEventListener('click', async () => {
@@ -239,6 +249,11 @@ function botonLlamada(atributo) {
     return `<button class="btn-secundario" ${atributo} title="Practicar hablando, como en una llamada"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">call</span> Llamada</button>`;
 }
 
+function botonVideo(atributo) {
+    if (!VIDEO_SOPORTADO) return '';
+    return `<button class="btn-secundario" ${atributo} title="Practicar por videollamada"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">videocam</span> Video</button>`;
+}
+
 async function iniciar(params, canal = 'chat') {
     mostrarVista('feedback');
     $('vistaFeedback').innerHTML = `<div class="loading-ia"><div class="spinner"></div>Preparando a tu cliente simulado…</div>`;
@@ -261,7 +276,7 @@ async function continuar(sesionId) {
 
 function abrirChat(sesionId, encabezado, ficha, mensajes, canal = 'chat') {
     detenerLlamada();
-    state.canal = canal === 'llamada' ? 'llamada' : 'chat';
+    state.canal = ['llamada', 'video'].includes(canal) ? canal : 'chat';
     state.sesionId = sesionId;
     state.encabezado = encabezado;
     state.ficha = ficha;
@@ -288,14 +303,19 @@ function abrirChat(sesionId, encabezado, ficha, mensajes, canal = 'chat') {
         if (m.sinRespuesta) agregarSistema('El cliente vio tu mensaje y no respondió.');
         else agregarBurbuja(m.r, m.t, '');
     });
-    const esLlamada = state.canal === 'llamada';
+    const esLlamada = state.canal !== 'chat';
+    const esVideo = state.canal === 'video';
     $('chatInput').style.display = esLlamada ? 'none' : '';
     $('llamadaBar').style.display = esLlamada ? '' : 'none';
-    $('sideHint').innerHTML = esLlamada ? HINT_LLAMADA : HINT_CHAT;
+    $('videoStage').style.display = esVideo ? '' : 'none';
+    $('videoCam').style.display = esVideo ? '' : 'none';
+    $('chatMsgs').closest('.chat-box').classList.toggle('modo-video', esVideo);
+    $('videoNombre').textContent = ficha.nombre || 'Postulante';
+    $('sideHint').innerHTML = esVideo ? HINT_VIDEO : esLlamada ? HINT_LLAMADA : HINT_CHAT;
     $('chatFinalizar').innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;">${esLlamada ? 'call_end' : 'flag'}</span> ${esLlamada ? 'Colgar y evaluar' : 'Finalizar simulación'}`;
     mostrarVista('chat');
     if (esLlamada) {
-        box.querySelector('.msg-sistema').textContent = 'Llamada en curso. Tú inicias: saluda al cliente. El cliente no sabe que es una práctica.';
+        box.querySelector('.msg-sistema').textContent = (esVideo ? 'Videollamada' : 'Llamada') + ' en curso. Tú inicias: saluda al cliente. El cliente no sabe que es una práctica.';
         iniciarLlamada();
     } else {
         $('chatTexto').focus();
@@ -307,6 +327,7 @@ function iniciarLlamada() {
         estadoLlamada('Tu navegador no permite llamadas de práctica. Usa Google Chrome o Microsoft Edge.', 'error');
         return;
     }
+    if (state.canal === 'video') iniciarVideo();
     voz.activa = true;
     voz.pausado = false;
     voz.bloqueado = false;
@@ -321,11 +342,60 @@ function detenerLlamada() {
     dejarDeEscuchar();
     if (VOZ_SOPORTADA) speechSynthesis.cancel();
     voz.hablando = false;
+    detenerVideo();
+}
+
+function iniciarVideo() {
+    detenerVideo();
+    video.avatar = crearAvatar($('videoAvatar'), { nombre: state.ficha?.nombre, edad: state.ficha?.edad, semilla: state.sesionId });
+    video.camaraEncendida = true;
+    encenderCamara();
+}
+
+function detenerVideo() {
+    apagarCamara();
+    if (video.avatar) { video.avatar.destruir(); video.avatar = null; }
+}
+
+async function encenderCamara() {
+    $('videoPropioOff').textContent = 'Encendiendo cámara…';
+    $('videoPropioOff').style.display = '';
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false });
+        if (state.canal !== 'video' || !video.avatar) { stream.getTracks().forEach((t) => t.stop()); return; }
+        video.stream = stream;
+        $('videoPropio').srcObject = stream;
+        $('videoPropioOff').style.display = 'none';
+    } catch (e) {
+        $('videoPropioOff').textContent = 'No hay acceso a la cámara. Puedes continuar solo con voz.';
+    }
+    pintarBotonCamara();
+}
+
+function apagarCamara() {
+    if (video.stream) video.stream.getTracks().forEach((t) => t.stop());
+    video.stream = null;
+    const el = $('videoPropio');
+    if (el) el.srcObject = null;
+    if ($('videoPropioOff')) { $('videoPropioOff').textContent = 'Cámara apagada'; $('videoPropioOff').style.display = ''; }
+}
+
+function alternarCamara() {
+    if (state.canal !== 'video' || !video.avatar) return;
+    video.camaraEncendida = !video.camaraEncendida;
+    if (video.camaraEncendida) encenderCamara(); else { apagarCamara(); pintarBotonCamara(); }
+}
+
+function pintarBotonCamara() {
+    $('videoCam').innerHTML = video.stream
+        ? '<span class="material-symbols-outlined">videocam_off</span> Apagar cámara'
+        : '<span class="material-symbols-outlined">videocam</span> Encender cámara';
 }
 
 function estadoLlamada(texto, clase = '') {
     $('llamadaEstado').textContent = texto;
     $('llamadaInd').className = 'llamada-ind' + (clase ? ' ' + clase : '');
+    video.avatar?.estado(clase);
     const icono = { escuchando: 'mic', hablando: 'volume_up', pensando: 'hourglass_top', error: 'error' }[clase] || 'mic_off';
     $('llamadaInd').innerHTML = `<span class="material-symbols-outlined">${icono}</span>`;
     $('llamadaListo').disabled = clase !== 'escuchando';
@@ -467,11 +537,14 @@ function hablar(texto) {
         if (voz.voz) { u.voice = voz.voz; u.lang = voz.voz.lang; } else { u.lang = 'es-PE'; }
         u.rate = 1.05;
         let listo = false;
-        const terminar = () => { if (listo) return; listo = true; voz.hablando = false; clearTimeout(t); resolve(); };
+        const terminar = () => { if (listo) return; listo = true; voz.hablando = false; video.avatar?.hablar(false); clearTimeout(t); resolve(); };
         const t = setTimeout(terminar, Math.max(6000, texto.length * 110));
         u.onend = terminar;
         u.onerror = terminar;
+        u.onboundary = () => video.avatar?.pulso();
+        u.onstart = () => video.avatar?.hablar(true);
         voz.hablando = true;
+        video.avatar?.hablar(true);
         estadoLlamada('El cliente está hablando…', 'hablando');
         speechSynthesis.speak(u);
     });
@@ -565,7 +638,7 @@ async function finalizar() {
     state.finalizando = true;
     clearTimeout(state.timer);
     $('chatFinalizar').disabled = true;
-    const eraLlamada = state.canal === 'llamada';
+    const eraLlamada = state.canal !== 'chat';
     detenerLlamada();
 
     while (state.esperando) await esperar(300);

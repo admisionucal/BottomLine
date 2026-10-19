@@ -70,6 +70,24 @@
         .llamada-btn:disabled { opacity: .5; cursor: not-allowed; }
         .llamada-btn .material-symbols-outlined { font-size: 17px; }
         .cap-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+        .video-stage { position: relative; height: 46vh; min-height: 260px; background: #1f2c34; flex-shrink: 0; overflow: hidden; }
+        .video-avatar { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+        .video-avatar .av2d { height: 100%; width: 100%; }
+        .video-nombre { position: absolute; left: 12px; bottom: 12px; background: rgba(0,0,0,.55); color: #fff; font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 6px; }
+        .video-propio { position: absolute; right: 12px; bottom: 12px; width: 176px; height: 132px; border-radius: 10px; overflow: hidden; background: #0f171c; border: 2px solid rgba(255,255,255,.7); box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+        .video-propio video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+        .video-propio-off { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px; color: #c9d1d9; font-size: 11.5px; }
+        .chat-box.modo-video .chat-msgs { flex: 1 1 0; min-height: 90px; }
+        .av2d .av-cuerpo { animation: avRespira 4.5s ease-in-out infinite; }
+        .av2d .av-cabeza, .av2d .av-ojos, .av2d .av-pupilas, .av2d .av-cejas { transform-box: fill-box; transform-origin: center; transition: transform .35s ease; }
+        .av2d .av-ojos { transition: transform .08s ease; }
+        .av2d.av-escuchando .av-cabeza { animation: avAsiente 3.2s ease-in-out infinite; }
+        .av2d.av-pensando .av-pupilas { transform: translate(-3px, -3px); }
+        .av2d.av-pensando .av-cejas { transform: translateY(-3px); }
+        .av2d.av-hablando .av-cabeza { animation: avHabla 2.6s ease-in-out infinite; }
+        @keyframes avRespira { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(1.6px); } }
+        @keyframes avAsiente { 0%, 100% { transform: rotate(0deg); } 30% { transform: rotate(-1.6deg) translateY(1px); } 60% { transform: rotate(1deg); } }
+        @keyframes avHabla { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(1.2deg); } }
 
         .fb-wrap { max-width: 860px; }
         .fb-scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0; }
@@ -180,6 +198,14 @@
                                     <div class="estado" id="chatEstado"></div>
                                 </div>
                             </div>
+                            <div class="video-stage" id="videoStage" style="display:none;">
+                                <div class="video-avatar" id="videoAvatar"></div>
+                                <div class="video-nombre" id="videoNombre"></div>
+                                <div class="video-propio">
+                                    <video id="videoPropio" autoplay muted playsinline></video>
+                                    <div class="video-propio-off" id="videoPropioOff">Cámara apagada</div>
+                                </div>
+                            </div>
                             <div class="chat-msgs" id="chatMsgs"></div>
                             <div class="llamada-bar" id="llamadaBar" style="display:none;">
                                 <div class="llamada-ind" id="llamadaInd"><span class="material-symbols-outlined">mic</span></div>
@@ -188,6 +214,7 @@
                                     <div class="llamada-parcial" id="llamadaParcial"></div>
                                 </div>
                                 <button class="llamada-btn" id="llamadaListo" title="Enviar ya lo que dijiste"><span class="material-symbols-outlined">send</span> Ya terminé</button>
+                                <button class="llamada-btn" id="videoCam" title="Encender o apagar tu cámara" style="display:none;"><span class="material-symbols-outlined">videocam_off</span> Cámara</button>
                                 <button class="llamada-btn" id="llamadaMic" title="Pausar o reanudar el micrófono"><span class="material-symbols-outlined">mic_off</span> Pausar</button>
                             </div>
                             <div class="chat-input" id="chatInput">
