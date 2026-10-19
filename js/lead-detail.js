@@ -403,7 +403,7 @@ function renderVista1() {
         const etiquetaBase = beneficioActual ? `S/ ${boletaActual} - S/ ${boletaConBecaActual} ${beneficioActual}` : `S/ ${boletaActual} - Sin beca`;
         opcionesBoletaBeneficio.unshift({
             value: valorComboActual,
-            label: `${etiquetaBase} (${esRecategorizacionVigente(lead) ? 'recategorización aprobada' : 'boleta actual'})`
+            label: `${etiquetaBase} (${esRecategorizacionVigente(lead) ? 'Reca' : 'boleta actual'})`
         });
     }
 
@@ -706,7 +706,7 @@ function renderSolicitudBox(permite, opciones, id, esColegioAliado) {
         const a = state.recategorizacionAprobada;
         avisos += `
             <div style="background:#e8f5e9; border:1px solid #81c784; padding:14px 18px; border-radius:8px; margin-top:20px; font-size:13px; color:#1b5e20;">
-                <strong>Recategorización aprobada:</strong> Boleta S/ ${escapeHtml(a.BOLETA_SOLICITADA)} (${escapeHtml(a.BENEFICIO_SOLICITADO || 'Sin beca')}),
+                <strong>Reca:</strong> Boleta S/ ${escapeHtml(a.BOLETA_SOLICITADA)} (${escapeHtml(a.BENEFICIO_SOLICITADO || 'Sin beca')}),
                 aprobada por ${escapeHtml(a.ADMIN_NOMBRE || a.ADMIN_EMAIL || '')}${a.FECHA_RESOLUCION ? ' el ' + escapeHtml(formatearFecha(a.FECHA_RESOLUCION)) : ''}.
             </div>`;
     }
