@@ -2,7 +2,7 @@ import { API_URL, esRolSupervisorOAdmision } from '../core/constants.js';
 
 import { getCurrentUser, getSessionToken, escapeHtml, minutosAHora, diffHoras, horasLabel, fechaDDMMYYYY, hoyDDMMYYYY, nowPeru, formato12h, normalizarUrlFoto, calcularDistanciaMetros } from '../core/utils.js';
 
-import { Sidebar, startClock, createMultiSelect } from '../core/components.js';
+import { Sidebar, startClock, createMultiSelect, crearSelectorRango } from '../core/components.js';
 
 const state = {
     user: null,
@@ -217,9 +217,9 @@ async function initPanelAnalisis() {
     app.innerHTML = `
         <div class="asis-tab-panel active" id="tabPanel-analisis">
             <div class="filter-row">
-                <input type="date" id="fechaDesde">
-                <span style="color:#888;font-size:13px;">hasta</span>
-                <input type="date" id="fechaHasta">
+                <input type="hidden" id="fechaDesde">
+                <input type="hidden" id="fechaHasta">
+                <div id="asisRangoFechas"></div>
                 <select id="fEmpAnalisis"><option value="">Todos los empleados</option></select>
                 <select id="fCampanaAnalisis"><option value="">Todas las campañas</option></select>
                 <button class="btn-refresh" id="btnActualizarAnalisis">↺ Actualizar</button>
@@ -239,6 +239,7 @@ async function initPanelAnalisis() {
     document.getElementById('fechaDesde').value = `${hoyPeru.getFullYear()}-${String(hoyPeru.getMonth() + 1).padStart(2, '0')}-01`;
     document.getElementById('fechaHasta').value = `${hoyPeru.getFullYear()}-${String(hoyPeru.getMonth() + 1).padStart(2, '0')}-${String(hoyPeru.getDate()).padStart(2, '0')}`;
 
+    crearSelectorRango(document.getElementById('asisRangoFechas'), { inputDesde: 'fechaDesde', inputHasta: 'fechaHasta', textoVacio: 'Elegir fechas' });
     document.getElementById('fechaDesde').addEventListener('change', () => cargarAnalisis());
     document.getElementById('fechaHasta').addEventListener('change', () => cargarAnalisis());
     document.getElementById('fEmpAnalisis').addEventListener('change', () => cargarAnalisis());

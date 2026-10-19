@@ -235,15 +235,7 @@
                                             <span class="material-symbols-outlined" style="font-size:16px;">event</span> Fecha VP/PP
                                         </button>
                                         <div class="cal-vpp-panel" id="calVpPpPanel">
-                                            <div class="cal-vpp-header">
-                                                <button type="button" onclick="window.cambiarMesCalVpPp && cambiarMesCalVpPp(-1)">&lt;</button>
-                                                <span id="calVpPpMesLabel"></span>
-                                                <button type="button" onclick="window.cambiarMesCalVpPp && cambiarMesCalVpPp(1)">&gt;</button>
-                                            </div>
-                                            <div class="cal-vpp-grid" id="calVpPpGrid"></div>
-                                            <div class="cal-vpp-footer">
-                                                <button type="button" onclick="window.limpiarFiltroCalVpPp && limpiarFiltroCalVpPp()">Limpiar</button>
-                                            </div>
+                                            <div id="calVpPpRango"></div>
                                         </div>
                                     </div>
                                     <span class="badge" id="leadCount">0 leads</span>
@@ -320,15 +312,7 @@
                                     <span class="material-symbols-outlined" style="font-size:16px;">event</span> Calendario
                                 </button>
                                 <div class="cal-vpp-panel" id="indCalPanel">
-                                    <div class="cal-vpp-header">
-                                        <button type="button" onclick="window.cambiarMesIndCal && cambiarMesIndCal(-1)">&lt;</button>
-                                        <span id="indCalMesLabel"></span>
-                                        <button type="button" onclick="window.cambiarMesIndCal && cambiarMesIndCal(1)">&gt;</button>
-                                    </div>
-                                    <div class="cal-vpp-grid" id="indCalGrid"></div>
-                                    <div class="cal-vpp-footer">
-                                        <button type="button" onclick="window.limpiarFiltroIndCal && limpiarFiltroIndCal()">Limpiar</button>
-                                    </div>
+                                    <div id="indCalRango"></div>
                                 </div>
                             </div>
                         </div>

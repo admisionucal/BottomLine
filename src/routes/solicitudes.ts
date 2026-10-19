@@ -34,14 +34,29 @@ export async function getSolicitudPendiente(client: Client, body: JsonBody) {
   const idPrometeo = String(body.idPrometeo || '').trim();
   const campana = String(body.campana || '').trim();
 
-  const result = await client.query(
+  const ultima = await client.query(
     `select * from solicitudes
-     where id_prometeo = $1 and campana = $2 and status in ('PENDIENTE', 'RECHAZADO')
+     where id_prometeo = $1 and campana = $2 and status in ('PENDIENTE', 'RECHAZADO', 'APROBADO')
      order by fecha_solicitud desc limit 1`,
     [idPrometeo, campana]
   );
+  const fila = ultima.rows[0];
+  const data = fila && (fila.status === 'PENDIENTE' || fila.status === 'RECHAZADO') ? filaASolicitudObj(fila) : null;
 
-  return jsonOk({ data: result.rows[0] ? filaASolicitudObj(result.rows[0]) : null });
+  const aprobada = await client.query(
+    `select s.*, coalesce(nullif(u.nombre_aux, ''), u.nombre, s.admin_email) as admin_nombre
+     from solicitudes s
+     left join usuarios u on lower(u.email) = lower(s.admin_email)
+     where s.id_prometeo = $1 and s.campana = $2 and s.status = 'APROBADO'
+     order by s.fecha_resolucion desc nulls last limit 1`,
+    [idPrometeo, campana]
+  );
+  const a = aprobada.rows[0];
+
+  return jsonOk({
+    data,
+    aprobada: a ? { ...filaASolicitudObj(a), ADMIN_NOMBRE: a.admin_nombre || a.admin_email } : null,
+  });
 }
 
 export async function createSolicitud(client: Client, body: JsonBody) {
@@ -94,34 +109,86 @@ export async function resolveSolicitud(client: Client, body: JsonBody) {
   if (!sesion) return jsonError(error!);
 
   const id = String(body.id || '').trim();
-  const nuevoStatus = String(body.status || '').trim();
-  if (!id || !nuevoStatus) return jsonError('Falta id o status.');
+  const nuevoStatus = String(body.status || '').trim().toUpperCase();
+  if (!id) return jsonError('Falta id de la solicitud.');
+  if (nuevoStatus !== 'APROBADO' && nuevoStatus !== 'RECHAZADO') return jsonError('Estado inválido.');
+
+  const previa = await client.query(`select * from solicitudes where id_solicitud = $1`, [id]);
+  const pendiente = previa.rows[0];
+  if (!pendiente) return jsonError('Solicitud no encontrada');
+  if (pendiente.status !== 'PENDIENTE') return jsonError('Esta solicitud ya fue resuelta o cancelada.');
+  if (nuevoStatus === 'APROBADO' && String(pendiente.asesor_email || '').trim().toLowerCase() === sesion.email.trim().toLowerCase()) {
+    return jsonError('No puedes aprobar una solicitud hecha por ti. Debe aprobarla otro supervisor o Admisión.');
+  }
 
   const result = await client.query(
     `update solicitudes set status = $1, fecha_resolucion = now(), admin_email = $2
-     where id_solicitud = $3
+     where id_solicitud = $3 and status = 'PENDIENTE'
      returning *`,
     [nuevoStatus, sesion.email, id]
   );
-
   const solicitud = result.rows[0];
-  if (!solicitud) return jsonError('Solicitud no encontrada');
+  if (!solicitud) return jsonError('Esta solicitud ya fue resuelta o cancelada.');
 
   if (nuevoStatus === 'APROBADO') {
-    await saveBottom(client, {
+    const filaBottom = (
+      await client.query(
+        `select asesor_email, admision_final, matricula_final, beneficio_adicional from leads_bottom
+         where id_prometeo = $1 and campana = $2
+         order by fecha_ult_modificacion desc nulls last limit 1`,
+        [solicitud.id_prometeo, solicitud.campana]
+      )
+    ).rows[0];
+
+    const data: Record<string, any> = {
+      BOLETA: solicitud.boleta_solicitada,
+      BENEFICIO: solicitud.beneficio_solicitado,
+      BOLETA_CON_BECA: solicitud.boleta_con_beca_solicitada,
+      ESTADO_APROBACION: 'RECATEGORIZACION_APROBADA',
+      APROBADO_POR: sesion.nombre || sesion.email,
+      FECHA_APROBACION: new Date().toISOString(),
+    };
+    const boletaFinal = calcularBoletaFinal(filaBottom, solicitud.boleta_con_beca_solicitada || solicitud.boleta_solicitada);
+    if (boletaFinal !== null) data.BOLETA_FINAL = boletaFinal;
+
+    const r = await saveBottom(client, {
       idPrometeo: solicitud.id_prometeo,
       campana: solicitud.campana,
       sessionToken: body.sessionToken,
-      asesorEmail: solicitud.asesor_email,
-      data: {
-        BOLETA: solicitud.boleta_solicitada,
-        BENEFICIO: solicitud.beneficio_solicitado,
-        BOLETA_CON_BECA: solicitud.boleta_con_beca_solicitada,
-      },
+      asesorEmail: filaBottom?.asesor_email || solicitud.asesor_email,
+      data,
     });
+    const respuesta: any = await r.json().catch(() => ({ success: false }));
+    if (!respuesta?.success) {
+      await client.query(
+        `update solicitudes set status = 'PENDIENTE', fecha_resolucion = null, admin_email = ''
+         where id_solicitud = $1`,
+        [id]
+      );
+      return jsonError('No se pudo aplicar la nueva boleta al lead: ' + (respuesta?.error || 'error desconocido') + '. La solicitud sigue pendiente.');
+    }
   }
 
   return jsonOk();
+}
+
+function numero(v: any): number {
+  const n = Number(String(v ?? '').replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function calcularBoletaFinal(fila: any, boletaAPagarRaw: any): number | null {
+  if (!fila || fila.admision_final === null || fila.admision_final === undefined || String(fila.admision_final).trim() === '') return null;
+  const boletaAPagar = numero(boletaAPagarRaw);
+  const [valorStr, modoRaw] = String(fila.beneficio_adicional || '0').split('||');
+  const valor = numero(valorStr);
+  const modo = String(modoRaw || 'PORCENTAJE').toUpperCase();
+  const descuentoAdicional =
+    modo === 'EXACTO' ? boletaAPagar - valor
+    : modo === 'FIJO' ? valor
+    : modo === 'CICLO' ? boletaAPagar * 5 * (valor / 100)
+    : boletaAPagar * (valor / 100);
+  return +(numero(fila.admision_final) + numero(fila.matricula_final) + boletaAPagar - +descuentoAdicional.toFixed(2)).toFixed(2);
 }
 
 export async function cancelarSolicitud(client: Client, body: JsonBody) {

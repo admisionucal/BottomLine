@@ -11,6 +11,7 @@ const state = {
     idPrometeo: '',
     historialAsesores: null,
     solicitudPendiente: null,
+    recategorizacionAprobada: null,
     solicitudVerificada: false,
     historialSnapshots: [],
     ultimoCalculo: {},
@@ -251,6 +252,7 @@ async function cargarSolicitudPendiente() {
             campana: state.campana
         });
         state.solicitudPendiente = (result && result.success) ? (result.data || null) : null;
+        state.recategorizacionAprobada = (result && result.success) ? (result.aprobada || null) : null;
         state.solicitudVerificada = true;
         renderAll();
     } catch (e) {
@@ -397,6 +399,13 @@ function renderVista1() {
     const opcionesBoletaBeneficio = opcionesBoletaBeneficioCatalogo(filasFiltradas);
     const boletaConBecaActual = obtenerCampo(lead, COLUMNAS.BOLETA_CON_BECA) || '';
     const valorComboActual = `${boletaActual}||${beneficioActual}||${boletaConBecaActual}`;
+    if (String(boletaActual).trim() !== '' && !opcionesBoletaBeneficio.some(o => o.value === valorComboActual)) {
+        const etiquetaBase = beneficioActual ? `S/ ${boletaActual} - S/ ${boletaConBecaActual} ${beneficioActual}` : `S/ ${boletaActual} - Sin beca`;
+        opcionesBoletaBeneficio.unshift({
+            value: valorComboActual,
+            label: `${etiquetaBase} (${esRecategorizacionVigente(lead) ? 'recategorización aprobada' : 'boleta actual'})`
+        });
+    }
 
     const boletaVirtualFija = obtenerBoletaVirtualFija(carrera, caso, modalidad);
 
@@ -681,9 +690,42 @@ function initComboBuscable(id, opcionesIniciales) {
     input._actualizarOpcionesCombo = (nuevas) => { opciones = nuevas; };
 }
 
+function esRecategorizacionVigente(lead) {
+    const a = state.recategorizacionAprobada;
+    if (!a || !lead) return false;
+    return String(a.BOLETA_SOLICITADA || '').trim() === String(obtenerCampo(lead, COLUMNAS.BOLETA) || '').trim()
+        && String(a.BENEFICIO_SOLICITADO || '').trim() === String(obtenerCampo(lead, COLUMNAS.BENEFICIO) || '').trim();
+}
+
 function renderSolicitudBox(permite, opciones, id, esColegioAliado) {
     const user = getCurrentUser();
     const esAdmin = esRolSupervisorOAdmision(user.rol);
+    let avisos = '';
+
+    if (esRecategorizacionVigente(state.lead)) {
+        const a = state.recategorizacionAprobada;
+        avisos += `
+            <div style="background:#e8f5e9; border:1px solid #81c784; padding:14px 18px; border-radius:8px; margin-top:20px; font-size:13px; color:#1b5e20;">
+                <strong>Recategorización aprobada:</strong> Boleta S/ ${escapeHtml(a.BOLETA_SOLICITADA)} (${escapeHtml(a.BENEFICIO_SOLICITADO || 'Sin beca')}),
+                aprobada por ${escapeHtml(a.ADMIN_NOMBRE || a.ADMIN_EMAIL || '')}${a.FECHA_RESOLUCION ? ' el ' + escapeHtml(formatearFecha(a.FECHA_RESOLUCION)) : ''}.
+            </div>`;
+    }
+
+    if (state.solicitudPendiente && state.solicitudPendiente.STATUS === 'RECHAZADO' && !esAdmin) {
+        avisos += `
+            <div style="background:#ffebee; border:1px solid #ef9a9a; padding:14px 18px; border-radius:8px; margin-top:20px; font-size:13px; color:#b71c1c;">
+                Tu solicitud de recategorización a Boleta S/ ${escapeHtml(state.solicitudPendiente.BOLETA_SOLICITADA)} fue rechazada. Puedes solicitar otra escala.
+            </div>`;
+    }
+
+    const valorActual = state.lead
+        ? `${obtenerCampo(state.lead, COLUMNAS.BOLETA) || ''}||${obtenerCampo(state.lead, COLUMNAS.BENEFICIO) || ''}||${obtenerCampo(state.lead, COLUMNAS.BOLETA_CON_BECA) || ''}`
+        : '';
+    const opcionesDisponibles = (opciones || []).filter(o => o.value !== valorActual);
+    return avisos + renderSolicitudBoxContenido(permite, opcionesDisponibles, id, esColegioAliado, esAdmin);
+}
+
+function renderSolicitudBoxContenido(permite, opciones, id, esColegioAliado, esAdmin) {
 
     if (state.solicitudPendiente && state.solicitudPendiente.STATUS === 'PENDIENTE') {
         const boletaSol = state.solicitudPendiente.BOLETA_SOLICITADA;
@@ -717,14 +759,6 @@ function renderSolicitudBox(permite, opciones, id, esColegioAliado) {
                 <div style="margin-top:10px;">
                     <button class="btn-guardar" style="background:#777;" id="btnCancelarSolicitud">Cancelar solicitud</button>
                 </div>
-            </div>
-        `;
-    }
-
-    if (state.solicitudPendiente && state.solicitudPendiente.STATUS === 'RECHAZADO' && !esAdmin) {
-        return `
-            <div style="background:#ffebee; border:1px solid #ef9a9a; padding:16px 20px; border-radius:8px; margin-top:20px; font-size:14px; color:#b71c1c;">
-                Solicitud de recategorización a Boleta S/ ${escapeHtml(state.solicitudPendiente.BOLETA_SOLICITADA)} Rechazada.
             </div>
         `;
     }

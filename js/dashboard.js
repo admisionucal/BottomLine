@@ -2,7 +2,7 @@ import { API_URL, COLUMNAS, STATUS, STATUS_LABELS, CACHE_KEYS, esRolSupervisorOA
 
 import { getCurrentUser, getUserCampanas, getSessionToken, cacheGet, cacheSet, escapeHtml, parsearFechaFlexible, fechaAClaveISO, limpiarEspacios, sumarCategoria } from '../core/utils.js';
 
-import { Sidebar, Toast, createMultiSelect, toggleMultiSelect, renderTable } from '../core/components.js';
+import { Sidebar, Toast, createMultiSelect, toggleMultiSelect, renderTable, crearCalendarioRango, fechasEnRango, formatoRangoFechas } from '../core/components.js';
 import { buscarDuplicados, limpiarCacheDuplicados } from './duplicados-sugeridos.js';
 import { unificarLeads } from './unificar-core.js';
 
@@ -417,6 +417,31 @@ window.addEventListener('multiselect-change', (e) => {
     }
 });
 
+const SUB_VISITA_GUIADA = '|VG';
+const SUB_SIN_VISITA_GUIADA = '|SIN_VG';
+
+function tieneVisitaGuiada(lead) {
+    return !!parsearFechaFlexible(lead[COLUMNAS.FECHA_VISITA_GUIADA]);
+}
+
+function pasaFiltroStatus(lead, status) {
+    if (!status || !status.length) return true;
+    const st = lead[COLUMNAS.STATUS_GESTION] || '';
+    if (status.includes(st)) return true;
+    if (st !== STATUS.VP_VIVA) return false;
+    const vg = tieneVisitaGuiada(lead);
+    return (vg && status.includes(st + SUB_VISITA_GUIADA)) || (!vg && status.includes(st + SUB_SIN_VISITA_GUIADA));
+}
+
+function subopcionesStatus() {
+    return {
+        [STATUS.VP_VIVA]: [
+            { value: STATUS.VP_VIVA + SUB_VISITA_GUIADA, label: 'Visita guiada' },
+            { value: STATUS.VP_VIVA + SUB_SIN_VISITA_GUIADA, label: 'Sin visita guiada' },
+        ],
+    };
+}
+
 function applyFilters() {
     const user = getCurrentUser();
     const esAdmin = esRolSupervisorOAdmision(user.rol);
@@ -430,10 +455,10 @@ function applyFilters() {
         if (beneficio.length > 0 && !beneficio.includes(lead[COLUMNAS.BENEFICIO] || '')) return false;
         if (modalidad.length > 0 && !modalidad.includes(lead[COLUMNAS.MODALIDAD] || '')) return false;
         if (esAdmin && asesor.length > 0 && !asesor.includes(lead[COLUMNAS.ASESOR_NOMBRE_RAW] || '')) return false;
-        if (status.length > 0 && !status.includes(lead[COLUMNAS.STATUS_GESTION] || '')) return false;
+        if (!pasaFiltroStatus(lead, status)) return false;
         if (perfil.length > 0 && !perfil.includes((lead.PERFILAMIENTO_COMPLETO || {}).estado || '')) return false;
         if (dolorNecesidad.length > 0 && !dolorNecesidad.includes(lead[COLUMNAS.DOLOR_NECESIDAD] || '')) return false;
-        if (fechaPrimVpPp.length > 0 && !fechaPrimVpPp.includes(lead[COLUMNAS.FECHA_PRIM_VP_PP] || '')) return false;
+        if (fechaPrimVpPp.length > 0 && !fechaPrimVpPp.includes(claveFechaLead(lead[COLUMNAS.FECHA_PRIM_VP_PP]))) return false;
 
         if (state.terminoBusqueda) {
             const id = String(lead[COLUMNAS.ID_PROMETEO] || '').toLowerCase();
@@ -476,7 +501,7 @@ function populateFilters() {
     createMultiSelect('filterIngreso', getValues(COLUMNAS.MODALIDAD_INGRESO, 'ingreso'), state.filtros.ingreso, 'Todos');
     createMultiSelect('filterBeneficio', getValues(COLUMNAS.BENEFICIO, 'beneficio'), state.filtros.beneficio, 'Todos');
     createMultiSelect('filterModalidad', getValues(COLUMNAS.MODALIDAD, 'modalidad'), state.filtros.modalidad, 'Todas');
-    createMultiSelect('filterStatus', getValues(COLUMNAS.STATUS_GESTION, 'status'), state.filtros.status, 'Todos', STATUS_LABELS);
+    createMultiSelect('filterStatus', getValues(COLUMNAS.STATUS_GESTION, 'status'), state.filtros.status, 'Todos', STATUS_LABELS, { subopciones: subopcionesStatus() });
     createMultiSelect('filterPerfil', ['Pendiente Asesor', 'Pendiente Supervisor', 'Completo'], state.filtros.perfil, 'Todos');
     createMultiSelect('filterDolorNecesidad', getValues(COLUMNAS.DOLOR_NECESIDAD, 'dolorNecesidad'), state.filtros.dolorNecesidad, 'Todos');
 
@@ -513,10 +538,10 @@ function leadPasaFiltrosSin(lead, filtroExcluido, esAdmin) {
     if (beneficio.length > 0 && !beneficio.includes(lead[COLUMNAS.BENEFICIO] || '')) return false;
     if (modalidad.length > 0 && !modalidad.includes(lead[COLUMNAS.MODALIDAD] || '')) return false;
     if (esAdmin && asesor.length > 0 && !asesor.includes(lead[COLUMNAS.ASESOR_NOMBRE_RAW] || '')) return false;
-    if (status.length > 0 && !status.includes(lead[COLUMNAS.STATUS_GESTION] || '')) return false;
+    if (!pasaFiltroStatus(lead, status)) return false;
     if (perfil.length > 0 && !perfil.includes((lead.PERFILAMIENTO_COMPLETO || {}).estado || '')) return false;
     if (dolorNecesidad.length > 0 && !dolorNecesidad.includes(lead[COLUMNAS.DOLOR_NECESIDAD] || '')) return false;
-    if (fechaPrimVpPp.length > 0 && !fechaPrimVpPp.includes(lead[COLUMNAS.FECHA_PRIM_VP_PP] || '')) return false;
+    if (fechaPrimVpPp.length > 0 && !fechaPrimVpPp.includes(claveFechaLead(lead[COLUMNAS.FECHA_PRIM_VP_PP]))) return false;
 
     return true;
 }
@@ -1437,12 +1462,6 @@ function cerrarCalVpPpFuera(e) {
     document.removeEventListener('click', cerrarCalVpPpFuera);
 }
 
-function cambiarMesCalVpPp(delta) {
-    state.calVpPpMes.setMonth(state.calVpPpMes.getMonth() + delta);
-    renderCalendarioFiltroVpPp();
-}
-window.cambiarMesCalVpPp = cambiarMesCalVpPp;
-
 function mapaFechasVpPp() {
     const user = getCurrentUser();
     const esAdmin = esRolSupervisorOAdmision(user.rol);
@@ -1457,60 +1476,6 @@ function mapaFechasVpPp() {
         });
     return mapa;
 }
-
-function renderCalendarioFiltroVpPp() {
-    const panel = document.getElementById('calVpPpPanel');
-    if (!panel || !panel.classList.contains('open')) return;
-
-    const grid = document.getElementById('calVpPpGrid');
-    const label = document.getElementById('calVpPpMesLabel');
-    if (!grid || !label) return;
-
-    const mes = state.calVpPpMes;
-    label.textContent = mesAnioCorto(mes);
-
-    const mapa = mapaFechasVpPp();
-    const seleccionadas = state.filtros.fechaPrimVpPp;
-
-    const primerDia = new Date(mes.getFullYear(), mes.getMonth(), 1);
-    const ultimoDia = new Date(mes.getFullYear(), mes.getMonth() + 1, 0);
-    const offset = (primerDia.getDay() + 6) % 7;
-
-    let html = '';
-    for (let i = 0; i < offset; i++) html += '<div class="cal-vpp-day vacio"></div>';
-    for (let d = 1; d <= ultimoDia.getDate(); d++) {
-        const clave = `${mes.getFullYear()}-${String(mes.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const count = mapa[clave] || 0;
-        const activo = seleccionadas.includes(clave);
-        html += `
-            <div class="cal-vpp-day ${count ? 'tiene-datos' : ''} ${activo ? 'seleccionado' : ''}"
-                 onclick="${count ? `window.toggleFechaVpPp('${clave}')` : ''}">
-                ${d}
-                ${count ? `<span class="cal-vpp-count">${count}</span>` : ''}
-            </div>`;
-    }
-    grid.innerHTML = html;
-
-    const btn = document.getElementById('calVpPpToggleBtn');
-    if (btn) btn.classList.toggle('has-selection', seleccionadas.length > 0);
-}
-window.renderCalendarioFiltroVpPp = renderCalendarioFiltroVpPp;
-
-function toggleFechaVpPp(clave) {
-    const idx = state.filtros.fechaPrimVpPp.indexOf(clave);
-    if (idx >= 0) state.filtros.fechaPrimVpPp.splice(idx, 1);
-    else state.filtros.fechaPrimVpPp.push(clave);
-    applyFilters();
-    renderCalendarioFiltroVpPp();
-}
-window.toggleFechaVpPp = toggleFechaVpPp;
-
-function limpiarFiltroCalVpPp() {
-    state.filtros.fechaPrimVpPp = [];
-    applyFilters();
-    renderCalendarioFiltroVpPp();
-}
-window.limpiarFiltroCalVpPp = limpiarFiltroCalVpPp;
 
 const ORDEN_STATUS_IND = [
     STATUS.BLACK_LIST,
@@ -1677,7 +1642,7 @@ function poblarFiltrosIndicadores() {
     });
     createMultiSelect('indFilterAsesor', nombresRawAsesor, state.indicadores.filtros.asesor, 'Todos', labelsAsesor);
     createMultiSelect('indFilterCanal', valoresUnicos(COLUMNAS.CANAL, 'canal'), state.indicadores.filtros.canal, 'Todos');
-    createMultiSelect('indFilterStatus', valoresUnicos(COLUMNAS.STATUS_GESTION, 'status'), state.indicadores.filtros.status, 'Todos', STATUS_LABELS);
+    createMultiSelect('indFilterStatus', valoresUnicos(COLUMNAS.STATUS_GESTION, 'status'), state.indicadores.filtros.status, 'Todos', STATUS_LABELS, { subopciones: subopcionesStatus() });
     createMultiSelect('indFilterPerfil', ['Completo', 'Pendiente Supervisor', 'Pendiente Asesor'], state.indicadores.filtros.perfil, 'Todos');
 
     const desdeLeads = todosLosLeadsIndicadores().map(l => String(l[COLUMNAS.CAMPANA] || '').trim()).filter(Boolean);
@@ -1704,7 +1669,7 @@ function leadsIndicadoresFiltradosExcluyendo(excluirClave) {
             if (!d) return false;
             if (!f.fechaCalendario.includes(fechaAClaveISO(d))) return false;
         }
-        if (excluirClave !== 'status' && f.status.length && !f.status.includes(lead[COLUMNAS.STATUS_GESTION] || '')) return false;
+        if (excluirClave !== 'status' && !pasaFiltroStatus(lead, f.status)) return false;
         if (excluirClave !== 'perfil' && f.perfil.length && !f.perfil.includes((lead.PERFILAMIENTO_COMPLETO || {}).estado || '')) return false;
         return true;
     });
@@ -1739,12 +1704,6 @@ function cerrarIndCalFuera(e) {
     document.removeEventListener('click', cerrarIndCalFuera);
 }
 
-function cambiarMesIndCal(delta) {
-    state.indicadores.calMes.setMonth(state.indicadores.calMes.getMonth() + delta);
-    renderIndCalendarioFiltro();
-}
-window.cambiarMesIndCal = cambiarMesIndCal;
-
 function mapaFechasIndCal() {
     const mapa = {};
     leadsIndicadoresFiltradosExcluyendo('fechaCalendario').forEach(lead => {
@@ -1755,62 +1714,6 @@ function mapaFechasIndCal() {
     });
     return mapa;
 }
-
-function renderIndCalendarioFiltro() {
-    const panel = document.getElementById('indCalPanel');
-    if (!panel || !panel.classList.contains('open')) return;
-
-    const grid = document.getElementById('indCalGrid');
-    const label = document.getElementById('indCalMesLabel');
-    if (!grid || !label) return;
-
-    const mes = state.indicadores.calMes;
-    label.textContent = mesAnioCorto(mes);
-
-    const mapa = mapaFechasIndCal();
-    const seleccionadas = state.indicadores.filtros.fechaCalendario;
-
-    const primerDia = new Date(mes.getFullYear(), mes.getMonth(), 1);
-    const ultimoDia = new Date(mes.getFullYear(), mes.getMonth() + 1, 0);
-    const offset = (primerDia.getDay() + 6) % 7;
-
-    let html = '';
-    for (let i = 0; i < offset; i++) html += '<div class="cal-vpp-day vacio"></div>';
-    for (let d = 1; d <= ultimoDia.getDate(); d++) {
-        const clave = `${mes.getFullYear()}-${String(mes.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const count = mapa[clave] || 0;
-        const activo = seleccionadas.includes(clave);
-        html += `
-            <div class="cal-vpp-day ${count ? 'tiene-datos' : ''} ${activo ? 'seleccionado' : ''}"
-                 onclick="${count ? `window.toggleFechaIndCal('${clave}')` : ''}">
-                ${d}
-                ${count ? `<span class="cal-vpp-count">${count}</span>` : ''}
-            </div>`;
-    }
-    grid.innerHTML = html;
-
-    const btn = document.getElementById('indCalToggleBtn');
-    if (btn) btn.classList.toggle('has-selection', seleccionadas.length > 0);
-}
-window.renderIndCalendarioFiltro = renderIndCalendarioFiltro;
-
-function toggleFechaIndCal(clave) {
-    const idx = state.indicadores.filtros.fechaCalendario.indexOf(clave);
-    if (idx >= 0) state.indicadores.filtros.fechaCalendario.splice(idx, 1);
-    else state.indicadores.filtros.fechaCalendario.push(clave);
-    poblarFiltrosIndicadores();
-    renderIndicadores();
-    renderIndCalendarioFiltro();
-}
-window.toggleFechaIndCal = toggleFechaIndCal;
-
-function limpiarFiltroIndCal() {
-    state.indicadores.filtros.fechaCalendario = [];
-    poblarFiltrosIndicadores();
-    renderIndicadores();
-    renderIndCalendarioFiltro();
-}
-window.limpiarFiltroIndCal = limpiarFiltroIndCal;
 
 function claveMesInd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 function labelMesInd(d) {
@@ -2452,3 +2355,70 @@ async function callAPI(action, data = {}) {
         return { success: false, error: error.message };
     }
 }
+
+function claveFechaLead(valor) {
+    const d = parsearFechaFlexible(valor);
+    return d ? fechaAClaveISO(d) : '';
+}
+
+function extremosFechas(lista) {
+    const orden = (lista || []).filter(Boolean).slice().sort();
+    return { desde: orden[0] || '', hasta: orden[orden.length - 1] || '' };
+}
+
+function pintarBotonCalendario(btnId, etiqueta, fechas) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    const { desde, hasta } = extremosFechas(fechas);
+    btn.classList.toggle('has-selection', !!desde);
+    btn.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;">event</span> ${etiqueta}${desde ? ': ' + formatoRangoFechas(desde, hasta) : ''}`;
+}
+
+let calendarioVpPp = null;
+
+function renderCalendarioFiltroVpPp() {
+    pintarBotonCalendario('calVpPpToggleBtn', 'Fecha VP/PP', state.filtros.fechaPrimVpPp);
+    const panel = document.getElementById('calVpPpPanel');
+    if (!panel || !panel.classList.contains('open')) return;
+    if (!calendarioVpPp) {
+        const { desde, hasta } = extremosFechas(state.filtros.fechaPrimVpPp);
+        calendarioVpPp = crearCalendarioRango(document.getElementById('calVpPpRango'), {
+            desde,
+            hasta,
+            conteos: mapaFechasVpPp,
+            onChange(d, h) {
+                state.filtros.fechaPrimVpPp = fechasEnRango(d, h);
+                applyFilters();
+            },
+        });
+    } else {
+        calendarioVpPp.render();
+    }
+}
+window.renderCalendarioFiltroVpPp = renderCalendarioFiltroVpPp;
+
+let calendarioInd = null;
+
+function renderIndCalendarioFiltro() {
+    pintarBotonCalendario('indCalToggleBtn', 'Calendario', state.indicadores.filtros.fechaCalendario);
+    const panel = document.getElementById('indCalPanel');
+    if (!panel || !panel.classList.contains('open')) return;
+    if (!calendarioInd) {
+        const { desde, hasta } = extremosFechas(state.indicadores.filtros.fechaCalendario);
+        calendarioInd = crearCalendarioRango(document.getElementById('indCalRango'), {
+            desde,
+            hasta,
+            conteos: mapaFechasIndCal,
+            onChange(d, h) {
+                state.indicadores.filtros.fechaCalendario = fechasEnRango(d, h);
+                poblarFiltrosIndicadores();
+                renderIndicadores();
+                renderIndCalendarioFiltro();
+            },
+        });
+    } else {
+        calendarioInd.render();
+    }
+}
+window.renderIndCalendarioFiltro = renderIndCalendarioFiltro;
+

@@ -508,6 +508,8 @@ table tbody tr:hover { background: #fafbff; }
     margin: 2px 2px 0;
 }
 .multiselect-option.ms-todos { font-weight: 700; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid #eee; }
+.multiselect-option.ms-padre { font-weight: 700; }
+.multiselect-option.ms-hijo { padding-left: 22px; }
 
 .filtros-panel .filters {
     display: grid;
@@ -554,7 +556,7 @@ table tbody tr:hover { background: #fafbff; }
     border-radius: var(--radius);
     box-shadow: 0 4px 16px rgba(0,0,0,0.12);
     padding: 12px;
-    width: 260px;
+    width: auto;
 }
 .cal-vpp-panel.open { display: block; }
 .cal-vpp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
@@ -907,3 +909,39 @@ table tbody tr:hover { background: #fafbff; }
 }
 .badge-estado.activo { background: #c8e6c9; color: #1b5e20; }
 .badge-estado.huerfano { background: #ffe0b2; color: #bf360c; }
+
+.cr { width: 252px; user-select: none; font-size: 13px; }
+.cr-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.cr-mes { font-weight: 600; color: #1f2937; }
+.cr-nav { border: none; background: none; cursor: pointer; font-size: 20px; line-height: 1; color: #5f6b7a; width: 28px; height: 28px; border-radius: 50%; }
+.cr-nav:hover { background: #eef2f7; }
+.cr-semana, .cr-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.cr-semana span { text-align: center; font-size: 11.5px; color: #6b7280; padding: 4px 0; }
+.cr-grid { row-gap: 4px; }
+.cr-dia { position: relative; border: none; background: transparent; height: 36px; padding: 0; cursor: pointer; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.cr-num { width: 30px; height: 30px; line-height: 30px; border-radius: 50%; font-size: 13.5px; color: #1f2937; position: relative; z-index: 1; }
+.cr-cant { position: absolute; bottom: -1px; font-size: 8.5px; color: #8a94a6; z-index: 1; line-height: 1; }
+.cr-dia:hover .cr-num { background: #e3edf9; }
+.cr-dia.cr-con-datos .cr-num { font-weight: 600; }
+.cr-dia.cr-hoy .cr-num { box-shadow: inset 0 0 0 1px #0b6bcb; }
+.cr-dia.cr-medio { background: #cfe2f7; }
+.cr-dia.cr-con-rango.cr-inicio { background: linear-gradient(to right, transparent 50%, #cfe2f7 50%); }
+.cr-dia.cr-con-rango.cr-fin { background: linear-gradient(to left, transparent 50%, #cfe2f7 50%); }
+.cr-dia.cr-inicio .cr-num, .cr-dia.cr-fin .cr-num { background: #0b6bcb; color: #fff; font-weight: 600; border-radius: 9px; }
+.cr-dia.cr-inicio .cr-cant, .cr-dia.cr-fin .cr-cant { color: #fff; }
+.cr-grid > .cr-dia:nth-child(7n + 1).cr-medio { border-radius: 18px 0 0 18px; }
+.cr-grid > .cr-dia:nth-child(7n).cr-medio { border-radius: 0 18px 18px 0; }
+.cr-grid > .cr-dia:nth-child(7n + 1).cr-fin.cr-con-rango, .cr-grid > .cr-dia:nth-child(7n).cr-inicio.cr-con-rango { background: transparent; }
+.cr-pie { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; gap: 8px; }
+.cr-texto { font-size: 12px; color: #4b5563; }
+.cr-limpiar { border: none; background: none; color: var(--color-primary); font-size: 12px; cursor: pointer; font-family: inherit; }
+.cr-limpiar:disabled { color: #bbb; cursor: default; }
+
+.selector-rango { position: relative; display: inline-block; }
+.selector-rango-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid #ddd; border-radius: 6px; background: white; font-size: 13px; cursor: pointer; font-family: inherit; color: #333; white-space: nowrap; }
+.selector-rango-btn .material-symbols-outlined { font-size: 17px; color: #6b7280; }
+.selector-rango-btn:hover, .selector-rango-btn.has-selection { border-color: var(--color-primary); }
+.selector-rango-btn.has-selection { color: var(--color-primary); font-weight: 600; }
+.selector-rango-panel { display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 60; background: white; border: 1px solid var(--color-border); border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.14); padding: 12px; }
+.selector-rango-panel.open { display: block; }
+.filter-group .selector-rango, .filter-group .selector-rango-btn { width: 100%; }

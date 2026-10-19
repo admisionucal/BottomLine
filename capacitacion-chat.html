@@ -172,8 +172,9 @@
                     <div id="tabHistorial" style="display:none;"></div>
                     <div id="tabEquipo" style="display:none;">
                         <div class="adm-toolbar">
-                            <label style="font-size:12px;">Desde <input type="date" id="eqDesde"></label>
-                            <label style="font-size:12px;">Hasta <input type="date" id="eqHasta"></label>
+                            <input type="hidden" id="eqDesde">
+                            <input type="hidden" id="eqHasta">
+                            <div id="eqRangoFechas"></div>
                             <input type="text" id="eqBuscar" placeholder="Buscar asesor…">
                             <button class="btn-secundario" id="eqFiltrar">Filtrar</button>
                         </div>

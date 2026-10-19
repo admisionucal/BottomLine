@@ -4,7 +4,7 @@ import {
     cacheGet, cacheSet, cacheRemove,
     escapeHtml, formatearFecha, getEspecializacionETU
 } from '../core/utils.js';
-import { Sidebar, renderTable, Toast, createMultiSelect } from '../core/components.js';
+import { Sidebar, renderTable, Toast, createMultiSelect, crearSelectorRango } from '../core/components.js';
 import { construirDatosCC, renderPlantillaCC, renderPlantillaCCPreview, detectarTipoReferido, precargarLogoCC, setConfigCampanas } from './cc-template.js';
 import { buscarDuplicados, limpiarCacheDuplicados } from './duplicados-sugeridos.js';
 import { unificarLeads } from './unificar-core.js';
@@ -29,7 +29,7 @@ const state = {
     solicitudes: [],
     solicitudesFiltradas: [],
     terminoBusqueda: '',
-    filtros: { carrera: [], asesor: [], estado: ['PENDIENTE'], campana: [] },
+    filtros: { carrera: [], asesor: [], estado: ['PENDIENTE'], campana: [], fechaDesde: '', fechaHasta: '' },
     currentPage: 1,
     pageSize: 11,
     pagesPerBlock: 20,
@@ -89,6 +89,13 @@ function initCC() {
             state.terminoBusqueda = e.target.value.trim().toLowerCase();
             aplicarFiltrosCC();
         });
+        const cambioFecha = () => {
+            state.filtros.fechaDesde = document.getElementById('filterCCFechaDesde')?.value || '';
+            state.filtros.fechaHasta = document.getElementById('filterCCFechaHasta')?.value || '';
+            aplicarFiltrosCC();
+        };
+        document.getElementById('filterCCFechaDesde')?.addEventListener('change', cambioFecha);
+        document.getElementById('filterCCFechaHasta')?.addEventListener('change', cambioFecha);
         window.addEventListener('multiselect-change', (e) => {
             const mapaClaves = { cccarrera: 'carrera', ccasesor: 'asesor', ccestado: 'estado', cccampana: 'campana' };
             const filtroKey = mapaClaves[e.detail.key];
@@ -98,6 +105,11 @@ function initCC() {
             }
         });
         __ccListenersAtados = true;
+    }
+
+    const contFechaCC = document.getElementById('ccFechaRango');
+    if (contFechaCC && !contFechaCC.querySelector('.selector-rango-btn')) {
+        crearSelectorRango(contFechaCC, { inputDesde: 'filterCCFechaDesde', inputHasta: 'filterCCFechaHasta' });
     }
 
     const idSolicitud = !modoEmbebido
@@ -178,14 +190,27 @@ async function cargarResueltasCC(cargaId, cacheKey) {
 
 const ORDEN_ESTADO_CC = { PENDIENTE: 0, PROCESANDO: 0, ENVIADO: 1, RECHAZADO: 2 };
 
+function fechaSolicitudISO(valor) {
+    if (!valor) return '';
+    const d = new Date(valor);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+}
+
 function aplicarFiltrosCC(mantenerPagina = false) {
-    const { carrera, asesor, estado, campana } = state.filtros;
+    const { carrera, asesor, estado, campana, fechaDesde, fechaHasta } = state.filtros;
 
     state.solicitudesFiltradas = state.solicitudes.filter(sol => {
         if (carrera.length > 0 && !carrera.includes(sol.CARRERA_LEAD || '')) return false;
         if (asesor.length > 0 && !asesor.includes(sol.ASESOR_NOMBRE || sol.ASESOR_EMAIL || '')) return false;
         if (estado.length > 0 && !estado.includes(sol.STATUS || '')) return false;
         if (campana.length > 0 && !campana.includes(sol.CAMPANA || '')) return false;
+        if (fechaDesde || fechaHasta) {
+            const f = fechaSolicitudISO(sol.FECHA_SOLICITUD);
+            if (!f) return false;
+            if (fechaDesde && f < fechaDesde) return false;
+            if (fechaHasta && f > fechaHasta) return false;
+        }
 
         if (state.terminoBusqueda) {
             const id = String(sol.ID_PROMETEO || '').toLowerCase();

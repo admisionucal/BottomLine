@@ -1,6 +1,6 @@
 import { API_URL, esRolSupervisorOAdmision, puedeVerCapacitacionIA } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml, formatearFecha } from '../core/utils.js';
-import { Sidebar, renderTable, Toast } from '../core/components.js';
+import { Sidebar, renderTable, Toast, crearSelectorRango } from '../core/components.js';
 import { crearAvatar } from './avatar-2d.js';
 
 const ESPERA_ANTES_DE_RESPONDER_MS = 2500;
@@ -113,6 +113,7 @@ async function init(embebido) {
     $('chatSalir').addEventListener('click', salirSinEvaluar);
 
     $('eqFiltrar').addEventListener('click', cargarEquipo);
+    crearSelectorRango($('eqRangoFechas'), { inputDesde: 'eqDesde', inputHasta: 'eqHasta', alCambiar: () => cargarEquipo() });
     $('escNuevo').addEventListener('click', () => abrirEscenario(null));
     $('escGuardar').addEventListener('click', guardarEscenario);
     $('asigGuardar').addEventListener('click', guardarAsignacion);
