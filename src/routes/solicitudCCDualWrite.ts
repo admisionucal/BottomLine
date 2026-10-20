@@ -26,6 +26,7 @@ const MAPEO_CC: Record<string, string> = {
   CC_PDF_FILE_NOMBRE: 'cc_pdf_file_nombre',
   COMPROBANTE_FILE_ID: 'comprobante_file_id',
   NEE_FILE_ID: 'nee_file_id',
+  CONFORMIDAD_FILE_ID: 'conformidad_file_id',
   VENTA_REGISTRADA_EN: 'venta_registrada_en',
   VENTA_REGISTRADA_POR: 'venta_registrada_por',
 };

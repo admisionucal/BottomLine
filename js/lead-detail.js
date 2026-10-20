@@ -1052,10 +1052,13 @@ function renderSolicitudCCBox(hayBoletaGuardada) {
             <div style="background:#e8f5e9; border:1px solid #81c784; padding:14px 16px; border-radius:8px; font-size:13px; color:#1b5e20; text-align:center; width:100%; box-sizing:border-box;">
                 <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">check_circle</span>
                 Condiciones Comerciales enviadas el ${formatearFecha(sol.FECHA_RESOLUCION)}.
-                <div style="margin-top:8px; display:flex; flex-direction:column; align-items:center; gap:8px;">
-                    ${!puedeRegistrarVenta() ? '' : sol.VENTA_REGISTRADA_EN
-                        ? `<div style="font-weight:600;"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">point_of_sale</span> Venta registrada el ${formatearFecha(sol.VENTA_REGISTRADA_EN)}</div>`
-                        : `<button class="btn-guardar" style="padding:7px 18px; font-size:13px; background:#2e7d32;" id="btnRegistrarVenta"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">point_of_sale</span> Registrar venta</button>`}
+                ${puedeRegistrarVenta() && sol.VENTA_REGISTRADA_EN
+                    ? `<div style="margin-top:6px; font-weight:600;"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">point_of_sale</span> Venta registrada el ${formatearFecha(sol.VENTA_REGISTRADA_EN)}</div>`
+                    : ''}
+                <div style="margin-top:8px; display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:nowrap; white-space:nowrap;">
+                    ${puedeRegistrarVenta() && !sol.VENTA_REGISTRADA_EN
+                        ? `<button class="btn-guardar" style="padding:6px 16px; font-size:12px; background:#2e7d32;" id="btnRegistrarVenta"><span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px;">point_of_sale</span> Registrar venta</button>`
+                        : ''}
                     <button class="btn-guardar" style="padding:6px 16px; font-size:12px;" id="btnSolicitarCCOtraVez">Solicitar nuevo envío</button>
                 </div>
             </div>
@@ -1321,6 +1324,7 @@ async function cancelarSolicitudCC() {
 
 const MOTIVOS_COMPRA_VENTA = ['Convenios internacionales', 'Bolsa Laboral', 'Docentes', 'Egresados', 'Flexibilidad de horarios', 'Ubicación de sede', 'Precio accesible', 'Beca', 'Descuentos en boletas de pago', 'Prestigio de la institución', 'Metodología de enseñanza', 'Equipos e instalaciones', 'Malla curricular', 'Otros'];
 const VB_VENTA = ['RAUL', 'MARIO', 'ROSMERY'];
+const MEDIOS_PAGO_VENTA = ['Pago Link', 'POS', 'CARGO'];
 const ROLES_REGISTRAR_VENTA = [ROLES.SISTEMAS];
 
 function puedeRegistrarVenta() {
@@ -1330,11 +1334,11 @@ const STATUS_PAGO_VENTA = [STATUS.PAGO_COMPLETO, STATUS.PAGO_FRACCIONADO];
 const DOCS_VENTA = [
     { campo: 'comprobante', label: 'Comprobante de pago', claveId: 'COMPROBANTE_FILE_ID', obligatorio: true },
     { campo: 'dni', label: 'DNI del postulante', claveId: 'DNI_FILE_ID', obligatorio: true },
-    { campo: 'cc', label: 'Condiciones Comerciales', claveId: 'CC_PDF_FILE_ID', obligatorio: false },
-    { campo: 'nee', label: 'Encuesta NEE', claveId: 'NEE_FILE_ID', obligatorio: false }
+    { campo: 'conformidad', label: 'Conformidad de CC (captura del correo)', claveId: 'CONFORMIDAD_FILE_ID', obligatorio: true },
+    { campo: 'nee', label: 'Encuesta NEE', claveId: 'NEE_FILE_ID', obligatorio: true }
 ];
 
-let ventaArchivos = { comprobante: [], dni: [], nee: [], cc: [] };
+let ventaArchivos = { comprobante: [], dni: [], conformidad: [], nee: [] };
 let ventaAsesores = null;
 
 function hoyISOLima() {
@@ -1420,6 +1424,18 @@ function asegurarModalVenta() {
             <p style="color:#888; font-size:13px; margin-bottom:14px;">Revisa los datos, completa el pago y verifica los documentos antes de registrar.</p>
             <div id="ventaResumen" class="venta-resumen"></div>
             <div class="venta-grid">
+                <label class="venta-campo">Nombre(s) del alumno *
+                    <input type="text" id="ventaNombres" class="campo-editable-input">
+                </label>
+                <label class="venta-campo">Apellidos del alumno *
+                    <input type="text" id="ventaApellidos" class="campo-editable-input">
+                </label>
+                <label class="venta-campo">Medio de pago *
+                    <select id="ventaMedioPago" class="campo-editable-input">
+                        <option value="">-- Seleccionar --</option>
+                        ${MEDIOS_PAGO_VENTA.map(m => `<option value="${m}">${m}</option>`).join('')}
+                    </select>
+                </label>
                 <label class="venta-campo">Status de pago *
                     <select id="ventaStatus" class="campo-editable-input">
                         ${STATUS_PAGO_VENTA.map(s => `<option value="${s}">${STATUS_LABELS[s] || s}</option>`).join('')}
@@ -1561,7 +1577,6 @@ function abrirModalVenta() {
     const d = datosDerivadosVenta(lead);
     const fila = (label, valor) => `<div><span>${label}</span><strong>${escapeHtml(String(valor ?? '') || '-')}</strong></div>`;
     document.getElementById('ventaResumen').innerHTML = [
-        fila('Alumno', `${d.F} ${d.G}`.trim()),
         fila('ID Prometeo', d.D),
         fila('Carrera', d.K),
         fila('Modalidad', d.O),
@@ -1569,10 +1584,12 @@ function abrirModalVenta() {
         fila('Descuento', d.S === 'NINGUNO' ? d.R : `${d.R} · ${d.S}`),
         fila('Beneficio adicional', d.T),
         fila('Boleta final', `S/ ${d.AI}`),
-        fila('Admisión / Matrícula', `S/ ${d.AE} / S/ ${d.AF}`),
-        fila('Medio de pago', d.W)
+        fila('Admisión / Matrícula', `S/ ${d.AE} / S/ ${d.AF}`)
     ].join('');
 
+    document.getElementById('ventaNombres').value = d.F;
+    document.getElementById('ventaApellidos').value = d.G;
+    document.getElementById('ventaMedioPago').value = MEDIOS_PAGO_VENTA.includes(d.W) ? d.W : '';
     document.getElementById('ventaStatus').value = STATUS.PAGO_COMPLETO;
     document.getElementById('ventaFechaPago').value = hoyISOLima();
     document.getElementById('ventaFechaPago').max = hoyISOLima();
@@ -1586,7 +1603,7 @@ function abrirModalVenta() {
     document.getElementById('ventaMsg').textContent = '';
     actualizarCamposFraccionadoVenta();
 
-    ventaArchivos = { comprobante: [], dni: [], nee: [], cc: [] };
+    ventaArchivos = { comprobante: [], dni: [], conformidad: [], nee: [] };
     document.getElementById('ventaDocs').innerHTML = DOCS_VENTA.map(doc => `<div class="venta-doc" id="ventaDoc_${doc.campo}"></div>`).join('');
     DOCS_VENTA.forEach(doc => renderDocVenta(doc.campo));
 
@@ -1616,6 +1633,13 @@ async function registrarVenta() {
     const vb = document.getElementById('ventaVB').value;
     const motivo = document.getElementById('ventaMotivo').value;
 
+    const nombresAlumno = document.getElementById('ventaNombres').value.trim().replace(/\s+/g, ' ');
+    const apellidosAlumno = document.getElementById('ventaApellidos').value.trim().replace(/\s+/g, ' ');
+    const medioPago = document.getElementById('ventaMedioPago').value;
+
+    if (!nombresAlumno) return error('Ingresa el/los nombre(s) del alumno.');
+    if (!apellidosAlumno) return error('Ingresa los apellidos del alumno.');
+    if (!medioPago) return error('Selecciona el medio de pago.');
     if (!fechaPago) return error('Selecciona la fecha de pago.');
     if (fraccionado && (!monto || Number(monto) <= 0)) return error('Ingresa el monto pagado.');
     if (fraccionado && !fechaCompromiso) return error('Selecciona la fecha de compromiso de pago completo.');
@@ -1627,6 +1651,9 @@ async function registrarVenta() {
     const { requiereVB, ...derivados } = d;
     const filaVenta = {
         ...derivados,
+        F: nombresAlumno,
+        G: apellidosAlumno,
+        W: medioPago,
         U: requiereVB ? vb : '',
         V: fechaPago,
         X: status,
@@ -1643,14 +1670,14 @@ async function registrarVenta() {
     msgEl.textContent = 'Registrando venta...';
 
     try {
-        const [comprobante, dni, nee, cc] = await Promise.all(['comprobante', 'dni', 'nee', 'cc'].map(armarArchivosVenta));
+        const [comprobante, dni, conformidad, nee] = await Promise.all(['comprobante', 'dni', 'conformidad', 'nee'].map(armarArchivosVenta));
         const result = await callAPI('registrarVenta', {
             idSolicitud: state.solicitudCC.ID_SOLICITUD,
             idPrometeo: d.D,
             campana: state.campana,
-            nombreCompleto: obtenerCampo(state.lead, COLUMNAS.NOMBRES) || '',
+            nombreCompleto: `${nombresAlumno} ${apellidosAlumno}`,
             fila: filaVenta,
-            archivos: { comprobante, dni, nee, cc }
+            archivos: { comprobante, dni, conformidad, nee }
         });
 
         if (!result || !result.success) return error('Error: ' + (result?.error || 'No se pudo registrar la venta'));

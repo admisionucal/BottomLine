@@ -28,6 +28,7 @@ function filaASolicitudCCObj(r: any) {
     CC_PDF_FILE_NOMBRE: r.cc_pdf_file_nombre || '',
     COMPROBANTE_FILE_ID: r.comprobante_file_id || '',
     NEE_FILE_ID: r.nee_file_id || '',
+    CONFORMIDAD_FILE_ID: r.conformidad_file_id || '',
     VENTA_REGISTRADA_EN: r.venta_registrada_en || null,
     VENTA_REGISTRADA_POR: r.venta_registrada_por || '',
   };
