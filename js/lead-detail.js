@@ -1324,7 +1324,41 @@ async function cancelarSolicitudCC() {
 
 const MOTIVOS_COMPRA_VENTA = ['Convenios internacionales', 'Bolsa Laboral', 'Docentes', 'Egresados', 'Flexibilidad de horarios', 'Ubicación de sede', 'Precio accesible', 'Beca', 'Descuentos en boletas de pago', 'Prestigio de la institución', 'Metodología de enseñanza', 'Equipos e instalaciones', 'Malla curricular', 'Otros'];
 const VB_VENTA = ['RAUL', 'MARIO', 'ROSMERY'];
-const MEDIOS_PAGO_VENTA = ['Pago Link', 'POS', 'CARGO'];
+const MEDIOS_PAGO_VENTA = ['Pago Link', 'POS', 'Cargo'];
+const CONECTORES_TITULO = new Set(['y', 'o', 'e', 'u', 'a', 'al', 'de', 'del', 'la', 'las', 'el', 'los', 'en', 'con', 'para', 'por', 'sin']);
+const SIGLAS_TITULO = new Set(['CPA', 'ETU', 'NEE', 'POS', 'UCAL']);
+const COLUMNAS_SIN_FORMATO_VENTA = new Set(['C', 'D', 'V', 'Z']);
+const COLUMNAS_MAYUSCULA_VENTA = new Set(['F', 'G', 'Q', 'R', 'S', 'X']);
+
+function sinTildes(texto) {
+    return String(texto).replace(/[áàäâ]/g, 'a').replace(/[éèëê]/g, 'e').replace(/[íìïî]/g, 'i').replace(/[óòöô]/g, 'o').replace(/[úùüû]/g, 'u')
+        .replace(/[ÁÀÄÂ]/g, 'A').replace(/[ÉÈËÊ]/g, 'E').replace(/[ÍÌÏÎ]/g, 'I').replace(/[ÓÒÖÔ]/g, 'O').replace(/[ÚÙÜÛ]/g, 'U');
+}
+
+function formatoTitulo(valor) {
+    if (typeof valor !== 'string') return valor;
+    const palabras = sinTildes(valor).trim().replace(/\s+/g, ' ').toLowerCase().split(' ').filter(Boolean);
+    return palabras.map((palabra, i) => {
+        if (SIGLAS_TITULO.has(palabra.toUpperCase().replace(/[^A-Z]/g, ''))) return palabra.toUpperCase();
+        if (i > 0 && CONECTORES_TITULO.has(palabra)) return palabra;
+        return palabra.replace(/(^|[-(\/])([a-zñ])/g, (_, previo, letra) => previo + letra.toUpperCase());
+    }).join(' ');
+}
+
+function formatoMayuscula(valor) {
+    if (typeof valor !== 'string') return valor;
+    return sinTildes(valor).trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
+function formatearFilaVenta(fila) {
+    const resultado = {};
+    Object.entries(fila).forEach(([columna, valor]) => {
+        resultado[columna] = COLUMNAS_SIN_FORMATO_VENTA.has(columna) ? valor
+            : COLUMNAS_MAYUSCULA_VENTA.has(columna) ? formatoMayuscula(valor)
+            : formatoTitulo(valor);
+    });
+    return resultado;
+}
 const ROLES_REGISTRAR_VENTA = [ROLES.SISTEMAS];
 
 function puedeRegistrarVenta() {
@@ -1383,7 +1417,7 @@ function datosDerivadosVenta(lead) {
     const metodoPago = String(obtenerCampo(lead, COLUMNAS.METODO_PAGO) || '').trim();
     const { admision, matricula } = montoAdmisionMatriculaVenta(lead);
 
-    return {
+    return formatearFilaVenta({
         C: campanaFormularioVenta(state.campana),
         D: String(obtenerCampo(lead, COLUMNAS.ID_PROMETEO) || '').trim(),
         F: nombres.slice(0, 2).join(' '),
@@ -1409,7 +1443,7 @@ function datosDerivadosVenta(lead) {
         AU: '',
         BA: obtenerCampo(lead, COLUMNAS.TIEMPO_OFRECIDO) || '',
         requiereVB: reca || beca
-    };
+    });
 }
 
 function asegurarModalVenta() {
@@ -1453,7 +1487,7 @@ function asegurarModalVenta() {
                 <label class="venta-campo" id="ventaBloqueVB">VB *
                     <select id="ventaVB" class="campo-editable-input">
                         <option value="">-- Seleccionar --</option>
-                        ${VB_VENTA.map(v => `<option value="${v}">${v}</option>`).join('')}
+                        ${VB_VENTA.map(v => `<option value="${v}">${formatoTitulo(v)}</option>`).join('')}
                     </select>
                 </label>
                 <label class="venta-campo">Cuota que paga *
@@ -1464,7 +1498,7 @@ function asegurarModalVenta() {
                 <label class="venta-campo">Motivo de compra *
                     <select id="ventaMotivo" class="campo-editable-input">
                         <option value="">-- Seleccionar --</option>
-                        ${MOTIVOS_COMPRA_VENTA.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('')}
+                        ${MOTIVOS_COMPRA_VENTA.map(formatoTitulo).map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('')}
                     </select>
                 </label>
                 <label class="venta-campo">Asesor que ayudó a cerrar
@@ -1490,6 +1524,10 @@ function asegurarModalVenta() {
     document.getElementById('ventaModalClose').addEventListener('click', cerrar);
     document.getElementById('ventaCancelarBtn').addEventListener('click', cerrar);
     document.getElementById('ventaStatus').addEventListener('change', actualizarCamposFraccionadoVenta);
+    [['ventaNombres', formatoMayuscula], ['ventaApellidos', formatoMayuscula], ['ventaComentario', formatoTitulo]].forEach(([id, formato]) => {
+        const campo = document.getElementById(id);
+        campo.addEventListener('blur', () => { campo.value = formato(campo.value); });
+    });
     document.getElementById('ventaRegistrarBtn').addEventListener('click', registrarVenta);
     document.getElementById('ventaDocs').addEventListener('click', (e) => {
         const subir = e.target.closest('[data-venta-subir]');
@@ -1567,7 +1605,7 @@ async function cargarAsesoresVenta() {
     const user = getCurrentUser();
     select.innerHTML = '<option value="">Ninguno</option>' + ventaAsesores
         .filter(a => String(a.email || '').toLowerCase() !== String(user.email || '').toLowerCase())
-        .map(a => `<option value="${escapeHtml(a.nombre)}">${escapeHtml(a.nombre)}</option>`).join('');
+        .map(a => formatoTitulo(a.nombre)).map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
 }
 
 function abrirModalVenta() {
@@ -1649,7 +1687,7 @@ async function registrarVenta() {
     if (faltante) return error(`Adjunta el documento: ${faltante.label}.`);
 
     const { requiereVB, ...derivados } = d;
-    const filaVenta = {
+    const filaVenta = formatearFilaVenta({
         ...derivados,
         F: nombresAlumno,
         G: apellidosAlumno,
@@ -1663,7 +1701,7 @@ async function registrarVenta() {
         AN: motivo,
         AO: document.getElementById('ventaComentario').value.trim(),
         AP: Number(document.getElementById('ventaCuota').value) || 1
-    };
+    });
 
     btn.disabled = true;
     msgEl.style.color = '#666';
