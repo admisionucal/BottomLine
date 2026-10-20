@@ -24,6 +24,12 @@ function filaASolicitudCCObj(r: any) {
     TIPO_REFERIDO: r.tipo_referido,
     PERSONAS_REFERIDO_JSON: r.personas_referido_json,
     HISTORIAL_ENVIOS: r.historial_envios,
+    CC_PDF_FILE_ID: r.cc_pdf_file_id || '',
+    CC_PDF_FILE_NOMBRE: r.cc_pdf_file_nombre || '',
+    COMPROBANTE_FILE_ID: r.comprobante_file_id || '',
+    NEE_FILE_ID: r.nee_file_id || '',
+    VENTA_REGISTRADA_EN: r.venta_registrada_en || null,
+    VENTA_REGISTRADA_POR: r.venta_registrada_por || '',
   };
 }
 

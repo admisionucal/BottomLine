@@ -22,6 +22,12 @@ const MAPEO_CC: Record<string, string> = {
   TIPO_REFERIDO: 'tipo_referido',
   PERSONAS_REFERIDO_JSON: 'personas_referido_json',
   HISTORIAL_ENVIOS: 'historial_envios',
+  CC_PDF_FILE_ID: 'cc_pdf_file_id',
+  CC_PDF_FILE_NOMBRE: 'cc_pdf_file_nombre',
+  COMPROBANTE_FILE_ID: 'comprobante_file_id',
+  NEE_FILE_ID: 'nee_file_id',
+  VENTA_REGISTRADA_EN: 'venta_registrada_en',
+  VENTA_REGISTRADA_POR: 'venta_registrada_por',
 };
 
 export async function actualizarSolicitudCC(client: Client, body: JsonBody, env: Env) {

@@ -18,7 +18,7 @@ import { getLeadPayments } from './routes/leadPayments';
 import { getResumenVpPp } from './routes/resumenVpPp';
 import { searchLeads } from './routes/searchLeads';
 import { unifyIds } from './routes/unifyIds';
-import { actualizarLeadsHoy } from './routes/leadsHoy';
+import { actualizarLeadsHoy, marcarVentaProvisional } from './routes/leadsHoy';
 import { actualizarLeadsBase } from './routes/leadsBase';
 import {
   getSolicitudPendiente,
@@ -36,7 +36,7 @@ import {
   eliminarArchivoCampana,
   obtenerArchivoCampanaBase64,
 } from './routes/campanas';
-import { getSupervisoresConfig, crearUsuario } from './routes/usuarios';
+import { getSupervisoresConfig, crearUsuario, getAsesoresActivos } from './routes/usuarios';
 import {
   getEvaluaciones,
   getEstadoEvaluacion,
@@ -92,6 +92,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   getSolicitudesCCCount,
   actualizarSolicitudCC,
   actualizarLeadsHoy,
+  marcarVentaProvisional,
   actualizarLeadsBase,
   getCampanasConfig,
   guardarCampana,
@@ -101,6 +102,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   obtenerArchivoCampanaBase64,
   getSupervisoresConfig,
   crearUsuario,
+  getAsesoresActivos,
   getEvaluaciones,
   getEstadoEvaluacion,
   guardarIntentoEvaluacion,
@@ -192,6 +194,7 @@ const ACCIONES_APPS_SCRIPT = new Set([
   'enviarCC',
   'generarPreviewPDF',
   'rechazarCC',
+  'registrarVenta',
 ]);
 
 async function proxyAAppsScript(originalRequest: Request, body: any, env: Env): Promise<Response> {

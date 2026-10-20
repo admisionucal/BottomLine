@@ -1,4 +1,4 @@
-import { API_URL, COLUMNAS, STATUS, STATUS_LABELS, STATUS_CLASES, CACHE_KEYS, SELECT_OPTIONS, PRECIOS_BASE, esRolSupervisorOAdmision, TIPOS_INSTITUCION_PROCEDENCIA } from '../core/constants.js';
+import { API_URL, ROLES, COLUMNAS, STATUS, STATUS_LABELS, STATUS_CLASES, CACHE_KEYS, SELECT_OPTIONS, PRECIOS_BASE, esRolSupervisorOAdmision, TIPOS_INSTITUCION_PROCEDENCIA } from '../core/constants.js';
 
 import { getCurrentUser, getSessionToken, cacheGet, cacheSet, cacheRemove, escapeHtml, normalizarTexto, parseNumero, getEspecializacionETU } from '../core/utils.js';
 
@@ -1052,11 +1052,15 @@ function renderSolicitudCCBox(hayBoletaGuardada) {
             <div style="background:#e8f5e9; border:1px solid #81c784; padding:14px 16px; border-radius:8px; font-size:13px; color:#1b5e20; text-align:center; width:100%; box-sizing:border-box;">
                 <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">check_circle</span>
                 Condiciones Comerciales enviadas el ${formatearFecha(sol.FECHA_RESOLUCION)}.
-                <div style="margin-top:8px;">
+                <div style="margin-top:8px; display:flex; flex-direction:column; align-items:center; gap:8px;">
+                    ${!puedeRegistrarVenta() ? '' : sol.VENTA_REGISTRADA_EN
+                        ? `<div style="font-weight:600;"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">point_of_sale</span> Venta registrada el ${formatearFecha(sol.VENTA_REGISTRADA_EN)}</div>`
+                        : `<button class="btn-guardar" style="padding:7px 18px; font-size:13px; background:#2e7d32;" id="btnRegistrarVenta"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">point_of_sale</span> Registrar venta</button>`}
                     <button class="btn-guardar" style="padding:6px 16px; font-size:12px;" id="btnSolicitarCCOtraVez">Solicitar nuevo envío</button>
                 </div>
             </div>
         `;
+        document.getElementById('btnRegistrarVenta')?.addEventListener('click', abrirModalVenta);
         document.getElementById('btnSolicitarCCOtraVez')?.addEventListener('click', abrirModalSolicitudCC);
         return;
     }
@@ -1312,6 +1316,356 @@ async function cancelarSolicitudCC() {
         }
     } catch (e) {
         alert('Error de conexión: ' + e.message);
+    }
+}
+
+const MOTIVOS_COMPRA_VENTA = ['Convenios internacionales', 'Bolsa Laboral', 'Docentes', 'Egresados', 'Flexibilidad de horarios', 'Ubicación de sede', 'Precio accesible', 'Beca', 'Descuentos en boletas de pago', 'Prestigio de la institución', 'Metodología de enseñanza', 'Equipos e instalaciones', 'Malla curricular', 'Otros'];
+const VB_VENTA = ['RAUL', 'MARIO', 'ROSMERY'];
+const ROLES_REGISTRAR_VENTA = [ROLES.SISTEMAS];
+
+function puedeRegistrarVenta() {
+    return ROLES_REGISTRAR_VENTA.includes(getCurrentUser()?.rol);
+}
+const STATUS_PAGO_VENTA = [STATUS.PAGO_COMPLETO, STATUS.PAGO_FRACCIONADO];
+const DOCS_VENTA = [
+    { campo: 'comprobante', label: 'Comprobante de pago', claveId: 'COMPROBANTE_FILE_ID', obligatorio: true },
+    { campo: 'dni', label: 'DNI del postulante', claveId: 'DNI_FILE_ID', obligatorio: true },
+    { campo: 'cc', label: 'Condiciones Comerciales', claveId: 'CC_PDF_FILE_ID', obligatorio: false },
+    { campo: 'nee', label: 'Encuesta NEE', claveId: 'NEE_FILE_ID', obligatorio: false }
+];
+
+let ventaArchivos = { comprobante: [], dni: [], nee: [], cc: [] };
+let ventaAsesores = null;
+
+function hoyISOLima() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+}
+
+function campanaFormularioVenta(campana) {
+    return '20' + String(campana || '').trim().replace('.', '-');
+}
+
+function esBecaVigente(lead) {
+    const beneficio = String(obtenerCampo(lead, COLUMNAS.BENEFICIO) || '').trim().toUpperCase();
+    return !!beneficio && !['NO', 'SIN BECA', 'ESCALA REGULAR', 'NINGUNO', 'RECATEGORIZACIÓN', 'RECATEGORIZACION'].includes(beneficio);
+}
+
+function montoAdmisionMatriculaVenta(lead) {
+    const descuento = String(obtenerCampo(lead, COLUMNAS.DESCUENTO_PRECIOS) || '0').trim();
+    const porDescuento = { '0': [250, 475], '80': [50, 95], '100': [0, 0] }[descuento] || [250, 475];
+    const admision = String(lead['ADMISION_FINAL'] ?? '').trim();
+    const matricula = String(lead['MATRICULA_FINAL'] ?? '').trim();
+    return {
+        admision: admision !== '' ? parseNumero(admision) : porDescuento[0],
+        matricula: matricula !== '' ? parseNumero(matricula) : porDescuento[1]
+    };
+}
+
+function datosDerivadosVenta(lead) {
+    const nombres = String(obtenerCampo(lead, COLUMNAS.NOMBRES) || '').trim().split(/\s+/).filter(Boolean);
+    const modalidadIngreso = String(obtenerCampo(lead, COLUMNAS.MODALIDAD_INGRESO) || '').toLowerCase();
+    const esMas2 = modalidadIngreso.indexOf('+2') !== -1;
+    const conConva = modalidadIngreso.indexOf('con conva') !== -1;
+    const sinConva = modalidadIngreso.indexOf('sin conva') !== -1;
+    const esEtu = obtenerCampo(lead, COLUMNAS.TIPO_ALUMNO) === 'ALUMNO ETU';
+    const modalidadNorm = normalizarTexto(obtenerCampo(lead, COLUMNAS.MODALIDAD) || '');
+    const esVirtual = modalidadNorm === 'virtual' || modalidadNorm === 'remoto';
+    const reca = esRecategorizacionVigente(lead);
+    const beca = esBecaVigente(lead);
+    const beneficio = String(obtenerCampo(lead, COLUMNAS.BENEFICIO) || '').trim().toUpperCase();
+    const adicional = String(obtenerCampo(lead, COLUMNAS.BENEFICIO_ADICIONAL) || '').split('||')[2] || '';
+    const boleta = parseNumero(obtenerCampo(lead, COLUMNAS.BOLETA) || '');
+    const boletaConBeca = parseNumero(obtenerCampo(lead, COLUMNAS.BOLETA_CON_BECA) || '');
+    const metodoPago = String(obtenerCampo(lead, COLUMNAS.METODO_PAGO) || '').trim();
+    const { admision, matricula } = montoAdmisionMatriculaVenta(lead);
+
+    return {
+        C: campanaFormularioVenta(state.campana),
+        D: String(obtenerCampo(lead, COLUMNAS.ID_PROMETEO) || '').trim(),
+        F: nombres.slice(0, 2).join(' '),
+        G: nombres.slice(2).join(' '),
+        K: obtenerCampo(lead, COLUMNAS.CARRERA, COLUMNAS.PROGRAMA) || '',
+        N: esMas2 ? 'Traslado +2'
+            : (conConva || sinConva) ? 'Admisión Extraordinaria (Traslados)'
+            : esEtu ? 'ETU'
+            : 'Admisión Ordinaria',
+        O: esVirtual ? 'Virtual' : 'Semi-presencial',
+        P: esVirtual ? 'Nocturno - Todas las carreras (CPA)' : 'Diurno - Todas las carreras (Semipresencial)',
+        Q: esMas2 ? 'Traslado +2' : conConva ? 'TRASLADO CON CONVA' : sinConva ? 'TRASLADO SIN CONVA' : 'NUEVO',
+        R: reca && beca ? 'RECA-BECA' : reca ? 'RECA' : beca ? 'BECA' : 'ESCALA REGULAR',
+        S: beca ? beneficio : reca ? 'RECATEGORIZACIÓN' : 'NINGUNO',
+        T: adicional.trim() || 'Ninguno',
+        W: metodoPago === 'LINK DE PAGO' ? 'Pago Link' : metodoPago,
+        AE: admision,
+        AF: matricula,
+        AG: boleta,
+        AI: beca && boletaConBeca ? boletaConBeca : boleta,
+        AJ: (conConva || esMas2) ? 1 : 0,
+        AK: String(obtenerCampo(lead, COLUMNAS.RINDE_EXAMEN_SUFICIENCIA) || '').toUpperCase() === 'SI' ? 1 : 0,
+        AU: '',
+        BA: obtenerCampo(lead, COLUMNAS.TIEMPO_OFRECIDO) || '',
+        requiereVB: reca || beca
+    };
+}
+
+function asegurarModalVenta() {
+    if (document.getElementById('ventaModal')) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'ventaModal';
+    overlay.innerHTML = `
+        <div class="modal-box modal-box-detalle" style="max-width:860px;">
+            <button class="modal-close-x" id="ventaModalClose"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
+            <h4 style="margin-bottom:2px;">Registrar venta</h4>
+            <p style="color:#888; font-size:13px; margin-bottom:14px;">Revisa los datos, completa el pago y verifica los documentos antes de registrar.</p>
+            <div id="ventaResumen" class="venta-resumen"></div>
+            <div class="venta-grid">
+                <label class="venta-campo">Status de pago *
+                    <select id="ventaStatus" class="campo-editable-input">
+                        ${STATUS_PAGO_VENTA.map(s => `<option value="${s}">${STATUS_LABELS[s] || s}</option>`).join('')}
+                    </select>
+                </label>
+                <label class="venta-campo">Fecha de pago *
+                    <input type="date" id="ventaFechaPago" class="campo-editable-input">
+                </label>
+                <label class="venta-campo venta-fraccionado">Monto pagado (S/) *
+                    <input type="number" id="ventaMontoFraccionado" class="campo-editable-input" min="0" step="0.01">
+                </label>
+                <label class="venta-campo venta-fraccionado">Fecha compromiso de pago completo *
+                    <input type="date" id="ventaFechaCompromiso" class="campo-editable-input">
+                </label>
+                <label class="venta-campo" id="ventaBloqueVB">VB *
+                    <select id="ventaVB" class="campo-editable-input">
+                        <option value="">-- Seleccionar --</option>
+                        ${VB_VENTA.map(v => `<option value="${v}">${v}</option>`).join('')}
+                    </select>
+                </label>
+                <label class="venta-campo">Cuota que paga *
+                    <select id="ventaCuota" class="campo-editable-input">
+                        <option value="1">1</option><option value="2">2</option>
+                    </select>
+                </label>
+                <label class="venta-campo">Motivo de compra *
+                    <select id="ventaMotivo" class="campo-editable-input">
+                        <option value="">-- Seleccionar --</option>
+                        ${MOTIVOS_COMPRA_VENTA.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('')}
+                    </select>
+                </label>
+                <label class="venta-campo">Asesor que ayudó a cerrar
+                    <select id="ventaAsesorAyudo" class="campo-editable-input"><option value="">Ninguno</option></select>
+                </label>
+                <label class="venta-campo venta-campo-ancho">Comentario
+                    <textarea id="ventaComentario" class="campo-editable-input" rows="2"></textarea>
+                </label>
+            </div>
+            <h5 class="venta-subtitulo">Documentos</h5>
+            <div id="ventaDocs" class="venta-docs"></div>
+            <div style="display:flex; gap:10px; margin-top:18px;">
+                <button class="btn-guardar" style="background:#777; flex:1;" id="ventaCancelarBtn">Cancelar</button>
+                <button class="btn-guardar" style="flex:1;" id="ventaRegistrarBtn">Registrar venta</button>
+            </div>
+            <span id="ventaMsg" style="display:block; margin-top:8px; font-size:13px; text-align:center;"></span>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const cerrar = () => overlay.classList.remove('show');
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) cerrar(); });
+    document.getElementById('ventaModalClose').addEventListener('click', cerrar);
+    document.getElementById('ventaCancelarBtn').addEventListener('click', cerrar);
+    document.getElementById('ventaStatus').addEventListener('change', actualizarCamposFraccionadoVenta);
+    document.getElementById('ventaRegistrarBtn').addEventListener('click', registrarVenta);
+    document.getElementById('ventaDocs').addEventListener('click', (e) => {
+        const subir = e.target.closest('[data-venta-subir]');
+        if (subir) { document.getElementById('ventaInput_' + subir.dataset.ventaSubir).click(); return; }
+        const quitar = e.target.closest('[data-venta-quitar]');
+        if (quitar) { ventaArchivos[quitar.dataset.ventaQuitar] = []; renderDocVenta(quitar.dataset.ventaQuitar); }
+    });
+    document.getElementById('ventaDocs').addEventListener('change', async (e) => {
+        const input = e.target.closest('[data-venta-input]');
+        if (!input) return;
+        const campo = input.dataset.ventaInput;
+        const seleccionados = Array.from(input.files || []);
+        input.value = '';
+        if (seleccionados.length === 0) return;
+        ventaArchivos[campo] = await Promise.all(seleccionados.map(normalizarOrientacionImagen));
+        renderDocVenta(campo);
+        document.getElementById('ventaMsg').textContent = '';
+    });
+}
+
+function actualizarCamposFraccionadoVenta() {
+    const fraccionado = document.getElementById('ventaStatus').value === STATUS.PAGO_FRACCIONADO;
+    document.querySelectorAll('#ventaModal .venta-fraccionado').forEach(el => { el.style.display = fraccionado ? '' : 'none'; });
+}
+
+function archivoExistenteVenta(doc) {
+    return String((state.solicitudCC || {})[doc.claveId] || '').trim();
+}
+
+function renderDocVenta(campo) {
+    const doc = DOCS_VENTA.find(d => d.campo === campo);
+    const cont = document.getElementById('ventaDoc_' + campo);
+    if (!doc || !cont) return;
+    const nuevos = ventaArchivos[campo];
+    const existente = archivoExistenteVenta(doc);
+
+    let preview;
+    let estado;
+    if (nuevos.length > 0) {
+        const pdf = nuevos.length === 1 && nuevos[0].type === 'application/pdf';
+        preview = pdf
+            ? `<iframe src="${URL.createObjectURL(nuevos[0])}" class="venta-doc-frame"></iframe>`
+            : `<div class="venta-doc-thumbs">${nuevos.map(f => (f.type || '').startsWith('image/')
+                ? `<img src="${URL.createObjectURL(f)}" alt="">`
+                : `<span class="material-symbols-outlined" style="font-size:40px; color:#c62828;">description</span>`).join('')}</div>`;
+        estado = `<span class="venta-doc-estado nuevo">${existente ? 'Reemplazo' : 'Nuevo'} · ${nuevos.length} archivo(s)</span>`;
+    } else if (existente) {
+        preview = `<iframe src="https://drive.google.com/file/d/${encodeURIComponent(existente)}/preview" class="venta-doc-frame" allow="autoplay"></iframe>`;
+        estado = `<span class="venta-doc-estado ok">Ya adjuntado</span>`;
+    } else {
+        preview = `<div class="venta-doc-vacio"><span class="material-symbols-outlined">upload_file</span>Sin documento</div>`;
+        estado = `<span class="venta-doc-estado ${doc.obligatorio ? 'falta' : ''}">${doc.obligatorio ? 'Obligatorio' : 'Opcional'}</span>`;
+    }
+
+    cont.innerHTML = `
+        <div class="venta-doc-cabecera">
+            <strong>${doc.label}${doc.obligatorio ? ' *' : ''}</strong>
+            ${estado}
+        </div>
+        ${preview}
+        <div class="venta-doc-acciones">
+            <input type="file" id="ventaInput_${campo}" data-venta-input="${campo}" accept=".pdf,.png,.jpg,.jpeg" multiple style="display:none;">
+            <button type="button" class="btn-guardar" data-venta-subir="${campo}" style="padding:5px 12px; font-size:12px;">${existente || nuevos.length ? 'Reemplazar' : 'Subir'}</button>
+            ${nuevos.length ? `<button type="button" class="btn-guardar" data-venta-quitar="${campo}" style="padding:5px 12px; font-size:12px; background:#777;">${existente ? 'Mantener actual' : 'Quitar'}</button>` : ''}
+        </div>
+    `;
+}
+
+async function cargarAsesoresVenta() {
+    const select = document.getElementById('ventaAsesorAyudo');
+    if (!ventaAsesores) {
+        const result = await callAPI('getAsesoresActivos', { campana: state.campana });
+        ventaAsesores = (result && result.success) ? (result.data || []) : [];
+    }
+    const user = getCurrentUser();
+    select.innerHTML = '<option value="">Ninguno</option>' + ventaAsesores
+        .filter(a => String(a.email || '').toLowerCase() !== String(user.email || '').toLowerCase())
+        .map(a => `<option value="${escapeHtml(a.nombre)}">${escapeHtml(a.nombre)}</option>`).join('');
+}
+
+function abrirModalVenta() {
+    if (!puedeRegistrarVenta() || !state.solicitudCC || state.solicitudCC.STATUS !== 'ENVIADO') return;
+    asegurarModalVenta();
+    const lead = state.lead;
+    const d = datosDerivadosVenta(lead);
+    const fila = (label, valor) => `<div><span>${label}</span><strong>${escapeHtml(String(valor ?? '') || '-')}</strong></div>`;
+    document.getElementById('ventaResumen').innerHTML = [
+        fila('Alumno', `${d.F} ${d.G}`.trim()),
+        fila('ID Prometeo', d.D),
+        fila('Carrera', d.K),
+        fila('Modalidad', d.O),
+        fila('Tipo de ingreso', d.Q),
+        fila('Descuento', d.S === 'NINGUNO' ? d.R : `${d.R} · ${d.S}`),
+        fila('Beneficio adicional', d.T),
+        fila('Boleta final', `S/ ${d.AI}`),
+        fila('Admisión / Matrícula', `S/ ${d.AE} / S/ ${d.AF}`),
+        fila('Medio de pago', d.W)
+    ].join('');
+
+    document.getElementById('ventaStatus').value = STATUS.PAGO_COMPLETO;
+    document.getElementById('ventaFechaPago').value = hoyISOLima();
+    document.getElementById('ventaFechaPago').max = hoyISOLima();
+    document.getElementById('ventaMontoFraccionado').value = '';
+    document.getElementById('ventaFechaCompromiso').value = '';
+    document.getElementById('ventaVB').value = '';
+    document.getElementById('ventaBloqueVB').style.display = d.requiereVB ? '' : 'none';
+    document.getElementById('ventaCuota').value = '1';
+    document.getElementById('ventaMotivo').value = '';
+    document.getElementById('ventaComentario').value = '';
+    document.getElementById('ventaMsg').textContent = '';
+    actualizarCamposFraccionadoVenta();
+
+    ventaArchivos = { comprobante: [], dni: [], nee: [], cc: [] };
+    document.getElementById('ventaDocs').innerHTML = DOCS_VENTA.map(doc => `<div class="venta-doc" id="ventaDoc_${doc.campo}"></div>`).join('');
+    DOCS_VENTA.forEach(doc => renderDocVenta(doc.campo));
+
+    cargarAsesoresVenta();
+    document.getElementById('ventaModal').classList.add('show');
+}
+
+async function armarArchivosVenta(campo) {
+    return Promise.all(ventaArchivos[campo].map(async (file) => ({
+        nombre: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        base64: await leerArchivoBase64(file)
+    })));
+}
+
+async function registrarVenta() {
+    const msgEl = document.getElementById('ventaMsg');
+    const btn = document.getElementById('ventaRegistrarBtn');
+    const error = (texto) => { msgEl.style.color = '#d32f2f'; msgEl.textContent = texto; };
+    const d = datosDerivadosVenta(state.lead);
+
+    const status = document.getElementById('ventaStatus').value;
+    const fechaPago = document.getElementById('ventaFechaPago').value;
+    const fraccionado = status === STATUS.PAGO_FRACCIONADO;
+    const monto = document.getElementById('ventaMontoFraccionado').value;
+    const fechaCompromiso = document.getElementById('ventaFechaCompromiso').value;
+    const vb = document.getElementById('ventaVB').value;
+    const motivo = document.getElementById('ventaMotivo').value;
+
+    if (!fechaPago) return error('Selecciona la fecha de pago.');
+    if (fraccionado && (!monto || Number(monto) <= 0)) return error('Ingresa el monto pagado.');
+    if (fraccionado && !fechaCompromiso) return error('Selecciona la fecha de compromiso de pago completo.');
+    if (d.requiereVB && !vb) return error('Selecciona el VB (obligatorio cuando hay Reca o Beca).');
+    if (!motivo) return error('Selecciona el motivo de compra.');
+    const faltante = DOCS_VENTA.find(doc => doc.obligatorio && ventaArchivos[doc.campo].length === 0 && !archivoExistenteVenta(doc));
+    if (faltante) return error(`Adjunta el documento: ${faltante.label}.`);
+
+    const { requiereVB, ...derivados } = d;
+    const filaVenta = {
+        ...derivados,
+        U: requiereVB ? vb : '',
+        V: fechaPago,
+        X: status,
+        Z: fraccionado ? fechaCompromiso : '',
+        AL: fraccionado ? Number(monto) : '',
+        AM: document.getElementById('ventaAsesorAyudo').value,
+        AN: motivo,
+        AO: document.getElementById('ventaComentario').value.trim(),
+        AP: Number(document.getElementById('ventaCuota').value) || 1
+    };
+
+    btn.disabled = true;
+    msgEl.style.color = '#666';
+    msgEl.textContent = 'Registrando venta...';
+
+    try {
+        const [comprobante, dni, nee, cc] = await Promise.all(['comprobante', 'dni', 'nee', 'cc'].map(armarArchivosVenta));
+        const result = await callAPI('registrarVenta', {
+            idSolicitud: state.solicitudCC.ID_SOLICITUD,
+            idPrometeo: d.D,
+            campana: state.campana,
+            nombreCompleto: obtenerCampo(state.lead, COLUMNAS.NOMBRES) || '',
+            fila: filaVenta,
+            archivos: { comprobante, dni, nee, cc }
+        });
+
+        if (!result || !result.success) return error('Error: ' + (result?.error || 'No se pudo registrar la venta'));
+
+        Object.assign(state.solicitudCC, result.archivos || {}, { VENTA_REGISTRADA_EN: result.ventaRegistradaEn || new Date().toISOString() });
+        if (result.statusProvisional) state.lead[COLUMNAS.STATUS_GESTION] = result.statusProvisional;
+        sincronizarCache();
+        document.getElementById('ventaModal').classList.remove('show');
+        Object.assign(state.lead, capturarEdicionesTemporal());
+        renderAll();
+        if (!result.statusProvisional) alert('La venta se registró, pero no se pudo actualizar el status del lead. Se actualizará con la carga del día siguiente.');
+    } catch (e) {
+        error('Error: ' + e.message);
+    } finally {
+        btn.disabled = false;
     }
 }
 

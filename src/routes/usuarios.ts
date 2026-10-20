@@ -66,3 +66,30 @@ export async function crearUsuario(client: Client, body: JsonBody) {
 
   return jsonOk({ usuario: result.rows[0] });
 }
+
+export async function getAsesoresActivos(client: Client, body: JsonBody) {
+  const { error } = await exigirSesion(client, body, ['SUPERVISOR', 'ASESOR', 'ADMISION']);
+  if (error) return jsonError(error);
+
+  const campana = String(body.campana || '').trim();
+  const result = await client.query(
+    `select usuario, nombre, nombre_aux, email, campana
+       from usuarios
+      where upper(rol) = 'ASESOR' and activo is not false
+      order by coalesce(nullif(nombre_aux, ''), nombre)`
+  );
+
+  const data = result.rows
+    .filter((u) => {
+      if (!campana) return true;
+      const campanas = String(u.campana || '').split(',').map((c: string) => c.trim()).filter(Boolean);
+      return campanas.length === 0 || campanas.includes(campana);
+    })
+    .map((u) => ({
+      usuario: u.usuario,
+      nombre: u.nombre_aux || u.nombre || u.usuario,
+      email: u.email || '',
+    }));
+
+  return jsonOk({ data });
+}

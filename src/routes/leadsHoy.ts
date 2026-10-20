@@ -145,4 +145,30 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
   }
 
   return jsonOk({ actualizados, errores, total: leads.length, primerError });
-}
+}
+
+const STATUS_VENTA_PROVISIONAL = new Set(['PAGO COMPLETO', 'PAGO FRACCIONADO']);
+
+export async function marcarVentaProvisional(client: Client, body: JsonBody, env: Env) {
+  if (!env.IMPORT_SECRET || body.secret !== env.IMPORT_SECRET) {
+    return jsonError('No autorizado.', 401);
+  }
+
+  const idPrometeo = String(body.idPrometeo || '').trim();
+  const campana = String(body.campana || '').trim();
+  const status = String(body.status || '').trim().toUpperCase();
+  if (!idPrometeo || !campana) return jsonError('Falta ID o campaña.');
+  if (!STATUS_VENTA_PROVISIONAL.has(status)) return jsonError('Status de pago inválido.');
+
+  const result = await client.query(
+    `update leads set
+       status_gestion = $3,
+       actualizado_hoy_en = now(),
+       actualizado_en = now()
+     where id_prometeo = $1 and campana = $2`,
+    [idPrometeo, campana, status]
+  );
+  if (result.rowCount === 0) return jsonError('Lead no encontrado.');
+
+  return jsonOk({ status });
+}

@@ -527,6 +527,26 @@
                 gap: 4px 14px;
             }
         }
+        .venta-resumen { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:8px 16px; background:#f5f8fc; border:1px solid #dbe5f1; border-radius:8px; padding:12px 14px; margin-bottom:16px; }
+        .venta-resumen div { display:flex; flex-direction:column; font-size:12px; color:#667; min-width:0; }
+        .venta-resumen strong { font-size:13px; color:#1d2433; overflow-wrap:anywhere; }
+        .venta-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:12px 16px; }
+        .venta-campo { display:flex; flex-direction:column; gap:4px; font-size:13px; font-weight:600; color:#555; }
+        .venta-campo-ancho { grid-column:1 / -1; }
+        .venta-subtitulo { margin:18px 0 8px; font-size:14px; color:var(--color-accent); }
+        .venta-docs { display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; }
+        .venta-doc { border:1px solid #e0e4ea; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:8px; min-width:0; }
+        .venta-doc-cabecera { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:13px; }
+        .venta-doc-estado { font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; background:#eceff1; color:#607d8b; white-space:nowrap; }
+        .venta-doc-estado.ok { background:#e8f5e9; color:#2e7d32; }
+        .venta-doc-estado.nuevo { background:#e3f2fd; color:#1565c0; }
+        .venta-doc-estado.falta { background:#ffebee; color:#c62828; }
+        .venta-doc-frame { width:100%; height:220px; border:1px solid #eee; border-radius:6px; background:#fafafa; }
+        .venta-doc-thumbs { display:flex; gap:6px; height:220px; overflow:auto; background:#fafafa; border:1px solid #eee; border-radius:6px; padding:6px; align-items:center; }
+        .venta-doc-thumbs img { max-height:100%; max-width:100%; object-fit:contain; border-radius:4px; }
+        .venta-doc-vacio { height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:#9aa0ab; font-size:12px; background:#fafafa; border:1px dashed #cfd6df; border-radius:6px; }
+        .venta-doc-acciones { display:flex; gap:8px; }
+        @media (max-width: 640px) { .venta-grid, .venta-docs { grid-template-columns:1fr; } }
     </style>
 </head>
 <body>
