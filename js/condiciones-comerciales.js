@@ -1,4 +1,4 @@
-import { API_URL, esRolSupervisorOAdmision, TIPOS_DOCUMENTO, normalizarTipoDocumento, tipoDocumentoPorNumero, etiquetaTipoDocumento, COLUMNAS, CACHE_KEYS, BCC_DEFAULT_CC, SELECT_OPTIONS, setBccDefault } from '../core/constants.js';
+import { API_URL, esRolSupervisorOAdmision, TIPOS_DOCUMENTO, normalizarTipoDocumento, tipoDocumentoPorNumero, etiquetaTipoDocumento, digitosTipoDocumento, COLUMNAS, CACHE_KEYS, BCC_DEFAULT_CC, SELECT_OPTIONS, setBccDefault } from '../core/constants.js';
 import {
     getCurrentUser, getUserCampanas, getSessionToken,
     cacheGet, cacheSet, cacheRemove,
@@ -589,15 +589,20 @@ function renderDetalleCC() {
 
                     <!-- REFERIDO: una sola persona (el referente), sin lista ni botón Agregar -->
                     <div id="ccReferidoUnicoWrap" style="display:none; flex-direction:column; gap:10px;">
-                        <label class="cc-campo">Nombre completo
-                            <input type="text" id="ccRefUnicoNombre">
-                        </label>
                         <div style="display:flex; gap:8px;">
-                            <label class="cc-campo" style="flex:1;">DNI (8 dígitos) o Carné de Extranjería (9)
-                                <input type="text" id="ccRefUnicoDni" maxlength="9" inputmode="numeric">
+                            <label class="cc-campo" style="flex:1;">Nombre completo
+                                <input type="text" id="ccRefUnicoNombre">
                             </label>
                             <label class="cc-campo" style="flex:1;">Email
                                 <input type="email" id="ccRefUnicoEmail">
+                            </label>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <label class="cc-campo" style="flex:1;">Tipo de documento
+                                <select id="ccRefUnicoTipoDoc">${TIPOS_DOCUMENTO.map(t => `<option value="${t.value}">${t.label}</option>`).join('')}</select>
+                            </label>
+                            <label class="cc-campo" style="flex:1;"><span id="ccRefUnicoDocLabel">N° de DNI (8 dígitos)</span>
+                                <input type="text" id="ccRefUnicoDni" maxlength="8" inputmode="numeric">
                             </label>
                         </div>
                     </div>
@@ -606,15 +611,20 @@ function renderDetalleCC() {
                     <div id="ccReferidoListaWrap" style="display:none;">
                         <div id="ccPersonasReferidoLista" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;"></div>
                         <div style="display:flex; flex-direction:column; gap:10px;">
-                            <label class="cc-campo">Nombre completo
-                                <input type="text" id="ccRefNombre">
-                            </label>
                             <div style="display:flex; gap:8px;">
-                                <label class="cc-campo" style="flex:1;">DNI (8 dígitos) o Carné de Extranjería (9)
-                                    <input type="text" id="ccRefDni" maxlength="9" inputmode="numeric">
+                                <label class="cc-campo" style="flex:1;">Nombre completo
+                                    <input type="text" id="ccRefNombre">
                                 </label>
                                 <label class="cc-campo" style="flex:1;">Email
                                     <input type="email" id="ccRefEmail">
+                                </label>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <label class="cc-campo" style="flex:1;">Tipo de documento
+                                    <select id="ccRefTipoDoc">${TIPOS_DOCUMENTO.map(t => `<option value="${t.value}">${t.label}</option>`).join('')}</select>
+                                </label>
+                                <label class="cc-campo" style="flex:1;"><span id="ccRefDocLabel">N° de DNI (8 dígitos)</span>
+                                    <input type="text" id="ccRefDni" maxlength="8" inputmode="numeric">
                                 </label>
                             </div>
                             <button type="button" class="btn-secundario" id="ccAgregarRefBtn">➕ Agregar</button>
@@ -714,6 +724,22 @@ function renderDetalleCC() {
     ['ccRefUnicoNombre', 'ccRefUnicoDni', 'ccRefUnicoEmail'].forEach(id => {
         document.getElementById(id)?.addEventListener('input', actualizarPersonaReferidoUnica);
     });
+    [['ccRefUnicoTipoDoc', 'ccRefUnicoDni', 'ccRefUnicoDocLabel'], ['ccRefTipoDoc', 'ccRefDni', 'ccRefDocLabel']].forEach(([selectId, inputId, labelId]) => {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        const sincronizar = () => {
+            const digitos = digitosTipoDocumento(select.value);
+            document.getElementById(labelId).textContent = `N° de ${etiquetaTipoDocumento(select.value)} (${digitos} dígitos)`;
+            const input = document.getElementById(inputId);
+            input.maxLength = digitos;
+            if (input.value.length > digitos) input.value = input.value.slice(0, digitos);
+        };
+        select.addEventListener('change', () => {
+            sincronizar();
+            if (selectId === 'ccRefUnicoTipoDoc') actualizarPersonaReferidoUnica();
+        });
+        sincronizar();
+    });
 
     document.getElementById('ccAgregarRefBtn')?.addEventListener('click', agregarPersonaReferidoVista2);
     document.getElementById('ccPersonasReferidoLista')?.addEventListener('click', (e) => {
@@ -801,8 +827,12 @@ function tipoDocumentoSolicitudActual() {
         ?? (sol.TIPO_DOCUMENTO || tipoDocumentoPorNumero((state.leadActual || {})[COLUMNAS.DNI])));
 }
 
+function documentoReferidoValido(tipo, numero) {
+    return new RegExp(`^\\d{${digitosTipoDocumento(tipo)}}$`).test(numero || '');
+}
+
 function personaReferidoValida(p) {
-    return !!p && !!p.nombre && /^\d{8,9}$/.test(p.dni || '') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email || '');
+    return !!p && !!p.nombre && documentoReferidoValido(p.tipoDocumento, p.dni) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email || '');
 }
 
 function renderCopiaCheckboxes(campana) {
@@ -830,8 +860,9 @@ function actualizarPersonaReferidoUnica() {
     const nombre = (document.getElementById('ccRefUnicoNombre')?.value || '').trim();
     const dni = (document.getElementById('ccRefUnicoDni')?.value || '').trim();
     const email = (document.getElementById('ccRefUnicoEmail')?.value || '').trim();
+    const tipoDocumento = document.getElementById('ccRefUnicoTipoDoc')?.value || 'DNI';
 
-    state.personasReferido = (nombre || dni || email) ? [{ nombre, dni, email }] : [];
+    state.personasReferido = (nombre || dni || email) ? [{ nombre, tipoDocumento, dni, email }] : [];
     actualizarPreviewCC();
 }
 
@@ -844,7 +875,7 @@ function renderPersonasReferidoListaVista2() {
     }
     cont.innerHTML = state.personasReferido.map((p, i) => `
         <div style="display:flex; align-items:center; justify-content:space-between; background:#f3f8ff; border:1px solid #90caf9; border-radius:6px; padding:6px 10px; font-size:13px;">
-            <span>${escapeHtml(p.nombre)} — ${etiquetaTipoDocumento(tipoDocumentoPorNumero(p.dni))} ${escapeHtml(p.dni)} — ${escapeHtml(p.email)}</span>
+            <span>${escapeHtml(p.nombre)} — ${etiquetaTipoDocumento(p.tipoDocumento || tipoDocumentoPorNumero(p.dni))} ${escapeHtml(p.dni)} — ${escapeHtml(p.email)}</span>
             <span class="material-symbols-outlined" data-quitar-ref="${i}" style="cursor:pointer; font-size:16px; color:#d32f2f;">close</span>
         </div>
     `).join('');
@@ -858,16 +889,20 @@ function agregarPersonaReferidoVista2() {
     const nombre = nombreInput.value.trim();
     const dni = dniInput.value.trim();
     const email = emailInput.value.trim();
+    const tipoDocumento = document.getElementById('ccRefTipoDoc')?.value || 'DNI';
 
     if (!nombre) { alert('Ingresa el nombre.'); return; }
-    if (!/^\d{8,9}$/.test(dni)) { alert('Ingresa un DNI de 8 dígitos o un Carné de Extranjería de 9 dígitos.'); return; }
+    if (!documentoReferidoValido(tipoDocumento, dni)) {
+        alert(`El ${etiquetaTipoDocumento(tipoDocumento)} debe tener ${digitosTipoDocumento(tipoDocumento)} dígitos.`);
+        return;
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Email inválido.'); return; }
     if (state.personasReferido.some(p => p.dni === dni || p.email === email)) {
         alert('Ya agregaste a una persona con ese documento o email.');
         return;
     }
 
-    state.personasReferido.push({ nombre, dni, email });
+    state.personasReferido.push({ nombre, tipoDocumento, dni, email });
     nombreInput.value = '';
     dniInput.value = '';
     emailInput.value = '';
