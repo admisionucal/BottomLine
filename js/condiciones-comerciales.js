@@ -1,4 +1,4 @@
-import { API_URL, esRolSupervisorOAdmision, COLUMNAS, CACHE_KEYS, BCC_DEFAULT_CC, SELECT_OPTIONS, setBccDefault } from '../core/constants.js';
+import { API_URL, esRolSupervisorOAdmision, TIPOS_DOCUMENTO, normalizarTipoDocumento, tipoDocumentoPorNumero, etiquetaTipoDocumento, COLUMNAS, CACHE_KEYS, BCC_DEFAULT_CC, SELECT_OPTIONS, setBccDefault } from '../core/constants.js';
 import {
     getCurrentUser, getUserCampanas, getSessionToken,
     cacheGet, cacheSet, cacheRemove,
@@ -464,10 +464,11 @@ function renderDetalleCC() {
         || '';
 
     const nombreActual = state.overrides.nombreCompleto ?? (lead[COLUMNAS.NOMBRES] || '');
+    const tipoDocumentoActual = tipoDocumentoSolicitudActual();
     const asesorActual = state.overrides.asesorNombre ?? (sol.ASESOR_NOMBRE || sol.ASESOR_EMAIL || '');
 
     const adjuntos = [
-        { label: 'DNI', id: sol.DNI_FILE_ID, nombre: sol.DNI_FILE_NOMBRE },
+        { label: etiquetaTipoDocumento(tipoDocumentoActual), id: sol.DNI_FILE_ID, nombre: sol.DNI_FILE_NOMBRE, claseEtiqueta: 'ccEtiquetaDocAdjunto' },
         { label: 'Certificado de Estudios', id: sol.CERTIFICADO_FILE_ID, nombre: sol.CERTIFICADO_FILE_NOMBRE }
     ];
     if (tipoIngresoActual !== 'regular') {
@@ -520,6 +521,13 @@ function renderDetalleCC() {
                     </label>
                     <label class="cc-campo" style="grid-column:1 / -1;">Nombre completo
                         <input type="text" id="ccNombreCompleto" value="${escapeHtml(nombreActual)}">
+                    </label>
+                    <label class="cc-campo">Tipo de documento
+                        <select id="ccTipoDocumento">
+                            ${TIPOS_DOCUMENTO.map(t =>
+                                `<option value="${t.value}" ${t.value === tipoDocumentoActual ? 'selected' : ''}>${t.label}</option>`
+                            ).join('')}
+                        </select>
                     </label>
                     <label class="cc-campo">Asesor
                         <input type="text" id="ccAsesorNombre" value="${escapeHtml(asesorActual)}">
@@ -585,8 +593,8 @@ function renderDetalleCC() {
                             <input type="text" id="ccRefUnicoNombre">
                         </label>
                         <div style="display:flex; gap:8px;">
-                            <label class="cc-campo" style="flex:1;">DNI (8 dígitos)
-                                <input type="text" id="ccRefUnicoDni" maxlength="8">
+                            <label class="cc-campo" style="flex:1;">DNI (8 dígitos) o Carné de Extranjería (9)
+                                <input type="text" id="ccRefUnicoDni" maxlength="9" inputmode="numeric">
                             </label>
                             <label class="cc-campo" style="flex:1;">Email
                                 <input type="email" id="ccRefUnicoEmail">
@@ -602,8 +610,8 @@ function renderDetalleCC() {
                                 <input type="text" id="ccRefNombre">
                             </label>
                             <div style="display:flex; gap:8px;">
-                                <label class="cc-campo" style="flex:1;">DNI (8 dígitos)
-                                    <input type="text" id="ccRefDni" maxlength="8">
+                                <label class="cc-campo" style="flex:1;">DNI (8 dígitos) o Carné de Extranjería (9)
+                                    <input type="text" id="ccRefDni" maxlength="9" inputmode="numeric">
                                 </label>
                                 <label class="cc-campo" style="flex:1;">Email
                                     <input type="email" id="ccRefEmail">
@@ -619,9 +627,9 @@ function renderDetalleCC() {
                     ${adjuntos.map(a => a.id
                         ? `<a href="https://drive.google.com/file/d/${a.id}/view" target="_blank" rel="noopener" style="display:block; font-size:13px; margin-bottom:6px; color:var(--color-primary);">
                              <span class="material-symbols-outlined" style="font-size:14px;vertical-align:-2px;">description</span>
-                             Ver ${a.label}
+                             Ver <span class="${a.claseEtiqueta || ''}">${a.label}</span>
                            </a>`
-                        : `<p style="font-size:13px; color:#aaa; margin-bottom:6px;">${a.label}: no adjuntado</p>`
+                        : `<p style="font-size:13px; color:#aaa; margin-bottom:6px;"><span class="${a.claseEtiqueta || ''}">${a.label}</span>: no adjuntado</p>`
                     ).join('')}
                 </div>
 
@@ -691,6 +699,10 @@ function renderDetalleCC() {
     bind('ccTipoIngreso', 'tipoIngresoOverride');
     bind('ccBeneficioAdicional', 'beneficioPrimeraRaw');
     bind('ccCorreosDestino', 'correosDestino');
+    document.getElementById('ccTipoDocumento')?.addEventListener('change', (e) => {
+        state.overrides.tipoDocumento = e.target.value;
+        document.querySelectorAll('.ccEtiquetaDocAdjunto').forEach(el => { el.textContent = etiquetaTipoDocumento(e.target.value); });
+    });
 
     renderCopiaCheckboxes(sol.CAMPANA);
     document.getElementById('ccCorreosCopiaExtra')?.addEventListener('input', recalcularCorreosCopia);
@@ -773,7 +785,7 @@ function actualizarPreviewCC() {
                 msg.textContent = 'Faltan datos obligatorios (carrera, modalidad o escala regular) para poder enviar.';
             } else if (faltanPersonas) {
                 msg.textContent = tipoRef === 'REFERIDO'
-                    ? 'Completa los datos del Referente (nombre, DNI y email) antes de enviar.'
+                    ? 'Completa los datos del Referente (nombre, DNI o Carné de Extranjería y email) antes de enviar.'
                     : 'Agrega al menos una persona (Referido) antes de enviar.';
             } else {
                 msg.textContent = '';
@@ -783,8 +795,14 @@ function actualizarPreviewCC() {
     }
 }
 
+function tipoDocumentoSolicitudActual() {
+    const sol = state.solicitudActual || {};
+    return normalizarTipoDocumento(state.overrides.tipoDocumento
+        ?? (sol.TIPO_DOCUMENTO || tipoDocumentoPorNumero((state.leadActual || {})[COLUMNAS.DNI])));
+}
+
 function personaReferidoValida(p) {
-    return !!p && !!p.nombre && /^\d{8}$/.test(p.dni || '') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email || '');
+    return !!p && !!p.nombre && /^\d{8,9}$/.test(p.dni || '') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email || '');
 }
 
 function renderCopiaCheckboxes(campana) {
@@ -826,7 +844,7 @@ function renderPersonasReferidoListaVista2() {
     }
     cont.innerHTML = state.personasReferido.map((p, i) => `
         <div style="display:flex; align-items:center; justify-content:space-between; background:#f3f8ff; border:1px solid #90caf9; border-radius:6px; padding:6px 10px; font-size:13px;">
-            <span>${escapeHtml(p.nombre)} — DNI ${escapeHtml(p.dni)} — ${escapeHtml(p.email)}</span>
+            <span>${escapeHtml(p.nombre)} — ${etiquetaTipoDocumento(tipoDocumentoPorNumero(p.dni))} ${escapeHtml(p.dni)} — ${escapeHtml(p.email)}</span>
             <span class="material-symbols-outlined" data-quitar-ref="${i}" style="cursor:pointer; font-size:16px; color:#d32f2f;">close</span>
         </div>
     `).join('');
@@ -842,10 +860,10 @@ function agregarPersonaReferidoVista2() {
     const email = emailInput.value.trim();
 
     if (!nombre) { alert('Ingresa el nombre.'); return; }
-    if (!/^\d{8}$/.test(dni)) { alert('El DNI debe tener 8 dígitos.'); return; }
+    if (!/^\d{8,9}$/.test(dni)) { alert('Ingresa un DNI de 8 dígitos o un Carné de Extranjería de 9 dígitos.'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Email inválido.'); return; }
     if (state.personasReferido.some(p => p.dni === dni || p.email === email)) {
-        alert('Ya agregaste a una persona con ese DNI o email.');
+        alert('Ya agregaste a una persona con ese documento o email.');
         return;
     }
 
@@ -950,13 +968,15 @@ async function enviarCC() {
             asesorNombreOverride: state.overrides.asesorNombre ?? null,
             correosDestinoOverride: state.overrides.correosDestino ?? null,
             correosCopiaOverride: state.overrides.correosCopia ?? null,
-            nombreCompletoOverride: datosCC.nombreCompleto
+            nombreCompletoOverride: datosCC.nombreCompleto,
+            tipoDocumentoOverride: tipoDocumentoSolicitudActual()
         });
 
         if (result.success) {
             const mensajeExito = esReenvio ? 'Condiciones Comerciales reenviadas correctamente' : 'Condiciones Comerciales enviadas correctamente';
             Toast?.show ? Toast.show(mensajeExito) : alert(mensajeExito);
             state.solicitudActual.STATUS = 'ENVIADO';
+            state.solicitudActual.TIPO_DOCUMENTO = tipoDocumentoSolicitudActual();
             invalidarCacheSolicitudesCC();
             renderDetalleCC();
         } else {

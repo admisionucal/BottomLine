@@ -1,4 +1,4 @@
-import { API_URL, ROLES, COLUMNAS, STATUS, STATUS_LABELS, STATUS_CLASES, CACHE_KEYS, SELECT_OPTIONS, PRECIOS_BASE, esRolSupervisorOAdmision, TIPOS_INSTITUCION_PROCEDENCIA } from '../core/constants.js';
+import { API_URL, ROLES, tipoDocumentoPorNumero, etiquetaTipoDocumento, digitosTipoDocumento, COLUMNAS, STATUS, STATUS_LABELS, STATUS_CLASES, CACHE_KEYS, SELECT_OPTIONS, PRECIOS_BASE, esRolSupervisorOAdmision, TIPOS_INSTITUCION_PROCEDENCIA } from '../core/constants.js';
 
 import { getCurrentUser, getSessionToken, cacheGet, cacheSet, cacheRemove, escapeHtml, normalizarTexto, parseNumero, getEspecializacionETU } from '../core/utils.js';
 
@@ -90,6 +90,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('solicitudCCModal').classList.remove('show');
     });
     document.getElementById('ccSolicitarBtn').addEventListener('click', enviarSolicitudCC);
+    document.getElementById('ccTipoDocumento').addEventListener('change', actualizarEtiquetasDocumentoCC);
     inicializarInputArchivoCC('dni', true);
     inicializarInputArchivoCC('certificado', false);
     inicializarInputArchivoCC('boletaProcedencia', false);
@@ -1195,11 +1196,20 @@ function abrirModalSolicitudCC() {
     const dniInput = document.getElementById('ccDniInput');
     if (bloqueDniFaltante) bloqueDniFaltante.style.display = dniActual ? 'none' : 'block';
     if (dniInput) dniInput.value = '';
+    document.getElementById('ccTipoDocumento').value = tipoDocumentoPorNumero(dniActual);
+    actualizarEtiquetasDocumentoCC();
 
     document.getElementById('ccNuevoCorreoInput').value = '';
     document.getElementById('ccSolicitudMsg').textContent = '';
     renderCorreosCCLista();
     document.getElementById('solicitudCCModal').classList.add('show');
+}
+
+function actualizarEtiquetasDocumentoCC() {
+    const tipo = document.getElementById('ccTipoDocumento').value;
+    document.querySelectorAll('.ccEtiquetaDocumento').forEach(el => { el.textContent = etiquetaTipoDocumento(tipo); });
+    const dniInput = document.getElementById('ccDniInput');
+    if (dniInput) dniInput.placeholder = tipo === 'CARNE DE EXTRANJERIA' ? 'Ej: 001234567' : 'Ej: 71234567';
 }
 
 function renderCorreosCCLista() {
@@ -1245,15 +1255,19 @@ async function enviarSolicitudCC() {
     const dni = String(obtenerCampo(state.lead, COLUMNAS.DNI) || '').trim() || (dniInput?.value || '').trim();
     const nombreCompleto = obtenerCampo(state.lead, COLUMNAS.NOMBRES) || '';
 
+    const tipoDocumento = document.getElementById('ccTipoDocumento').value;
+    const etiquetaDocumento = etiquetaTipoDocumento(tipoDocumento);
+    const digitos = digitosTipoDocumento(tipoDocumento);
+
     if (!dni) {
         msgEl.style.color = '#d32f2f';
-        msgEl.textContent = 'Ingresa el N° de DNI del alumno para poder solicitar las Condiciones Comerciales.';
+        msgEl.textContent = `Ingresa el N° de ${etiquetaDocumento} del alumno para poder solicitar las Condiciones Comerciales.`;
         dniInput?.focus();
         return;
     }
-    if (dniInput && dniInput.value.trim() && !/^\d{8}$/.test(dni)) {
+    if (dniInput && dniInput.value.trim() && !new RegExp(`^\\d{${digitos}}$`).test(dni)) {
         msgEl.style.color = '#d32f2f';
-        msgEl.textContent = 'El DNI debe tener 8 dígitos.';
+        msgEl.textContent = `El ${etiquetaDocumento} debe tener ${digitos} dígitos.`;
         dniInput.focus();
         return;
     }
@@ -1273,6 +1287,7 @@ async function enviarSolicitudCC() {
             idPrometeo: id,
             campana: state.campana,
             dni: dni,
+            tipoDocumento: tipoDocumento,
             nombreCompleto: nombreCompleto,
             modalidadIngreso: obtenerCampo(state.lead, COLUMNAS.MODALIDAD_INGRESO) || '',
             asesorEmail: user.email,
@@ -1288,6 +1303,7 @@ async function enviarSolicitudCC() {
         if (result.success) {
             state.solicitudCC = {
                 ID_SOLICITUD: result.idSolicitud,
+                TIPO_DOCUMENTO: tipoDocumento,
                 STATUS: 'PENDIENTE',
                 FECHA_SOLICITUD: new Date().toISOString()
             };
@@ -1472,7 +1488,7 @@ function asegurarModalVenta() {
                 </label>
                 <label class="venta-campo">Status de pago *
                     <select id="ventaStatus" class="campo-editable-input">
-                        ${STATUS_PAGO_VENTA.map(s => `<option value="${s}">${STATUS_LABELS[s] || s}</option>`).join('')}
+                        ${STATUS_PAGO_VENTA.map(s => `<option value="${s}">${s}</option>`).join('')}
                     </select>
                 </label>
                 <label class="venta-campo">Fecha de pago *
@@ -1553,6 +1569,13 @@ function actualizarCamposFraccionadoVenta() {
     document.querySelectorAll('#ventaModal .venta-fraccionado').forEach(el => { el.style.display = fraccionado ? '' : 'none'; });
 }
 
+function etiquetaDocVenta(doc) {
+    if (doc.campo !== 'dni') return doc.label;
+    const sol = state.solicitudCC || {};
+    const tipo = sol.TIPO_DOCUMENTO || tipoDocumentoPorNumero(obtenerCampo(state.lead, COLUMNAS.DNI));
+    return `${etiquetaTipoDocumento(tipo)} del postulante`;
+}
+
 function archivoExistenteVenta(doc) {
     return String((state.solicitudCC || {})[doc.claveId] || '').trim();
 }
@@ -1584,7 +1607,7 @@ function renderDocVenta(campo) {
 
     cont.innerHTML = `
         <div class="venta-doc-cabecera">
-            <strong>${doc.label}${doc.obligatorio ? ' *' : ''}</strong>
+            <strong>${etiquetaDocVenta(doc)}${doc.obligatorio ? ' *' : ''}</strong>
             ${estado}
         </div>
         ${preview}
@@ -1684,7 +1707,7 @@ async function registrarVenta() {
     if (d.requiereVB && !vb) return error('Selecciona el VB (obligatorio cuando hay Reca o Beca).');
     if (!motivo) return error('Selecciona el motivo de compra.');
     const faltante = DOCS_VENTA.find(doc => doc.obligatorio && ventaArchivos[doc.campo].length === 0 && !archivoExistenteVenta(doc));
-    if (faltante) return error(`Adjunta el documento: ${faltante.label}.`);
+    if (faltante) return error(`Adjunta el documento: ${etiquetaDocVenta(faltante)}.`);
 
     const { requiereVB, ...derivados } = d;
     const filaVenta = formatearFilaVenta({

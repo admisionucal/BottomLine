@@ -11,6 +11,7 @@ const MAPEO_CC: Record<string, string> = {
   CORREOS_ADICIONALES: 'correos_adicionales',
   DNI_FILE_ID: 'dni_file_id',
   DNI_FILE_NOMBRE: 'dni_file_nombre',
+  TIPO_DOCUMENTO: 'tipo_documento',
   CERTIFICADO_FILE_ID: 'certificado_file_id',
   CERTIFICADO_FILE_NOMBRE: 'certificado_file_nombre',
   BOLETA_PROCEDENCIA_FILE_ID: 'boleta_procedencia_file_id',

@@ -114,6 +114,27 @@ export const ROLES = {
     SISTEMAS: 'SISTEMAS',
 };
 
+export const TIPOS_DOCUMENTO = [
+    { value: 'DNI', label: 'DNI', digitos: 8 },
+    { value: 'CARNE DE EXTRANJERIA', label: 'Carné de Extranjería', digitos: 9 },
+];
+
+export function normalizarTipoDocumento(tipo) {
+    return /CARNE|EXTRANJ/i.test(String(tipo || '')) ? 'CARNE DE EXTRANJERIA' : 'DNI';
+}
+
+export function tipoDocumentoPorNumero(numero) {
+    return /^\d{9}$/.test(String(numero || '').trim()) ? 'CARNE DE EXTRANJERIA' : 'DNI';
+}
+
+export function etiquetaTipoDocumento(tipo) {
+    return TIPOS_DOCUMENTO.find(t => t.value === normalizarTipoDocumento(tipo)).label;
+}
+
+export function digitosTipoDocumento(tipo) {
+    return TIPOS_DOCUMENTO.find(t => t.value === normalizarTipoDocumento(tipo)).digitos;
+}
+
 export function esRolSupervisorOAdmision(rol) {
     return rol === ROLES.SUPERVISOR || rol === ROLES.ADMISION || rol === ROLES.SISTEMAS;
 }

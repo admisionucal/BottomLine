@@ -13,6 +13,7 @@ function filaASolicitudCCObj(r: any) {
     CORREOS_ADICIONALES: r.correos_adicionales,
     DNI_FILE_ID: r.dni_file_id,
     DNI_FILE_NOMBRE: r.dni_file_nombre,
+    TIPO_DOCUMENTO: r.tipo_documento || '',
     CERTIFICADO_FILE_ID: r.certificado_file_id,
     CERTIFICADO_FILE_NOMBRE: r.certificado_file_nombre,
     BOLETA_PROCEDENCIA_FILE_ID: r.boleta_procedencia_file_id,
