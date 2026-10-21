@@ -218,19 +218,6 @@ async function cargarLead() {
             state.lead = result.data;
             state.historialAsesores = result.historialAsesores || null;
 
-            if (cachedSelected) {
-                const statusCache = cachedSelected[COLUMNAS.STATUS_GESTION];
-                if (statusCache === STATUS.PAGO_COMPLETO || statusCache === STATUS.PAGO_FRACCIONADO) {
-                    state.lead[COLUMNAS.STATUS_GESTION] = statusCache;
-                    if (cachedSelected[COLUMNAS.FECHA_PAGO_COMPLETO]) {
-                        state.lead[COLUMNAS.FECHA_PAGO_COMPLETO] = cachedSelected[COLUMNAS.FECHA_PAGO_COMPLETO];
-                    }
-                    if (cachedSelected[COLUMNAS.FECHA_PROMESA_PAGO]) {
-                        state.lead[COLUMNAS.FECHA_PROMESA_PAGO] = cachedSelected[COLUMNAS.FECHA_PROMESA_PAGO];
-                    }
-                }
-            }
-
             cacheSet(CACHE_KEYS.LEAD_DETAIL(state.idPrometeo, state.campana, user.email), state.lead);
             cacheSet(CACHE_KEYS.LEAD_SELECTED(state.idPrometeo, state.campana), state.lead);
 
@@ -1859,7 +1846,7 @@ async function registrarVenta() {
 const STATUS_NO_ASIGNABLES = [STATUS.VP_VIVA, STATUS.PP_VIVA, STATUS.PAGO_COMPLETO, STATUS.PAGO_FRACCIONADO];
 
 function puedeAsignarAsesor() {
-    if (getCurrentUser()?.rol !== ROLES.SISTEMAS || !state.lead) return false;
+    if (!esRolSupervisorOAdmision(getCurrentUser()?.rol) || !state.lead) return false;
     const status = String(state.lead[COLUMNAS.STATUS_GESTION] || '').trim().toUpperCase();
     return !STATUS_NO_ASIGNABLES.includes(status);
 }

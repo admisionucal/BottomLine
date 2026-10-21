@@ -1,11 +1,11 @@
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
+import { STATUS_EFECTIVO } from '../lib/statusVenta';
 
 const ESTADOS_VP_PP = ['VALORES_VALORACIONES_POSITIVAS_VIVA', 'VALORES_PROMESA_DE_PAGO_VIVA'];
 const ESTADOS_VISIBLES_ASESOR = [...ESTADOS_VP_PP, 'PAGO FRACCIONADO'];
 const ES_HOY_PROVISIONAL = `(l.asesor_provisional_en at time zone 'America/Lima')::date = (now() at time zone 'America/Lima')::date`;
-const STATUS_EFECTIVO = `(case when p.status_pago_final in ('PAGO COMPLETO', 'PAGO FRACCIONADO') then p.status_pago_final else l.status_gestion end)`;
 
 export async function getLeads(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ASESOR', 'ADMISION']);

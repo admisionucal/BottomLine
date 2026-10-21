@@ -1,6 +1,7 @@
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
+import { STATUS_EFECTIVO } from '../lib/statusVenta';
 
 const ESTADOS_VP_PP = ['VALORES_VALORACIONES_POSITIVAS_VIVA', 'VALORES_PROMESA_DE_PAGO_VIVA'];
 const CAMPOS_ASESOR = ['por_que_eligio_carrera', 'que_busca_universidad', 'quien_financiara', 'que_le_falta', 'otras_opciones', 'dolor_necesidad'];
@@ -31,14 +32,13 @@ export async function getResumenVpPp(client: Client, body: JsonBody) {
         `(l.vps_dif_ti_inte <> 0 or (l.actualizado_hoy_en is not null and l.status_gestion = any($${params.push(ESTADOS_VP_PP)})))`
       );
     } else {
-      condiciones.push(`l.status_gestion = any($${params.push(ESTADOS_VP_PP)})`);
+      condiciones.push(`${STATUS_EFECTIVO} = any($${params.push(ESTADOS_VP_PP)})`);
       if (nombreAsesor) condiciones.push(`lower(l.asesor) = lower($${params.push(nombreAsesor)})`);
     }
 
     const sql = `
       select
-        case when ${esAdmin} and p.status_pago_final in ('PAGO COMPLETO', 'PAGO FRACCIONADO')
-             then p.status_pago_final else l.status_gestion end as status_final,
+        ${STATUS_EFECTIVO} as status_final,
         b.por_que_eligio_carrera, b.que_busca_universidad, b.quien_financiara,
         b.que_le_falta, b.otras_opciones, b.dolor_necesidad, b.acciones_definidas
       from leads l

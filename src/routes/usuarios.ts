@@ -2,6 +2,7 @@ import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
 import { hashPassword } from '../lib/crypto';
+import { STATUS_EFECTIVO } from '../lib/statusVenta';
 
 export async function getSupervisoresConfig(client: Client, body: JsonBody) {
   const { error } = await exigirSesion(client, body, ['ADMISION']);
@@ -102,9 +103,8 @@ const STATUS_NO_ASIGNABLES = new Set([
 ]);
 
 export async function asignarLeadProvisional(client: Client, body: JsonBody) {
-  const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
+  const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
-  if (sesion.rolReal !== 'SISTEMAS') return jsonError('Solo el perfil Sistemas puede asignar leads.');
 
   const idPrometeo = String(body.idPrometeo || '').trim();
   const campana = String(body.campana || '').trim();
@@ -112,8 +112,7 @@ export async function asignarLeadProvisional(client: Client, body: JsonBody) {
   if (!idPrometeo || !campana || !usuario) return jsonError('Falta el lead o el asesor.');
 
   const leadRes = await client.query(
-    `select case when p.status_pago_final in ('PAGO COMPLETO', 'PAGO FRACCIONADO') then p.status_pago_final
-                 else l.status_gestion end as status
+    `select ${STATUS_EFECTIVO} as status
        from leads l
        left join leads_pagos p on p.id_prometeo = l.id_prometeo and p.campana = l.campana
       where l.id_prometeo = $1 and l.campana = $2`,

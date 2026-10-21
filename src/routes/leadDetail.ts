@@ -1,6 +1,7 @@
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 import { exigirSesion } from '../lib/session';
+import { VENTA_PROVISIONAL_VIGENTE } from '../lib/statusVenta';
 import { calcularPerfilamientoCompleto } from '../lib/perfilamiento';
 
 function esRolSupervisorOAdmision(rol: string) {
@@ -72,6 +73,15 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
   const statusPagoFinal = String(pagoInfo?.status_pago_final || '').trim().toUpperCase();
   if (statusPagoFinal === 'PAGO COMPLETO' || statusPagoFinal === 'PAGO FRACCIONADO') {
     leadObj['STATUS DE GESTION'] = statusPagoFinal;
+  } else {
+    const provisional = await client.query(
+      `select l.venta_provisional_status from leads l
+        where l.id_prometeo = $1 and l.campana = $2 and ${VENTA_PROVISIONAL_VIGENTE}`,
+      [idTarget, campana]
+    );
+    if (provisional.rows[0]?.venta_provisional_status) {
+      leadObj['STATUS DE GESTION'] = provisional.rows[0].venta_provisional_status;
+    }
   }
   if (esAdmin) {
     if (statusPagoFinal === 'PAGO COMPLETO') {

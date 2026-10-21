@@ -1,5 +1,6 @@
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
+import { STATUS_EFECTIVO } from '../lib/statusVenta';
 
 const MAPEO_HOY: Record<string, string> = {
   'NOMBRES': 'nombres',
@@ -14,6 +15,7 @@ const MAPEO_HOY: Record<string, string> = {
   'CODIGO MODULAR': 'codigo_modular',
 };
 
+const STATUS_VENTA_PROVISIONAL = new Set(['PAGO COMPLETO', 'PAGO FRACCIONADO']);
 const ESTADOS_VIVOS = new Set(['VALORES_VALORACIONES_POSITIVAS_VIVA', 'VALORES_PROMESA_DE_PAGO_VIVA']);
 const VALORES_NO_MERGE = new Set(['', 'NO DEFINIDO', '-', 'SIN INFORMACION', 'SIN INFORMACIÓN']);
 
@@ -88,7 +90,10 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
       );
 
       const ref = await client.query(
-        `select en_base, asesor_base, status_base, fecha_prim_vp_pp from leads where id_prometeo = $1 and campana = $2`,
+        `select l.en_base, l.asesor_base, l.status_base, l.fecha_prim_vp_pp, ${STATUS_EFECTIVO} as status_efectivo
+           from leads l
+           left join leads_pagos p on p.id_prometeo = l.id_prometeo and p.campana = l.campana
+          where l.id_prometeo = $1 and l.campana = $2`,
         [idPrometeo, campana]
       );
       const encontradoEnBase = !!ref.rows[0]?.en_base;
@@ -104,7 +109,9 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
 
       const columnas: Record<string, any> = {};
 
-      if (esValorMerge(statusHoy)) columnas.status_gestion = statusHoy;
+      const yaPagado = STATUS_VENTA_PROVISIONAL.has(String(ref.rows[0]?.status_efectivo || '').trim().toUpperCase());
+      const statusHoyEsPago = STATUS_VENTA_PROVISIONAL.has(String(statusHoy || '').trim().toUpperCase());
+      if (esValorMerge(statusHoy) && (!yaPagado || statusHoyEsPago)) columnas.status_gestion = statusHoy;
 
       if (permitirAsesor && esValorMerge(asesorHoy)) columnas.asesor = asesorHoy;
 
@@ -147,7 +154,6 @@ export async function actualizarLeadsHoy(client: Client, body: JsonBody, env: En
   return jsonOk({ actualizados, errores, total: leads.length, primerError });
 }
 
-const STATUS_VENTA_PROVISIONAL = new Set(['PAGO COMPLETO', 'PAGO FRACCIONADO']);
 
 export async function marcarVentaProvisional(client: Client, body: JsonBody, env: Env) {
   if (!env.IMPORT_SECRET || body.secret !== env.IMPORT_SECRET) {
@@ -163,6 +169,8 @@ export async function marcarVentaProvisional(client: Client, body: JsonBody, env
   const result = await client.query(
     `update leads set
        status_gestion = $3,
+       venta_provisional_status = $3,
+       venta_provisional_en = now(),
        actualizado_hoy_en = now(),
        actualizado_en = now()
      where id_prometeo = $1 and campana = $2`,
