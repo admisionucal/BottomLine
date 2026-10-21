@@ -112,6 +112,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderCorreosCCLista();
     });    
 
+    document.getElementById('btnAsignarAsesor').addEventListener('click', abrirModalAsignarAsesor);
+
     document.getElementById('snapshotModalClose').addEventListener('click', () => {
         document.getElementById('snapshotModal').classList.remove('show');
     });
@@ -314,12 +316,18 @@ function renderHeaderLead() {
     document.getElementById('leadCanal').textContent = canal;
 
     const asesorWrap = document.getElementById('leadAsesorWrap');
-    if (esRolSupervisorOAdmision(user.rol)) {
+    const esAdminVista = esRolSupervisorOAdmision(user.rol);
+    const asesorProvisional = esAdminVista ? (lead.ASESOR_PROVISIONAL || '') : '';
+    const etiquetaProvisional = document.getElementById('leadAsesorProvisional');
+    if (esAdminVista) {
         document.getElementById('leadAsesor').textContent = asesor;
         asesorWrap.style.display = '';
     } else {
         asesorWrap.style.display = 'none';
     }
+    etiquetaProvisional.style.display = asesorProvisional ? '' : 'none';
+    etiquetaProvisional.textContent = asesorProvisional ? `Asignado hoy a ${asesorProvisional} (provisional)` : '';
+    document.getElementById('btnAsignarAsesor').style.display = puedeAsignarAsesor() ? '' : 'none';
 
     document.getElementById('leadDocumento').textContent = dni;
     document.getElementById('leadCelular').textContent = celularesTexto;
@@ -1858,6 +1866,81 @@ async function registrarVenta() {
         }
     } catch (e) {
         error('Error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+const STATUS_NO_ASIGNABLES = [STATUS.VP_VIVA, STATUS.PP_VIVA, STATUS.PAGO_COMPLETO, STATUS.PAGO_FRACCIONADO];
+
+function puedeAsignarAsesor() {
+    if (getCurrentUser()?.rol !== ROLES.SISTEMAS || !state.lead) return false;
+    const status = String(state.lead[COLUMNAS.STATUS_GESTION] || '').trim().toUpperCase();
+    return !STATUS_NO_ASIGNABLES.includes(status);
+}
+
+function asegurarModalAsignarAsesor() {
+    if (document.getElementById('asignarAsesorModal')) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'asignarAsesorModal';
+    overlay.innerHTML = `
+        <div class="modal-box modal-box-detalle" style="max-width:440px;">
+            <button class="modal-close-x" id="asignarAsesorClose"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
+            <h4 style="margin-bottom:2px;">Asignar asesor</h4>
+            <p style="color:#888; font-size:13px; margin-bottom:14px;">La asignación es provisional: el asesor verá este lead hoy para poder registrar su venta. Mañana se mantiene el asesor que traiga la base.</p>
+            <label class="venta-campo">Asesor
+                <select id="asignarAsesorSelect" class="campo-editable-input"><option value="">Cargando...</option></select>
+            </label>
+            <div style="display:flex; gap:10px; margin-top:18px;">
+                <button class="btn-guardar" style="background:#777; flex:1;" id="asignarAsesorCancelar">Cancelar</button>
+                <button class="btn-guardar" style="flex:1;" id="asignarAsesorConfirmar">Asignar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    const cerrar = () => overlay.classList.remove('show');
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) cerrar(); });
+    document.getElementById('asignarAsesorClose').addEventListener('click', cerrar);
+    document.getElementById('asignarAsesorCancelar').addEventListener('click', cerrar);
+    document.getElementById('asignarAsesorConfirmar').addEventListener('click', asignarAsesorProvisional);
+}
+
+async function abrirModalAsignarAsesor() {
+    if (!puedeAsignarAsesor()) return;
+    asegurarModalAsignarAsesor();
+    document.getElementById('asignarAsesorModal').classList.add('show');
+    const select = document.getElementById('asignarAsesorSelect');
+    const result = await callAPI('getAsesoresActivos', { campana: state.campana });
+    const asesores = (result && result.success) ? (result.data || []) : [];
+    select.innerHTML = '<option value="">-- Selecciona un asesor --</option>' +
+        asesores.map(a => `<option value="${escapeHtml(a.usuario)}">${escapeHtml(a.nombre)}</option>`).join('');
+    if (!result || !result.success) notificar('No se pudo cargar la lista de asesores: ' + (result?.error || 'error desconocido'), 'err');
+}
+
+async function asignarAsesorProvisional() {
+    const select = document.getElementById('asignarAsesorSelect');
+    const usuario = select.value;
+    if (!usuario) { notificar('Selecciona un asesor.', 'err'); return; }
+    const btn = document.getElementById('asignarAsesorConfirmar');
+    btn.disabled = true;
+    try {
+        const result = await callAPI('asignarLeadProvisional', {
+            idPrometeo: obtenerCampo(state.lead, COLUMNAS.ID_PROMETEO),
+            campana: state.campana,
+            usuario
+        });
+        if (!result || !result.success) {
+            notificar('Error: ' + (result?.error || 'No se pudo asignar el lead'), 'err');
+            return;
+        }
+        state.lead.ASESOR_PROVISIONAL = result.asesor;
+        sincronizarCache();
+        document.getElementById('asignarAsesorModal').classList.remove('show');
+        renderHeaderLead();
+        notificar(`Lead asignado a ${result.asesor} por hoy`);
+    } catch (e) {
+        notificar('Error de conexión: ' + e.message, 'err');
     } finally {
         btn.disabled = false;
     }

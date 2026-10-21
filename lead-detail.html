@@ -546,6 +546,11 @@
         .venta-doc-thumbs img { max-height:100%; max-width:100%; object-fit:contain; border-radius:4px; }
         .venta-doc-vacio { height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:#9aa0ab; font-size:12px; background:#fafafa; border:1px dashed #cfd6df; border-radius:6px; }
         .venta-doc-acciones { display:flex; gap:8px; }
+        #leadAsesorWrap { flex-wrap:wrap; }
+        .asesor-extra { flex-basis:100%; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+        .asesor-provisional { display:block; font-size:11px; color:#8a4b00; background:#fff3e0; border-radius:10px; padding:2px 8px; width:fit-content; }
+        .btn-asignar-asesor { display:block; background:none; border:1px solid var(--color-primary); color:var(--color-primary); border-radius:6px; font-size:11px; padding:2px 8px; cursor:pointer; }
+        .btn-asignar-asesor:hover { background:#eef4ff; }
         .venta-aviso { background:#fff8e1; border:1px solid #ffcc80; color:#8a4b00; border-radius:8px; padding:10px 14px; font-size:13px; margin-bottom:12px; display:flex; flex-direction:column; gap:4px; }
         @media (max-width: 640px) { .venta-grid, .venta-docs { grid-template-columns:1fr; } }
     </style>
@@ -582,6 +587,12 @@
                                 <div id="leadAsesorWrap">
                                     <span class="campo-label">Asesor</span>
                                     <strong class="campo-valor" id="leadAsesor">---</strong>
+                                    <div class="asesor-extra">
+                                        <span id="leadAsesorProvisional" class="asesor-provisional" style="display:none;"></span>
+                                        <button type="button" id="btnAsignarAsesor" class="btn-asignar-asesor" style="display:none;">
+                                            <span class="material-symbols-outlined" style="font-size:14px;vertical-align:-2px;">person_add</span> Asignar asesor
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

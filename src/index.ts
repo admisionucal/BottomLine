@@ -37,7 +37,7 @@ import {
   eliminarArchivoCampana,
   obtenerArchivoCampanaBase64,
 } from './routes/campanas';
-import { getSupervisoresConfig, crearUsuario, getAsesoresActivos } from './routes/usuarios';
+import { getSupervisoresConfig, crearUsuario, getAsesoresActivos, asignarLeadProvisional } from './routes/usuarios';
 import {
   getEvaluaciones,
   getEstadoEvaluacion,
@@ -105,6 +105,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   getSupervisoresConfig,
   crearUsuario,
   getAsesoresActivos,
+  asignarLeadProvisional,
   getEvaluaciones,
   getEstadoEvaluacion,
   guardarIntentoEvaluacion,

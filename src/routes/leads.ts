@@ -3,6 +3,9 @@ import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
 
 const ESTADOS_VP_PP = ['VALORES_VALORACIONES_POSITIVAS_VIVA', 'VALORES_PROMESA_DE_PAGO_VIVA'];
+const ESTADOS_VISIBLES_ASESOR = [...ESTADOS_VP_PP, 'PAGO FRACCIONADO'];
+const ES_HOY_PROVISIONAL = `(l.asesor_provisional_en at time zone 'America/Lima')::date = (now() at time zone 'America/Lima')::date`;
+const STATUS_EFECTIVO = `(case when p.status_pago_final in ('PAGO COMPLETO', 'PAGO FRACCIONADO') then p.status_pago_final else l.status_gestion end)`;
 
 export async function getLeads(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ASESOR', 'ADMISION']);
@@ -45,14 +48,20 @@ export async function getLeads(client: Client, body: JsonBody) {
   const params: any[] = [campana];
   const condiciones: string[] = ['l.campana = $1'];
 
-  condiciones.push(`(l.en_base = true or (l.actualizado_hoy_en at time zone 'America/Lima')::date = (now() at time zone 'America/Lima')::date)`);
+  condiciones.push(`(l.en_base = true or (l.actualizado_hoy_en at time zone 'America/Lima')::date = (now() at time zone 'America/Lima')::date or ${ES_HOY_PROVISIONAL})`);
 
   if (esAdmin) {
     condiciones.push(`(l.vps_dif_ti_inte <> 0 or (l.actualizado_hoy_en is not null and l.status_gestion = any($${params.push(ESTADOS_VP_PP)})))`);
   } else {
-    condiciones.push(`l.status_gestion = any($${params.push(ESTADOS_VP_PP)})`);
+    const idxEstados = params.push(ESTADOS_VISIBLES_ASESOR);
     if (nombreAsesor) {
-      condiciones.push(`lower(l.asesor) = lower($${params.push(nombreAsesor)})`);
+      const idxAsesor = params.push(nombreAsesor);
+      condiciones.push(
+        `((lower(l.asesor) = lower($${idxAsesor}) and ${STATUS_EFECTIVO} = any($${idxEstados}))` +
+        ` or (${ES_HOY_PROVISIONAL} and lower(l.asesor_provisional) = lower($${idxAsesor})))`
+      );
+    } else {
+      condiciones.push(`${STATUS_EFECTIVO} = any($${idxEstados})`);
     }
   }
 
@@ -82,8 +91,8 @@ export async function getLeads(client: Client, body: JsonBody) {
       l.colegio, l.codigo_modular, l.programa, l.numero_documento, l.modalidad,
       l.modalidad_ingreso, l.boleta_colegio, l.fecha_hora_registro, l.asesor,
       coalesce(u.nombre_aux, l.asesor, '-') as asesor_nombre,
-      case when ${esAdmin} and p.status_pago_final in ('PAGO COMPLETO', 'PAGO FRACCIONADO')
-           then p.status_pago_final else l.status_gestion end as status_gestion,
+      ${STATUS_EFECTIVO} as status_gestion,
+      (${ES_HOY_PROVISIONAL}) as asignado_provisional,
       l.fecha_compromiso_pago,
       l.fecha_visita_guiada,
       l.fecha_prim_vp_pp,

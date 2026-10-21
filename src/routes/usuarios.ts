@@ -93,3 +93,51 @@ export async function getAsesoresActivos(client: Client, body: JsonBody) {
 
   return jsonOk({ data });
 }
+
+const STATUS_NO_ASIGNABLES = new Set([
+  'VALORES_VALORACIONES_POSITIVAS_VIVA',
+  'VALORES_PROMESA_DE_PAGO_VIVA',
+  'PAGO COMPLETO',
+  'PAGO FRACCIONADO',
+]);
+
+export async function asignarLeadProvisional(client: Client, body: JsonBody) {
+  const { sesion, error } = await exigirSesion(client, body, ['ADMISION']);
+  if (!sesion) return jsonError(error!);
+  if (sesion.rolReal !== 'SISTEMAS') return jsonError('Solo el perfil Sistemas puede asignar leads.');
+
+  const idPrometeo = String(body.idPrometeo || '').trim();
+  const campana = String(body.campana || '').trim();
+  const usuario = String(body.usuario || '').trim();
+  if (!idPrometeo || !campana || !usuario) return jsonError('Falta el lead o el asesor.');
+
+  const leadRes = await client.query(
+    `select case when p.status_pago_final in ('PAGO COMPLETO', 'PAGO FRACCIONADO') then p.status_pago_final
+                 else l.status_gestion end as status
+       from leads l
+       left join leads_pagos p on p.id_prometeo = l.id_prometeo and p.campana = l.campana
+      where l.id_prometeo = $1 and l.campana = $2`,
+    [idPrometeo, campana]
+  );
+  if (!leadRes.rows[0]) return jsonError('Lead no encontrado.');
+  if (STATUS_NO_ASIGNABLES.has(String(leadRes.rows[0].status || '').trim().toUpperCase())) {
+    return jsonError('No se pueden asignar leads en VP Viva, PP Viva ni con pago registrado.');
+  }
+
+  const asesorRes = await client.query(
+    `select nombre, nombre_aux from usuarios
+      where lower(usuario) = lower($1) and upper(rol) = 'ASESOR' and activo is not false`,
+    [usuario]
+  );
+  const asesor = asesorRes.rows[0];
+  if (!asesor) return jsonError('Asesor no encontrado o inactivo.');
+
+  const result = await client.query(
+    `update leads set asesor_provisional = $3, asesor_provisional_en = now(), asesor_provisional_por = $4
+      where id_prometeo = $1 and campana = $2`,
+    [idPrometeo, campana, asesor.nombre, sesion.email]
+  );
+  if (result.rowCount === 0) return jsonError('Lead no encontrado.');
+
+  return jsonOk({ asesor: asesor.nombre_aux || asesor.nombre });
+}

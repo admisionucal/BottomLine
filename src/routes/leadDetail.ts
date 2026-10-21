@@ -64,23 +64,36 @@ export async function getLeadDetail(client: Client, body: JsonBody) {
     leadObj['ASESOR ULT TIP DF SN CONTC'] = '-';
   }
 
+  const pagoResult = await client.query(`select * from leads_pagos where id_prometeo = $1 and campana = $2`, [
+    idTarget,
+    campana,
+  ]);
+  const pagoInfo = pagoResult.rows[0];
+  const statusPagoFinal = String(pagoInfo?.status_pago_final || '').trim().toUpperCase();
+  if (statusPagoFinal === 'PAGO COMPLETO' || statusPagoFinal === 'PAGO FRACCIONADO') {
+    leadObj['STATUS DE GESTION'] = statusPagoFinal;
+  }
   if (esAdmin) {
-    const pagoResult = await client.query(`select * from leads_pagos where id_prometeo = $1 and campana = $2`, [
-      idTarget,
-      campana,
-    ]);
-    const pagoInfo = pagoResult.rows[0];
-    const statusPagoFinal = String(pagoInfo?.status_pago_final || '').trim().toUpperCase();
-
     if (statusPagoFinal === 'PAGO COMPLETO') {
-      leadObj['STATUS DE GESTION'] = statusPagoFinal;
       if (pagoInfo.fecha_pago_completo) leadObj['FECHA DE PAGO COMPLETO'] = pagoInfo.fecha_pago_completo;
     } else if (statusPagoFinal === 'PAGO FRACCIONADO') {
-      leadObj['STATUS DE GESTION'] = statusPagoFinal;
       if (pagoInfo.fecha_promesa_pago) leadObj['FECHA DE PROMESA DE PAGO'] = pagoInfo.fecha_promesa_pago;
     } else {
       leadObj['FECHA DE PROMESA DE PAGO'] = leadObj['FECHA COMPROMISO DE PAGO'];
     }
+  }
+
+  const provisionalResult = await client.query(
+    `select l.asesor_provisional_por, coalesce(nullif(u.nombre_aux, ''), u.nombre, l.asesor_provisional) as nombre
+       from leads l
+       left join usuarios u on lower(u.nombre) = lower(l.asesor_provisional)
+      where l.id_prometeo = $1 and l.campana = $2 and l.asesor_provisional <> ''
+        and (l.asesor_provisional_en at time zone 'America/Lima')::date = (now() at time zone 'America/Lima')::date`,
+    [idTarget, campana]
+  );
+  if (provisionalResult.rows[0]) {
+    leadObj['ASESOR_PROVISIONAL'] = provisionalResult.rows[0].nombre;
+    leadObj['ASESOR_PROVISIONAL_POR'] = provisionalResult.rows[0].asesor_provisional_por;
   }
 
   const bottomResult = await client.query(
