@@ -1005,6 +1005,7 @@ async function enviarCC() {
             correosCopiaOverride: state.overrides.correosCopia ?? null,
             nombreCompletoOverride: datosCC.nombreCompleto,
             nombreLead: state.leadActual[COLUMNAS.NOMBRES] || '',
+            dniLead: String(state.leadActual[COLUMNAS.DNI] || '').trim(),
             tipoDocumentoOverride: tipoDocumentoSolicitudActual()
         });
 
