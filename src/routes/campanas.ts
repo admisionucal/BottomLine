@@ -31,6 +31,25 @@ function storageUrl(env: Env, path: string) {
   return `${env.SUPABASE_URL}/storage/v1/object/${env.SUPABASE_STORAGE_BUCKET}/${path}`;
 }
 
+function extraerIdSpreadsheet(valor: any): string {
+  const texto = String(valor || '').trim();
+  const m = texto.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : texto;
+}
+
+export async function obtenerConfigCampanaInterna(client: Client, body: JsonBody, env: Env) {
+  if (!env.IMPORT_SECRET || body.secret !== env.IMPORT_SECRET) {
+    return jsonError('No autorizado.', 401);
+  }
+  const codigo = String(body.campana || '').trim();
+  const result = await client.query(
+    `select codigo, periodo, ventas_spreadsheet_id as "ventasSpreadsheetId", ventas_hoja as "ventasHoja"
+       from campanas where codigo = $1`,
+    [codigo]
+  );
+  return jsonOk({ data: result.rows[0] || null });
+}
+
 export async function getCampanasConfig(client: Client, body: JsonBody) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ASESOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
@@ -40,7 +59,9 @@ export async function getCampanasConfig(client: Client, body: JsonBody) {
       `select codigo, periodo, perc as "perC", inicio_clases as "inicioClases",
               to_char(fecha_inicio_periodo, 'YYYY-MM-DD') as "fechaInicioPeriodo",
               to_char(fecha_fin_periodo, 'YYYY-MM-DD') as "fechaFinPeriodo",
-              activa, bcc_default as "bccDefault"
+              activa, bcc_default as "bccDefault",
+              ventas_spreadsheet_id as "ventasSpreadsheetId", ventas_hoja as "ventasHoja",
+              vb_lista as "vbLista"
       from campanas order by codigo`
     ),
     client.query(
@@ -80,6 +101,11 @@ export async function guardarCampana(client: Client, body: JsonBody) {
   const fechaFinPeriodo = String(body.fechaFinPeriodo || '').trim() || null;
   const activa = body.activa !== false;
   const bccDefault = Array.isArray(body.bccDefault) ? body.bccDefault : [];
+  const ventasSpreadsheetId = extraerIdSpreadsheet(body.ventasSpreadsheetId);
+  const ventasHoja = String(body.ventasHoja || '').trim();
+  const vbLista = Array.isArray(body.vbLista)
+    ? body.vbLista.map((v: any) => String(v).trim().toUpperCase()).filter(Boolean)
+    : ['RAUL', 'MARIO', 'ROSMERY'];
 
   if (!periodo || !perc) {
     return jsonError('Periodo y perC son obligatorios (ej. periodo "2027-2", perC "27-2").');
@@ -89,8 +115,9 @@ export async function guardarCampana(client: Client, body: JsonBody) {
   }
 
   await client.query(
-    `insert into campanas (codigo, periodo, perc, inicio_clases, fecha_inicio_periodo, fecha_fin_periodo, activa, bcc_default)
-     values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+    `insert into campanas (codigo, periodo, perc, inicio_clases, fecha_inicio_periodo, fecha_fin_periodo, activa, bcc_default,
+                           ventas_spreadsheet_id, ventas_hoja, vb_lista)
+     values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11::jsonb)
      on conflict (codigo) do update set
        periodo = excluded.periodo,
        perc = excluded.perc,
@@ -99,8 +126,12 @@ export async function guardarCampana(client: Client, body: JsonBody) {
        fecha_fin_periodo = excluded.fecha_fin_periodo,
        activa = excluded.activa,
        bcc_default = excluded.bcc_default,
+       ventas_spreadsheet_id = excluded.ventas_spreadsheet_id,
+       ventas_hoja = excluded.ventas_hoja,
+       vb_lista = excluded.vb_lista,
        actualizado_en = now()`,
-    [codigo, periodo, perc, inicioClases, fechaInicioPeriodo, fechaFinPeriodo, activa, JSON.stringify(bccDefault)]
+    [codigo, periodo, perc, inicioClases, fechaInicioPeriodo, fechaFinPeriodo, activa, JSON.stringify(bccDefault),
+     ventasSpreadsheetId, ventasHoja, JSON.stringify(vbLista)]
   );
 
   return jsonOk();

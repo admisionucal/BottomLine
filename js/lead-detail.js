@@ -4,6 +4,7 @@ import { getCurrentUser, getSessionToken, cacheGet, cacheSet, cacheRemove, escap
 
 import { Sidebar } from '../core/components.js';
 import { construirDatosCC } from './cc-template.js';
+import { buscarDuplicados } from './duplicados-sugeridos.js';
 
 const state = {
     lead: null,
@@ -1057,14 +1058,15 @@ function renderSolicitudCCBox(hayBoletaGuardada) {
                     ? `<div style="margin-top:6px; font-weight:600;"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">point_of_sale</span> Venta registrada el ${formatearFecha(sol.VENTA_REGISTRADA_EN)}</div>`
                     : ''}
                 <div style="margin-top:8px; display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:nowrap; white-space:nowrap;">
-                    ${puedeRegistrarVenta() && !sol.VENTA_REGISTRADA_EN
-                        ? `<button class="btn-guardar" style="padding:6px 16px; font-size:12px; background:#2e7d32;" id="btnRegistrarVenta"><span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px;">point_of_sale</span> Registrar venta</button>`
-                        : ''}
+                    ${!puedeRegistrarVenta() ? '' : sol.VENTA_REGISTRADA_EN
+                        ? `<button class="btn-guardar" style="padding:6px 16px; font-size:12px; background:#2e7d32;" id="btnEditarVenta"><span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px;">edit</span> Editar venta</button>`
+                        : `<button class="btn-guardar" style="padding:6px 16px; font-size:12px; background:#2e7d32;" id="btnRegistrarVenta"><span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px;">point_of_sale</span> Registrar venta</button>`}
                     <button class="btn-guardar" style="padding:6px 16px; font-size:12px;" id="btnSolicitarCCOtraVez">Solicitar nuevo envío</button>
                 </div>
             </div>
         `;
-        document.getElementById('btnRegistrarVenta')?.addEventListener('click', abrirModalVenta);
+        document.getElementById('btnRegistrarVenta')?.addEventListener('click', () => abrirModalVenta(false));
+        document.getElementById('btnEditarVenta')?.addEventListener('click', () => abrirModalVenta(true));
         document.getElementById('btnSolicitarCCOtraVez')?.addEventListener('click', abrirModalSolicitudCC);
         return;
     }
@@ -1339,7 +1341,10 @@ async function cancelarSolicitudCC() {
 }
 
 const MOTIVOS_COMPRA_VENTA = ['Convenios internacionales', 'Bolsa Laboral', 'Docentes', 'Egresados', 'Flexibilidad de horarios', 'Ubicación de sede', 'Precio accesible', 'Beca', 'Descuentos en boletas de pago', 'Prestigio de la institución', 'Metodología de enseñanza', 'Equipos e instalaciones', 'Malla curricular', 'Otros'];
-const VB_VENTA = ['RAUL', 'MARIO', 'ROSMERY'];
+const VB_VENTA_DEFECTO = ['RAUL', 'MARIO', 'ROSMERY'];
+let ventaModoEdicion = false;
+let ventaDuplicadosCRM = [];
+let ventaVbLista = null;
 const MEDIOS_PAGO_VENTA = ['Pago Link', 'POS', 'Cargo'];
 const CONECTORES_TITULO = new Set(['y', 'o', 'e', 'u', 'a', 'al', 'de', 'del', 'la', 'las', 'el', 'los', 'en', 'con', 'para', 'por', 'sin']);
 const SIGLAS_TITULO = new Set(['CPA', 'ETU', 'NEE', 'POS', 'UCAL']);
@@ -1470,8 +1475,9 @@ function asegurarModalVenta() {
     overlay.innerHTML = `
         <div class="modal-box modal-box-detalle" style="max-width:860px;">
             <button class="modal-close-x" id="ventaModalClose"><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">close</span></button>
-            <h4 style="margin-bottom:2px;">Registrar venta</h4>
+            <h4 style="margin-bottom:2px;" id="ventaTitulo">Registrar venta</h4>
             <p style="color:#888; font-size:13px; margin-bottom:14px;">Revisa los datos, completa el pago y verifica los documentos antes de registrar.</p>
+            <div id="ventaAvisoDuplicados" class="venta-aviso" style="display:none;"></div>
             <div id="ventaResumen" class="venta-resumen"></div>
             <div class="venta-grid">
                 <label class="venta-campo">Nombre(s) del alumno *
@@ -1503,7 +1509,6 @@ function asegurarModalVenta() {
                 <label class="venta-campo" id="ventaBloqueVB">VB *
                     <select id="ventaVB" class="campo-editable-input">
                         <option value="">-- Seleccionar --</option>
-                        ${VB_VENTA.map(v => `<option value="${v}">${formatoTitulo(v)}</option>`).join('')}
                     </select>
                 </label>
                 <label class="venta-campo">Cuota que paga *
@@ -1631,9 +1636,80 @@ async function cargarAsesoresVenta() {
         .map(a => formatoTitulo(a.nombre)).map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
 }
 
-function abrirModalVenta() {
+async function cargarVbVenta() {
+    if (!ventaVbLista) {
+        const result = await callAPI('getCampanasConfig', {});
+        const campana = (result && result.success) ? (result.data || []).find(c => c.codigo === state.campana) : null;
+        ventaVbLista = (campana && Array.isArray(campana.vbLista) && campana.vbLista.length) ? campana.vbLista : VB_VENTA_DEFECTO;
+    }
+    const select = document.getElementById('ventaVB');
+    const actual = select.value;
+    select.innerHTML = '<option value="">-- Seleccionar --</option>' +
+        ventaVbLista.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(formatoTitulo(v))}</option>`).join('');
+    select.value = ventaVbLista.includes(actual) ? actual : '';
+}
+
+async function revisarDuplicadosVenta() {
+    const aviso = document.getElementById('ventaAvisoDuplicados');
+    aviso.style.display = 'none';
+    ventaDuplicadosCRM = [];
+    try {
+        ventaDuplicadosCRM = await buscarDuplicados({
+            idPrometeo: obtenerCampo(state.lead, COLUMNAS.ID_PROMETEO),
+            celular: obtenerCampo(state.lead, COLUMNAS.TELEFONO_2),
+            nombre: obtenerCampo(state.lead, COLUMNAS.NOMBRES)
+        });
+    } catch (e) {
+        ventaDuplicadosCRM = [];
+    }
+    if (!ventaDuplicadosCRM.length) return;
+    aviso.innerHTML = `
+        <strong><span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">warning</span> Posible lead duplicado</strong>
+        <div>${ventaDuplicadosCRM.map(dup => `ID ${escapeHtml(String(dup[COLUMNAS.ID_PROMETEO] || ''))} (${escapeHtml(String(dup[COLUMNAS.CAMPANA] || ''))}) — ${escapeHtml((dup._motivos || []).join(', '))}`).join('<br>')}</div>
+        <div>Unifica los IDs desde "Unificar IDs" antes de registrar la venta.</div>
+    `;
+    aviso.style.display = '';
+}
+
+function valorOpcion(select, valor, transformar = v => v) {
+    const buscado = transformar(String(valor || '').trim());
+    const opcion = Array.from(select.options).find(o => transformar(o.value) === buscado);
+    select.value = opcion ? opcion.value : '';
+}
+
+async function precargarVentaExistente() {
+    const msgEl = document.getElementById('ventaMsg');
+    msgEl.style.color = '#666';
+    msgEl.textContent = 'Cargando la venta registrada...';
+    const result = await callAPI('obtenerVenta', { idSolicitud: state.solicitudCC.ID_SOLICITUD });
+    if (!result || !result.success) {
+        msgEl.style.color = '#d32f2f';
+        msgEl.textContent = 'Error: ' + (result?.error || 'No se pudo cargar la venta');
+        return;
+    }
+    const f = result.fila || {};
+    msgEl.textContent = '';
+    if (f.F) document.getElementById('ventaNombres').value = formatoMayuscula(f.F);
+    if (f.G) document.getElementById('ventaApellidos').value = formatoMayuscula(f.G);
+    if (f.W) valorOpcion(document.getElementById('ventaMedioPago'), f.W, formatoTitulo);
+    if (f.X) valorOpcion(document.getElementById('ventaStatus'), f.X, formatoMayuscula);
+    if (f.V) document.getElementById('ventaFechaPago').value = f.V;
+    document.getElementById('ventaFechaCompromiso').value = f.Z || '';
+    document.getElementById('ventaMontoFraccionado').value = String(f.AL || '').replace(/[^\d.]/g, '');
+    if (f.U) valorOpcion(document.getElementById('ventaVB'), f.U, formatoMayuscula);
+    if (f.AP) document.getElementById('ventaCuota').value = String(parseInt(f.AP, 10) || 1);
+    if (f.AN) valorOpcion(document.getElementById('ventaMotivo'), f.AN, formatoTitulo);
+    if (f.AM) valorOpcion(document.getElementById('ventaAsesorAyudo'), f.AM, formatoTitulo);
+    document.getElementById('ventaComentario').value = f.AO || '';
+    actualizarCamposFraccionadoVenta();
+}
+
+async function abrirModalVenta(editar = false) {
     if (!puedeRegistrarVenta() || !state.solicitudCC || state.solicitudCC.STATUS !== 'ENVIADO') return;
     asegurarModalVenta();
+    ventaModoEdicion = !!editar;
+    document.getElementById('ventaTitulo').textContent = ventaModoEdicion ? 'Editar venta' : 'Registrar venta';
+    document.getElementById('ventaRegistrarBtn').textContent = ventaModoEdicion ? 'Guardar cambios' : 'Registrar venta';
     const lead = state.lead;
     const d = datosDerivadosVenta(lead);
     const fila = (label, valor) => `<div><span>${label}</span><strong>${escapeHtml(String(valor ?? '') || '-')}</strong></div>`;
@@ -1668,8 +1744,9 @@ function abrirModalVenta() {
     document.getElementById('ventaDocs').innerHTML = DOCS_VENTA.map(doc => `<div class="venta-doc" id="ventaDoc_${doc.campo}"></div>`).join('');
     DOCS_VENTA.forEach(doc => renderDocVenta(doc.campo));
 
-    cargarAsesoresVenta();
     document.getElementById('ventaModal').classList.add('show');
+    await Promise.all([cargarAsesoresVenta(), cargarVbVenta(), revisarDuplicadosVenta()]);
+    if (ventaModoEdicion) await precargarVentaExistente();
 }
 
 async function armarArchivosVenta(campo) {
@@ -1726,20 +1803,34 @@ async function registrarVenta() {
         AP: Number(document.getElementById('ventaCuota').value) || 1
     });
 
+    if (!ventaModoEdicion && ventaDuplicadosCRM.length
+        && !confirm('Este lead tiene posibles duplicados sin unificar (mismo nombre o celular). Lo recomendable es unificarlos antes de registrar la venta.\n\n¿Registrar de todas formas?')) {
+        return;
+    }
+
     btn.disabled = true;
     msgEl.style.color = '#666';
-    msgEl.textContent = 'Registrando venta...';
+    msgEl.textContent = ventaModoEdicion ? 'Guardando cambios...' : 'Registrando venta...';
 
     try {
         const [comprobante, dni, conformidad, nee] = await Promise.all(['comprobante', 'dni', 'conformidad', 'nee'].map(armarArchivosVenta));
-        const result = await callAPI('registrarVenta', {
+        const payload = {
             idSolicitud: state.solicitudCC.ID_SOLICITUD,
             idPrometeo: d.D,
             campana: state.campana,
+            editar: ventaModoEdicion,
             nombreCompleto: `${nombresAlumno} ${apellidosAlumno}`,
             fila: filaVenta,
             archivos: { comprobante, dni, conformidad, nee }
-        });
+        };
+        let result = await callAPI('registrarVenta', payload);
+        if (result && result.requiereConfirmacion) {
+            if (!confirm(result.error + '\n\n¿Guardar de todas formas?')) {
+                msgEl.textContent = '';
+                return;
+            }
+            result = await callAPI('registrarVenta', { ...payload, confirmarDuplicado: true });
+        }
 
         if (!result || !result.success) return error('Error: ' + (result?.error || 'No se pudo registrar la venta'));
 

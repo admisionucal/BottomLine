@@ -1,5 +1,5 @@
 import type { Client } from 'pg';
-import { jsonOk, jsonError, type JsonBody } from '../types';
+import { jsonOk, jsonError, type JsonBody, type Env } from '../types';
 import { exigirSesion } from '../lib/session';
 
 function parsearHistorial(raw: any): any[] {
@@ -34,7 +34,22 @@ function normalizarSecundarios(body: JsonBody): SecundarioInput[] {
   return idsSecundarios.filter((id) => id).map((id) => ({ id, campana: campanaFallback }));
 }
 
-export async function unifyIds(client: Client, body: JsonBody) {
+async function unificarIdsEnHojas(env: Env, idPrincipal: string, secundarios: SecundarioInput[]): Promise<string> {
+  if (!env.APPS_SCRIPT_URL || !env.IMPORT_SECRET) return 'No se pudo actualizar el ID en las hojas (configuración incompleta).';
+  try {
+    const resp = await fetch(env.APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'unificarIdsHojas', secret: env.IMPORT_SECRET, idPrincipal, secundarios }),
+    });
+    const r: any = await resp.json();
+    return r?.success ? '' : 'No se pudo actualizar el ID en las hojas: ' + (r?.error || 'error desconocido');
+  } catch (e: any) {
+    return 'No se pudo actualizar el ID en las hojas: ' + (e?.message || String(e));
+  }
+}
+
+export async function unifyIds(client: Client, body: JsonBody, env: Env) {
   const { sesion, error } = await exigirSesion(client, body, ['SUPERVISOR', 'ADMISION']);
   if (!sesion) return jsonError(error!);
 
@@ -215,7 +230,11 @@ export async function unifyIds(client: Client, body: JsonBody) {
     return jsonError('Error al unificar: ' + (e?.message || String(e)));
   }
 
+  const avisoHojas = await unificarIdsEnHojas(env, idPrincipal, secundariosValidos);
+
   return jsonOk({
-    message: `Fusión completada: ${secundariosValidos.length} registro(s) unificado(s) al principal ${idPrincipal} (${campanaPrincipal}). Interacciones reasignadas y registro(s) secundario(s) eliminado(s) de leads, sin importar la campaña de origen.`,
+    message: `Fusión completada: ${secundariosValidos.length} registro(s) unificado(s) al principal ${idPrincipal} (${campanaPrincipal}). Interacciones reasignadas y registro(s) secundario(s) eliminado(s) de leads, sin importar la campaña de origen.`
+      + (avisoHojas ? ` Atención: ${avisoHojas}` : ''),
+    avisoHojas,
   });
 }

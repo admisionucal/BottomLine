@@ -189,6 +189,23 @@ function renderDetalle(c, esNueva) {
                 <input type="text" id="cfgBcc" value="${escapeHtml((c.bccDefault || []).join(', '))}">
             </label>
         </div>
+        <div class="cfg-form-row">
+            <label class="cfg-campo" style="flex:2;">Hoja de ventas (enlace del Google Sheet)
+                <input type="text" id="cfgVentasUrl" placeholder="https://docs.google.com/spreadsheets/d/..."
+                    value="${c.ventasSpreadsheetId ? `https://docs.google.com/spreadsheets/d/${escapeHtml(c.ventasSpreadsheetId)}/edit` : ''}">
+                <span id="cfgVentasMsg" style="font-size:11px; color:#888;"></span>
+            </label>
+            <label class="cfg-campo">Pestaña de ventas
+                <select id="cfgVentasHoja" style="padding:8px 10px; border:1px solid var(--color-border); border-radius:var(--radius); font-size:13px;">
+                    ${c.ventasHoja ? `<option value="${escapeHtml(c.ventasHoja)}">${escapeHtml(c.ventasHoja)}</option>` : '<option value="">-- Pega primero el enlace --</option>'}
+                </select>
+            </label>
+        </div>
+        <div class="cfg-form-row">
+            <label class="cfg-campo" style="flex-basis:100%;">VB (quienes dan el visto bueno a Reca o Beca), separados por coma
+                <input type="text" id="cfgVbLista" value="${escapeHtml((c.vbLista && c.vbLista.length ? c.vbLista : ['RAUL', 'MARIO', 'ROSMERY']).join(', '))}">
+            </label>
+        </div>
         <button type="button" class="btn-export" id="cfgBtnGuardar">
             <span class="material-symbols-outlined" style="font-size:16px;">save</span> Guardar campaña
         </button>
@@ -198,6 +215,8 @@ function renderDetalle(c, esNueva) {
     `;
 
     document.getElementById('cfgBtnGuardar')?.addEventListener('click', () => guardarCampana(esNueva));
+    document.getElementById('cfgVentasUrl')?.addEventListener('change', () => cargarPestanasVentas(''));
+    if (c.ventasSpreadsheetId) cargarPestanasVentas(c.ventasHoja || '');
 
     if (!esNueva) {
         TIPOS_ARCHIVO.forEach((t) => {
@@ -208,6 +227,31 @@ function renderDetalle(c, esNueva) {
             document.getElementById(`cfgEliminar_${t.tipo}`)?.addEventListener('click', () => eliminarArchivo(c.codigo, t.tipo));
         });
     }
+}
+
+async function cargarPestanasVentas(seleccionada) {
+    const url = document.getElementById('cfgVentasUrl').value.trim();
+    const select = document.getElementById('cfgVentasHoja');
+    const msg = document.getElementById('cfgVentasMsg');
+    if (!url) {
+        select.innerHTML = '<option value="">-- Pega primero el enlace --</option>';
+        msg.textContent = '';
+        return;
+    }
+    msg.style.color = '#888';
+    msg.textContent = 'Cargando pestañas...';
+    const result = await callAPI('listarHojasVentas', { spreadsheet: url });
+    if (!result || !result.success) {
+        msg.style.color = '#d32f2f';
+        msg.textContent = result?.error || 'No se pudo abrir el archivo.';
+        return;
+    }
+    msg.style.color = '#2e7d32';
+    msg.textContent = `Archivo: ${result.nombre}`;
+    const actual = seleccionada || select.value;
+    select.innerHTML = '<option value="">-- Selecciona la pestaña --</option>' +
+        (result.hojas || []).map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+    select.value = (result.hojas || []).includes(actual) ? actual : '';
 }
 
 function renderArchivoCard(c, t) {
@@ -245,6 +289,10 @@ async function guardarCampana(esNueva) {
     const fechaFinPeriodo = document.getElementById('cfgFechaFinPeriodo').value;
     const bccDefault = document.getElementById('cfgBcc').value
         .split(',').map((s) => s.trim()).filter(Boolean);
+    const ventasSpreadsheetId = document.getElementById('cfgVentasUrl').value.trim();
+    const ventasHoja = document.getElementById('cfgVentasHoja').value;
+    const vbLista = document.getElementById('cfgVbLista').value
+        .split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
 
     if (!codigo || !periodo || !perC) {
         alert('Código, periodo y per. corto son obligatorios.');
@@ -254,10 +302,14 @@ async function guardarCampana(esNueva) {
         alert('La fecha de inicio del periodo no puede ser posterior a la de fin.');
         return;
     }
+    if (ventasSpreadsheetId && !ventasHoja) {
+        alert('Selecciona la pestaña de la hoja de ventas.');
+        return;
+    }
 
     const result = await callAPI('guardarCampana', {
         codigo, periodo, perC, inicioClases, fechaInicioPeriodo, fechaFinPeriodo,
-        activa: true, bccDefault,
+        activa: true, bccDefault, ventasSpreadsheetId, ventasHoja, vbLista,
     });
     if (!result.success) {
         alert(result.error || 'No se pudo guardar la campaña.');

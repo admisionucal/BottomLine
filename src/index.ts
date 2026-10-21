@@ -30,6 +30,7 @@ import { getSolicitudesCC, getSolicitudCC, getSolicitudesCCCount } from './route
 import { actualizarSolicitudCC } from './routes/solicitudCCDualWrite';
 import {
   getCampanasConfig,
+  obtenerConfigCampanaInterna,
   guardarCampana,
   toggleCampanaActiva,
   subirArchivoCampana,
@@ -95,6 +96,7 @@ const ACCIONES_LOCALES: Record<string, (client: any, body: any, env: Env, ctx: E
   marcarVentaProvisional,
   actualizarLeadsBase,
   getCampanasConfig,
+  obtenerConfigCampanaInterna,
   guardarCampana,
   toggleCampanaActiva,
   subirArchivoCampana,
@@ -195,6 +197,8 @@ const ACCIONES_APPS_SCRIPT = new Set([
   'generarPreviewPDF',
   'rechazarCC',
   'registrarVenta',
+  'obtenerVenta',
+  'listarHojasVentas',
 ]);
 
 async function proxyAAppsScript(originalRequest: Request, body: any, env: Env): Promise<Response> {
