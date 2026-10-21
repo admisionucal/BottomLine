@@ -2,7 +2,7 @@ import { API_URL, esRolSupervisorOAdmision } from '../core/constants.js';
 
 import { getCurrentUser, getSessionToken, escapeHtml, minutosAHora, diffHoras, horasLabel, fechaDDMMYYYY, hoyDDMMYYYY, nowPeru, formato12h, normalizarUrlFoto, calcularDistanciaMetros } from '../core/utils.js';
 
-import { Sidebar, startClock, createMultiSelect, crearSelectorRango } from '../core/components.js';
+import { Sidebar, startClock, createMultiSelect, crearSelectorRango, notificar } from '../core/components.js';
 
 const state = {
     user: null,
@@ -1274,12 +1274,7 @@ function estadoDiaAsesor(registro, fecha, esHoyOAnterior) {
 }
 
 function showToast(msg, type = 'info') {
-    const el = document.getElementById('toast');
-    if (!el) return;
-    el.textContent = msg;
-    el.className = `toast show ${type}`;
-    clearTimeout(el._timer);
-    el._timer = setTimeout(() => el.classList.remove('show'), 3200);
+    notificar(msg, type);
 }
 
 async function getIP() {
@@ -1546,7 +1541,7 @@ async function toggleColabActivo(chk) {
     } catch (e) {
         chk.checked = !chk.checked;
         fila.querySelectorAll('.colab-cfg-hora').forEach(inp => inp.disabled = !chk.checked);
-        showToast('No se pudo actualizar el estado', 'err');
+        showToast('No se pudo actualizar el estado: ' + (e.message || 'error desconocido'), 'err');
     }
 }
 
@@ -1596,7 +1591,7 @@ async function guardarCampanasAsesor(usuario, campanas) {
         if (u) u.campanas = campanas;
         showToast('Campañas actualizadas', 'ok');
     } catch (e) {
-        showToast('No se pudieron actualizar las campañas', 'err');
+        showToast('No se pudieron actualizar las campañas: ' + (e.message || 'error desconocido'), 'err');
     }
 }
 

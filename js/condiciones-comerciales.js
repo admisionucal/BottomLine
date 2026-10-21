@@ -4,7 +4,7 @@ import {
     cacheGet, cacheSet, cacheRemove,
     escapeHtml, formatearFecha, getEspecializacionETU
 } from '../core/utils.js';
-import { Sidebar, renderTable, Toast, createMultiSelect, crearSelectorRango } from '../core/components.js';
+import { Sidebar, renderTable, notificar, createMultiSelect, crearSelectorRango } from '../core/components.js';
 import { construirDatosCC, renderPlantillaCC, renderPlantillaCCPreview, detectarTipoReferido, precargarLogoCC, setConfigCampanas } from './cc-template.js';
 import { buscarDuplicados, limpiarCacheDuplicados } from './duplicados-sugeridos.js';
 import { unificarLeads } from './unificar-core.js';
@@ -325,7 +325,7 @@ window.irADetalleCC = function (idSolicitud) {
 
 function exportarSolicitudesCCExcel() {
     if (state.solicitudesFiltradas.length === 0) {
-        alert('No hay datos para exportar');
+        notificar('No hay datos para exportar', 'err');
         return;
     }
     const datos = state.solicitudesFiltradas.map(sol => ({
@@ -891,14 +891,14 @@ function agregarPersonaReferidoVista2() {
     const email = emailInput.value.trim();
     const tipoDocumento = document.getElementById('ccRefTipoDoc')?.value || 'DNI';
 
-    if (!nombre) { alert('Ingresa el nombre.'); return; }
+    if (!nombre) { notificar('Ingresa el nombre.', 'err'); return; }
     if (!documentoReferidoValido(tipoDocumento, dni)) {
-        alert(`El ${etiquetaTipoDocumento(tipoDocumento)} debe tener ${digitosTipoDocumento(tipoDocumento)} dígitos.`);
+        notificar(`El ${etiquetaTipoDocumento(tipoDocumento)} debe tener ${digitosTipoDocumento(tipoDocumento)} dígitos.`, 'err');
         return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Email inválido.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { notificar('Email inválido.', 'err'); return; }
     if (state.personasReferido.some(p => p.dni === dni || p.email === email)) {
-        alert('Ya agregaste a una persona con ese documento o email.');
+        notificar('Ya agregaste a una persona con ese documento o email.', 'err');
         return;
     }
 
@@ -924,7 +924,7 @@ async function descargarPreviewPDF() {
 
         const result = await callAPI('generarPreviewPDF', { htmlFinal });
         if (!result.success) {
-            alert('No se pudo generar el PDF: ' + (result.error || 'Error desconocido'));
+            notificar('No se pudo generar el PDF: ' + (result.error || 'Error desconocido'), 'err');
             return;
         }
 
@@ -942,7 +942,7 @@ async function descargarPreviewPDF() {
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (e) {
-        alert('Error generando el PDF: ' + e.message);
+        notificar('Error generando el PDF: ' + e.message, 'err');
     } finally {
         if (btn) {
             btn.disabled = false;
@@ -1009,7 +1009,7 @@ async function enviarCC() {
 
         if (result.success) {
             const mensajeExito = esReenvio ? 'Condiciones Comerciales reenviadas correctamente' : 'Condiciones Comerciales enviadas correctamente';
-            Toast?.show ? Toast.show(mensajeExito) : alert(mensajeExito);
+            notificar(mensajeExito);
             state.solicitudActual.STATUS = 'ENVIADO';
             state.solicitudActual.TIPO_DOCUMENTO = tipoDocumentoSolicitudActual();
             invalidarCacheSolicitudesCC();
@@ -1017,11 +1017,13 @@ async function enviarCC() {
         } else {
             msg.style.color = '#c62828';
             msg.textContent = 'Error: ' + (result.error || 'No se pudo enviar');
+            notificar('Error: ' + (result.error || 'No se pudo enviar'), 'err');
             btn.disabled = false;
         }
     } catch (e) {
         msg.style.color = '#c62828';
         msg.textContent = 'Error de conexión: ' + e.message;
+        notificar('Error de conexión: ' + e.message, 'err');
         btn.disabled = false;
     }
 }
@@ -1030,7 +1032,7 @@ async function rechazarCC() {
     const motivo = prompt('Motivo del rechazo (se guardará en la solicitud):');
     if (motivo === null) return;
     if (!motivo.trim()) {
-        alert('Debes indicar un motivo para rechazar la solicitud.');
+        notificar('Debes indicar un motivo para rechazar la solicitud.', 'err');
         return;
     }
 
@@ -1052,8 +1054,10 @@ async function rechazarCC() {
             state.solicitudActual.MOTIVO_RECHAZO = motivo.trim();
             invalidarCacheSolicitudesCC();
             renderDetalleCC();
+            notificar('Solicitud de Condiciones Comerciales rechazada');
         } else {
             if (msg) { msg.style.color = '#c62828'; msg.textContent = 'Error: ' + (result.error || 'No se pudo rechazar'); }
+            notificar('Error: ' + (result.error || 'No se pudo rechazar'), 'err');
             if (btnEnviar) btnEnviar.disabled = false;
             if (btnRechazar) btnRechazar.disabled = false;
         }
@@ -1189,7 +1193,7 @@ async function confirmarUnificacionDesdePopup(candidatos) {
     });
 
     if (result.success) {
-        new Toast().show('Unificación completada', 'ok');
+        notificar('Unificación completada');
         limpiarCacheDuplicados();
         overlay.remove();
         cargarSolicitudesCC(true);

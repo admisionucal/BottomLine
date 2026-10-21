@@ -2,7 +2,7 @@ import { API_URL, ROLES, tipoDocumentoPorNumero, etiquetaTipoDocumento, digitosT
 
 import { getCurrentUser, getSessionToken, cacheGet, cacheSet, cacheRemove, escapeHtml, normalizarTexto, parseNumero, getEspecializacionETU } from '../core/utils.js';
 
-import { Sidebar } from '../core/components.js';
+import { Sidebar, notificar } from '../core/components.js';
 import { construirDatosCC } from './cc-template.js';
 import { buscarDuplicados } from './duplicados-sugeridos.js';
 
@@ -99,8 +99,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const input = document.getElementById('ccNuevoCorreoInput');
         const correo = input.value.trim();
         if (!correo) return;
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) { alert('Correo inválido'); return; }
-        if (ccCorreosAdicionales.includes(correo)) { alert('Ese correo ya fue agregado'); return; }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) { notificar('Correo inválido', 'err'); return; }
+        if (ccCorreosAdicionales.includes(correo)) { notificar('Ese correo ya fue agregado', 'err'); return; }
         ccCorreosAdicionales.push(correo);
         input.value = '';
         renderCorreosCCLista();
@@ -1179,7 +1179,7 @@ function abrirModalSolicitudCC() {
     const caso = determinarCasoIngreso(state.lead);
     const faltantes = camposFaltantesCC(state.lead, caso);
     if (faltantes.length > 0) {
-        alert('Debes guardar los datos de la boleta antes de solicitar Condiciones Comerciales:\n\n- ' + faltantes.join('\n- '));
+        notificar('Guarda primero los datos de la boleta. Falta: ' + faltantes.join(', ') + '.', 'err');
         return;
     }
 
@@ -1312,6 +1312,7 @@ async function enviarSolicitudCC() {
             document.getElementById('solicitudCCModal').classList.remove('show');
             Object.assign(state.lead, capturarEdicionesTemporal());
             renderVista1();
+            notificar('Solicitud de Condiciones Comerciales enviada');
         } else {
             msgEl.style.color = '#d32f2f';
             msgEl.textContent = 'Error: ' + (result?.error || 'No se pudo enviar la solicitud');
@@ -1332,11 +1333,12 @@ async function cancelarSolicitudCC() {
             state.solicitudCC = null;
             Object.assign(state.lead, capturarEdicionesTemporal());
             renderVista1();
+            notificar('Solicitud de Condiciones Comerciales cancelada');
         } else {
-            alert('Error: ' + (result?.error || 'Error desconocido'));
+            notificar('Error: ' + (result?.error || 'Error desconocido'), 'err');
         }
     } catch (e) {
-        alert('Error de conexión: ' + e.message);
+        notificar('Error de conexión: ' + e.message, 'err');
     }
 }
 
@@ -1840,7 +1842,11 @@ async function registrarVenta() {
         document.getElementById('ventaModal').classList.remove('show');
         Object.assign(state.lead, capturarEdicionesTemporal());
         renderAll();
-        if (!result.statusProvisional) alert('La venta se registró, pero no se pudo actualizar el status del lead. Se actualizará con la carga del día siguiente.');
+        if (result.statusProvisional) {
+            notificar(ventaModoEdicion ? 'Venta actualizada' : 'Venta registrada');
+        } else {
+            notificar(`${ventaModoEdicion ? 'Venta actualizada' : 'Venta registrada'}, pero no se pudo actualizar el status del lead. Se actualizará con la carga del día siguiente.`, 'info');
+        }
     } catch (e) {
         error('Error: ' + e.message);
     } finally {
@@ -1852,7 +1858,7 @@ async function guardarFicha(idPrometeo) {
     const user = getCurrentUser();
 
     if (!esRolSupervisorOAdmision(user.rol) && state.solicitudPendiente && state.solicitudPendiente.STATUS === 'PENDIENTE') {
-        alert('No puedes editar la ficha mientras tengas una solicitud pendiente.');
+        notificar('No puedes editar la ficha mientras tengas una solicitud pendiente.', 'err');
         return;
     }
 
@@ -1918,13 +1924,13 @@ async function guardarFicha(idPrometeo) {
         if (result.success) {
             Object.assign(state.lead, data);
             sincronizarCache();
-            document.getElementById('fichaGuardadoMsg').innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">check_circle</span> Guardado correctamente';
             renderVista1();
+            notificar('Ficha guardada');
         } else {
-            alert('Error al guardar: ' + (result?.error || 'Error desconocido'));
+            notificar('Error al guardar: ' + (result?.error || 'Error desconocido'), 'err');
         }
     } catch (e) {
-        alert('Error de conexión: ' + e.message);
+        notificar('Error de conexión: ' + e.message, 'err');
     } finally {
         mostrarOverlay(false);
     }
@@ -2072,7 +2078,7 @@ function renderVista2() {
             document.getElementById('inputPropuestaIA').value = result.propuesta;
             state.lead.PROPUESTA_ACCION_IA = result.propuesta;
         } else {
-            alert(result.error || 'No se pudo generar la propuesta.');
+            notificar(result.error || 'No se pudo generar la propuesta.', 'err');
         }
         btn.disabled = false; btn.textContent = 'Generar con IA';
     });
@@ -2306,13 +2312,13 @@ async function guardarPerfilamiento(idPrometeo) {
             if (dolorDescripcionNueva) await actualizarCatalogosPerfilamiento();
             Object.assign(state.lead, data);
             sincronizarCache();
-            document.getElementById('perfilGuardadoMsg').innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">check_circle</span> Guardado correctamente';
             renderVista2();
+            notificar('Perfilamiento guardado');
         } else {
-            alert('Error al guardar: ' + (result?.error || 'Error desconocido'));
+            notificar('Error al guardar: ' + (result?.error || 'Error desconocido'), 'err');
         }
     } catch (e) {
-        alert('Error de conexión: ' + e.message);
+        notificar('Error de conexión: ' + e.message, 'err');
     } finally {
         mostrarOverlay(false);
     }
@@ -2470,12 +2476,12 @@ async function restaurarSnapshot(idx) {
         if (result.success) {
             document.getElementById('snapshotModal').classList.remove('show');
             await cargarLead();
-            alert('Versión restablecida correctamente.');
+            notificar('Versión restablecida');
         } else {
-            alert('Error al restablecer: ' + (result?.error || 'Error desconocido'));
+            notificar('Error al restablecer: ' + (result?.error || 'Error desconocido'), 'err');
         }
     } catch (e) {
-        alert('Error de conexión: ' + e.message);
+        notificar('Error de conexión: ' + e.message, 'err');
     } finally {
         mostrarOverlay(false);
     }
@@ -2502,11 +2508,12 @@ async function agregarComentario() {
         if (result.success) {
             input.value = '';
             await cargarLead();
+            notificar('Comentario agregado');
         } else {
-            alert('Error al agregar comentario: ' + (result?.error || 'Error desconocido'));
+            notificar('Error al agregar comentario: ' + (result?.error || 'Error desconocido'), 'err');
         }
     } catch (e) {
-        alert('Error de conexión: ' + e.message);
+        notificar('Error de conexión: ' + e.message, 'err');
     } finally {
         mostrarOverlay(false);
     }
@@ -2572,11 +2579,12 @@ document.addEventListener('click', async (e) => {
                 } else {
                     renderAll();
                 }
+                notificar(status === 'APROBADO' ? 'Recategorización aprobada' : 'Recategorización rechazada');
             } else {
-                alert('Error: ' + (result?.error || 'Error desconocido'));
+                notificar('Error: ' + (result?.error || 'Error desconocido'), 'err');
             }
         } catch (err) {
-            alert('Error de conexión: ' + err.message);
+            notificar('Error de conexión: ' + err.message, 'err');
         } finally {
             mostrarOverlay(false);
         }
@@ -2586,7 +2594,7 @@ document.addEventListener('click', async (e) => {
         const sel = document.getElementById('selectEscalaMenor');
         const msgEl = document.getElementById('solicitudMsg');
         if (!sel || !sel.value) {
-            alert('Selecciona una boleta para solicitar.');
+            notificar('Selecciona una boleta para solicitar.', 'err');
             return;
         }
 
@@ -2621,13 +2629,14 @@ document.addEventListener('click', async (e) => {
                     STATUS: 'PENDIENTE'
                 };
                 renderVista1();
+                notificar('Solicitud de recategorización enviada');
             } else {
                 if (msgEl) msgEl.textContent = '';
-                alert('Error: ' + (result?.error || 'Error desconocido'));
+                notificar('Error: ' + (result?.error || 'Error desconocido'), 'err');
             }
         } catch (err) {
             if (msgEl) msgEl.textContent = '';
-            alert('Error de conexión: ' + err.message);
+            notificar('Error de conexión: ' + err.message, 'err');
         }
     }
 
@@ -2639,11 +2648,12 @@ document.addEventListener('click', async (e) => {
             if (result.success) {
                 state.solicitudPendiente = null;
                 renderVista1();
+                notificar('Solicitud de recategorización cancelada');
             } else {
-                alert('Error: ' + (result?.error || 'Error desconocido'));
+                notificar('Error: ' + (result?.error || 'Error desconocido'), 'err');
             }
         } catch (err) {
-            alert('Error de conexión: ' + err.message);
+            notificar('Error de conexión: ' + err.message, 'err');
         }
     }
 });

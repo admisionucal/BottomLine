@@ -208,6 +208,8 @@ export class Sidebar {
     }
 }
 
+const ICONOS_TOAST = { ok: 'check_circle', err: 'error', info: 'info' };
+
 export class Toast {
     constructor() {
         this.toast = document.getElementById('toast');
@@ -221,15 +223,38 @@ export class Toast {
     }
 
     show(message, type = 'info') {
+        const tipo = type === 'error' ? 'err' : (ICONOS_TOAST[type] ? type : 'info');
         if (this.timer) clearTimeout(this.timer);
-        this.toast.textContent = message;
-        this.toast.className = `toast show ${type}`;
-        this.timer = setTimeout(() => this.hide(), 3200);
+        this.toast.innerHTML = '';
+        const icono = document.createElement('span');
+        icono.className = 'material-symbols-outlined toast-icono';
+        icono.textContent = ICONOS_TOAST[tipo];
+        const texto = document.createElement('span');
+        texto.className = 'toast-texto';
+        texto.textContent = message;
+        this.toast.append(icono, texto);
+        if (tipo === 'err') {
+            const cerrar = document.createElement('button');
+            cerrar.type = 'button';
+            cerrar.className = 'toast-cerrar material-symbols-outlined';
+            cerrar.textContent = 'close';
+            cerrar.addEventListener('click', () => this.hide());
+            this.toast.append(cerrar);
+        }
+        this.toast.className = `toast show ${tipo}`;
+        this.timer = setTimeout(() => this.hide(), tipo === 'err' ? 7000 : 3200);
     }
 
     hide() {
         this.toast.classList.remove('show');
     }
+}
+
+let toastGlobal = null;
+
+export function notificar(mensaje, tipo = 'ok') {
+    if (!toastGlobal || !document.body.contains(toastGlobal.toast)) toastGlobal = new Toast();
+    toastGlobal.show(mensaje, tipo);
 }
 
 export function renderTable(containerId, headers, rows, options = {}) {

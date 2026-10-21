@@ -1,6 +1,6 @@
 import { API_URL, esRolSupervisorOAdmision } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml } from '../core/utils.js';
-import { Sidebar } from '../core/components.js';
+import { Sidebar, notificar } from '../core/components.js';
 
 let modoEmbebido = false;
 
@@ -167,7 +167,7 @@ window.guardarVentana = async (codigo) => {
     const duracionMinutos = parseInt(document.getElementById(`duracion-${codigo}`).value, 10);
 
     if (!Number.isInteger(duracionMinutos) || duracionMinutos < 1) {
-        alert('Ingresa una duración válida en minutos.');
+        notificar('Ingresa una duración válida en minutos.', 'err');
         return;
     }
 
@@ -178,10 +178,11 @@ window.guardarVentana = async (codigo) => {
         duracionMinutos,
     });
     if (!result.success) {
-        alert(result.error || 'No se pudo guardar la ventana de disponibilidad.');
+        notificar(result.error || 'No se pudo guardar la ventana de disponibilidad.', 'err');
         return;
     }
     await cargarEvaluaciones(getCurrentUser(), true);
+    notificar('Ventana de evaluación guardada');
 };
 
 function formatearFechaHora(iso) {
@@ -300,16 +301,17 @@ window.guardarAsignacion = async (codigo) => {
         : [];
 
     if (modo === 'especificos' && usuarios.length === 0) {
-        alert('Selecciona al menos un asesor, o elige "Todos" o "Nadie".');
+        notificar('Selecciona al menos un asesor, o elige "Todos" o "Nadie".', 'err');
         return;
     }
 
     const result = await callAPI('guardarAsignacionesEvaluacion', { codigo, usuarios, asignadoANadie: modo === 'nadie' });
     if (!result.success) {
-        alert(result.error || 'No se pudo guardar la asignación.');
+        notificar(result.error || 'No se pudo guardar la asignación.', 'err');
         return;
     }
     await cargarEvaluaciones(getCurrentUser(), true);
+    notificar('Asignaciones guardadas');
 };
 
 window.cancelarAsignacion = (codigo) => {

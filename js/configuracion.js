@@ -1,6 +1,6 @@
 import { API_URL, esRolAdmision } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml } from '../core/utils.js';
-import { Sidebar, Toast } from '../core/components.js';
+import { Sidebar, notificar } from '../core/components.js';
 import { createMultiSelect } from '../core/components.js';
 
 const TIPOS_ARCHIVO = [
@@ -134,12 +134,13 @@ function renderGrid() {
 async function toggleActiva(codigo, activa) {
     const result = await callAPI('toggleCampanaActiva', { codigo, activa });
     if (!result.success) {
-        Toast?.show ? Toast.show(result.error || 'No se pudo actualizar', 'error') : alert(result.error);
+        notificar(result.error || 'No se pudo actualizar la campaña.', 'err');
         cargarCampanas();
         return;
     }
     const c = state.campanas.find((x) => x.codigo === codigo);
     if (c) c.activa = activa;
+    notificar(activa ? 'Campaña activada' : 'Campaña desactivada');
 }
 
 function abrirFormularioNuevaCampana() {
@@ -295,15 +296,15 @@ async function guardarCampana(esNueva) {
         .split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
 
     if (!codigo || !periodo || !perC) {
-        alert('Código, periodo y per. corto son obligatorios.');
+        notificar('Código, periodo y per. corto son obligatorios.', 'err');
         return;
     }
     if (fechaInicioPeriodo && fechaFinPeriodo && fechaInicioPeriodo > fechaFinPeriodo) {
-        alert('La fecha de inicio del periodo no puede ser posterior a la de fin.');
+        notificar('La fecha de inicio del periodo no puede ser posterior a la de fin.', 'err');
         return;
     }
     if (ventasSpreadsheetId && !ventasHoja) {
-        alert('Selecciona la pestaña de la hoja de ventas.');
+        notificar('Selecciona la pestaña de la hoja de ventas.', 'err');
         return;
     }
 
@@ -312,12 +313,13 @@ async function guardarCampana(esNueva) {
         activa: true, bccDefault, ventasSpreadsheetId, ventasHoja, vbLista,
     });
     if (!result.success) {
-        alert(result.error || 'No se pudo guardar la campaña.');
+        notificar(result.error || 'No se pudo guardar la campaña.', 'err');
         return;
     }
 
     state.seleccionada = codigo;
     await cargarCampanas();
+    notificar('Campaña guardada');
 }
 
 function subirArchivo(campana, tipo, file) {
@@ -327,10 +329,11 @@ function subirArchivo(campana, tipo, file) {
             campana, tipo, archivoBase64: reader.result,
         });
         if (!result.success) {
-            alert(result.error || 'No se pudo subir el archivo.');
+            notificar(result.error || 'No se pudo subir el archivo.', 'err');
             return;
         }
         await cargarCampanas();
+        notificar('Archivo subido');
     };
     reader.readAsDataURL(file);
 }
@@ -339,10 +342,11 @@ async function eliminarArchivo(campana, tipo) {
     if (!confirm('¿Eliminar este archivo? Dejará de adjuntarse en las Condiciones Comerciales hasta que subas uno nuevo.')) return;
     const result = await callAPI('eliminarArchivoCampana', { campana, tipo });
     if (!result.success) {
-        alert(result.error || 'No se pudo eliminar el archivo.');
+        notificar(result.error || 'No se pudo eliminar el archivo.', 'err');
         return;
     }
     await cargarCampanas();
+    notificar('Archivo eliminado');
 }
 
 async function cargarSupervisores() {
@@ -375,12 +379,12 @@ window.addEventListener('multiselect-change', async (e) => {
         const usuario = e.detail.containerId.replace('supCampanas-', '');
         const result = await callAPI('actualizarCampanasAsesor', { usuario, campanas: e.detail.values });
         if (!result.success) {
-            Toast?.show ? Toast.show(result.error || 'No se pudo actualizar', 'error') : alert(result.error);
+            notificar(result.error || 'No se pudieron actualizar las campañas.', 'err');
             return;
         }
         const u = state.supervisores.find((s) => s.usuario === usuario);
         if (u) u.campanas = e.detail.values;
-        Toast?.show?.('Campañas actualizadas', 'ok');
+        notificar('Campañas actualizadas');
         return;
     }
     if (e.detail.containerId === 'cfgNuevoUsuarioCampanas') {
@@ -406,16 +410,16 @@ async function crearUsuarioSubmit() {
     const campanas = state.nuevoUsuarioCampanas || [];
 
     if (!usuario || !nombre || !password) {
-        alert('Usuario, nombre y contraseña son obligatorios.');
+        notificar('Usuario, nombre y contraseña son obligatorios.', 'err');
         return;
     }
 
     const result = await callAPI('crearUsuario', { usuario, nombre, nombreCorto, password, rol, cargo, dni, email, campanas });
     if (!result.success) {
-        alert(result.error || 'No se pudo crear el usuario.');
+        notificar(result.error || 'No se pudo crear el usuario.', 'err');
         return;
     }
-    Toast?.show?.('Usuario creado', 'ok');
+    notificar('Usuario creado');
     ['cfgNuevoUsuario','cfgNuevoNombre','cfgNuevoNombreCorto','cfgNuevoPassword','cfgNuevoCargo','cfgNuevoDni','cfgNuevoEmail']
         .forEach((id) => document.getElementById(id).value = '');
     document.getElementById('cfgNuevoRol').value = 'ASESOR';
