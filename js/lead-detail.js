@@ -1059,7 +1059,7 @@ function renderSolicitudCCBox(hayBoletaGuardada) {
                     : ''}
                 <div style="margin-top:8px; display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:nowrap; white-space:nowrap;">
                     ${!puedeRegistrarVenta() ? '' : sol.VENTA_REGISTRADA_EN
-                        ? `<button class="btn-guardar" style="padding:6px 16px; font-size:12px; background:#2e7d32;" id="btnEditarVenta"><span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px;">edit</span> Editar venta</button>`
+                        ? !puedeEditarVenta(sol) ? '' : `<button class="btn-guardar" style="padding:6px 16px; font-size:12px; background:#2e7d32;" id="btnEditarVenta"><span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px;">edit</span> Editar venta</button>`
                         : `<button class="btn-guardar" style="padding:6px 16px; font-size:12px; background:#2e7d32;" id="btnRegistrarVenta"><span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px;">point_of_sale</span> Registrar venta</button>`}
                     <button class="btn-guardar" style="padding:6px 16px; font-size:12px;" id="btnSolicitarCCOtraVez">Solicitar nuevo envío</button>
                 </div>
@@ -1382,10 +1382,18 @@ function formatearFilaVenta(fila) {
     });
     return resultado;
 }
-const ROLES_REGISTRAR_VENTA = [ROLES.SISTEMAS];
+const ROLES_REGISTRAR_VENTA = [ROLES.ASESOR, ROLES.SUPERVISOR, ROLES.ADMISION, ROLES.SISTEMAS];
 
 function puedeRegistrarVenta() {
     return ROLES_REGISTRAR_VENTA.includes(getCurrentUser()?.rol);
+}
+
+function puedeEditarVenta(sol) {
+    const user = getCurrentUser() || {};
+    if (esRolSupervisorOAdmision(user.rol)) return true;
+    const email = String(user.email || '').trim().toLowerCase();
+    return !!email && [sol?.VENTA_REGISTRADA_POR, sol?.ASESOR_EMAIL]
+        .some(v => String(v || '').trim().toLowerCase() === email);
 }
 const STATUS_PAGO_VENTA = [STATUS.PAGO_COMPLETO, STATUS.PAGO_FRACCIONADO];
 const DOCS_VENTA = [
@@ -1708,6 +1716,7 @@ async function precargarVentaExistente() {
 
 async function abrirModalVenta(editar = false) {
     if (!puedeRegistrarVenta() || !state.solicitudCC || state.solicitudCC.STATUS !== 'ENVIADO') return;
+    if (editar && !puedeEditarVenta(state.solicitudCC)) return;
     asegurarModalVenta();
     ventaModoEdicion = !!editar;
     document.getElementById('ventaTitulo').textContent = ventaModoEdicion ? 'Editar venta' : 'Registrar venta';
