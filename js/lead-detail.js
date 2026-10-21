@@ -5,6 +5,7 @@ import { getCurrentUser, getSessionToken, cacheGet, cacheSet, cacheRemove, escap
 import { Sidebar, notificar } from '../core/components.js';
 import { construirDatosCC } from './cc-template.js';
 import { buscarDuplicados } from './duplicados-sugeridos.js';
+import { prepararArchivosParaEnvio } from './pdf-cliente.js';
 
 const state = {
     lead: null,
@@ -1237,23 +1238,8 @@ function renderCorreosCCLista() {
     `).join('');
 }
 
-function leerArchivoBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
-        reader.readAsDataURL(file);
-    });
-}
-
 async function armarArchivosCC(campo) {
-    const files = ccArchivos[campo];
-    if (!files || files.length === 0) return [];
-    return Promise.all(files.map(async (file) => ({
-        nombre: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        base64: await leerArchivoBase64(file)
-    })));
+    return prepararArchivosParaEnvio(ccArchivos[campo], campo);
 }
 
 async function enviarSolicitudCC() {
@@ -1769,11 +1755,7 @@ async function abrirModalVenta(editar = false) {
 }
 
 async function armarArchivosVenta(campo) {
-    return Promise.all(ventaArchivos[campo].map(async (file) => ({
-        nombre: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        base64: await leerArchivoBase64(file)
-    })));
+    return prepararArchivosParaEnvio(ventaArchivos[campo], campo);
 }
 
 async function registrarVenta() {
@@ -1829,16 +1811,19 @@ async function registrarVenta() {
 
     btn.disabled = true;
     msgEl.style.color = '#666';
-    msgEl.textContent = ventaModoEdicion ? 'Guardando cambios...' : 'Registrando venta...';
+    msgEl.textContent = 'Preparando documentos...';
 
     try {
         const [comprobante, dni, conformidad, nee] = await Promise.all(['comprobante', 'dni', 'conformidad', 'nee'].map(armarArchivosVenta));
+        msgEl.textContent = ventaModoEdicion ? 'Guardando cambios...' : 'Registrando venta...';
         const payload = {
             idSolicitud: state.solicitudCC.ID_SOLICITUD,
             idPrometeo: d.D,
             campana: state.campana,
             editar: ventaModoEdicion,
             nombreCompleto: `${nombresAlumno} ${apellidosAlumno}`,
+            nombreLead: obtenerCampo(state.lead, COLUMNAS.NOMBRES) || '',
+            dni: String(obtenerCampo(state.lead, COLUMNAS.DNI) || '').trim(),
             fila: filaVenta,
             archivos: { comprobante, dni, conformidad, nee }
         };

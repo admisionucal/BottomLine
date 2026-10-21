@@ -1004,6 +1004,7 @@ async function enviarCC() {
             correosDestinoOverride: state.overrides.correosDestino ?? null,
             correosCopiaOverride: state.overrides.correosCopia ?? null,
             nombreCompletoOverride: datosCC.nombreCompleto,
+            nombreLead: state.leadActual[COLUMNAS.NOMBRES] || '',
             tipoDocumentoOverride: tipoDocumentoSolicitudActual()
         });
 
