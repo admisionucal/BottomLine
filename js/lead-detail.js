@@ -1328,38 +1328,48 @@ const VB_VENTA_DEFECTO = ['RAUL', 'MARIO', 'ROSMERY'];
 let ventaModoEdicion = false;
 let ventaDuplicadosCRM = [];
 let ventaVbLista = null;
-const MEDIOS_PAGO_VENTA = ['Pago Link', 'POS', 'Cargo'];
+const MEDIOS_PAGO_VENTA = ['Pago Link', 'POS', 'CARGO'];
 const CONECTORES_TITULO = new Set(['y', 'o', 'e', 'u', 'a', 'al', 'de', 'del', 'la', 'las', 'el', 'los', 'en', 'con', 'para', 'por', 'sin']);
 const SIGLAS_TITULO = new Set(['CPA', 'ETU', 'NEE', 'POS', 'UCAL']);
 const COLUMNAS_SIN_FORMATO_VENTA = new Set(['C', 'D', 'V', 'Z']);
-const COLUMNAS_MAYUSCULA_VENTA = new Set(['F', 'G', 'Q', 'R', 'S', 'X']);
+const COLUMNAS_MAYUSCULA_VENTA = new Set(['F', 'G', 'Q', 'R', 'S', 'U', 'X']);
+const COLUMNAS_CON_TILDE_VENTA = new Set(['F', 'G', 'K', 'N']);
 
 function sinTildes(texto) {
     return String(texto).replace(/[áàäâ]/g, 'a').replace(/[éèëê]/g, 'e').replace(/[íìïî]/g, 'i').replace(/[óòöô]/g, 'o').replace(/[úùüû]/g, 'u')
         .replace(/[ÁÀÄÂ]/g, 'A').replace(/[ÉÈËÊ]/g, 'E').replace(/[ÍÌÏÎ]/g, 'I').replace(/[ÓÒÖÔ]/g, 'O').replace(/[ÚÙÜÛ]/g, 'U');
 }
 
-function formatoTitulo(valor) {
+function formatoTitulo(valor, conservarTildes = false) {
     if (typeof valor !== 'string') return valor;
-    const palabras = sinTildes(valor).trim().replace(/\s+/g, ' ').toLowerCase().split(' ').filter(Boolean);
+    const base = conservarTildes ? valor : sinTildes(valor);
+    const palabras = base.trim().replace(/\s+/g, ' ').toLowerCase().split(' ').filter(Boolean);
     return palabras.map((palabra, i) => {
         if (SIGLAS_TITULO.has(palabra.toUpperCase().replace(/[^A-Z]/g, ''))) return palabra.toUpperCase();
         if (i > 0 && CONECTORES_TITULO.has(palabra)) return palabra;
-        return palabra.replace(/(^|[-(\/])([a-zñ])/g, (_, previo, letra) => previo + letra.toUpperCase());
+        return palabra.replace(/(^|[-(\/])([a-záéíóúüñ])/g, (_, previo, letra) => previo + letra.toUpperCase());
     }).join(' ');
 }
 
-function formatoMayuscula(valor) {
+function formatoMayuscula(valor, conservarTildes = false) {
     if (typeof valor !== 'string') return valor;
-    return sinTildes(valor).trim().replace(/\s+/g, ' ').toUpperCase();
+    const base = conservarTildes ? valor : sinTildes(valor);
+    return base.trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
+function formatoMedioPago(valor) {
+    const normalizado = formatoMayuscula(String(valor || ''));
+    return (normalizado === 'PAGO LINK' || normalizado === 'LINK DE PAGO') ? 'Pago Link' : normalizado;
 }
 
 function formatearFilaVenta(fila) {
     const resultado = {};
     Object.entries(fila).forEach(([columna, valor]) => {
+        const conTildes = COLUMNAS_CON_TILDE_VENTA.has(columna);
         resultado[columna] = COLUMNAS_SIN_FORMATO_VENTA.has(columna) ? valor
-            : COLUMNAS_MAYUSCULA_VENTA.has(columna) ? formatoMayuscula(valor)
-            : formatoTitulo(valor);
+            : columna === 'W' ? formatoMedioPago(valor)
+            : COLUMNAS_MAYUSCULA_VENTA.has(columna) ? formatoMayuscula(valor, conTildes)
+            : formatoTitulo(valor, conTildes);
     });
     return resultado;
 }
@@ -1445,7 +1455,7 @@ function datosDerivadosVenta(lead) {
         R: reca && beca ? 'RECA-BECA' : reca ? 'RECA' : beca ? 'BECA' : 'ESCALA REGULAR',
         S: beca ? beneficio : reca ? 'RECATEGORIZACIÓN' : 'NINGUNO',
         T: adicional.trim() || 'Ninguno',
-        W: metodoPago === 'LINK DE PAGO' ? 'Pago Link' : metodoPago,
+        W: formatoMedioPago(metodoPago),
         AE: admision,
         AF: matricula,
         AG: boleta,
@@ -1536,7 +1546,7 @@ function asegurarModalVenta() {
     document.getElementById('ventaModalClose').addEventListener('click', cerrar);
     document.getElementById('ventaCancelarBtn').addEventListener('click', cerrar);
     document.getElementById('ventaStatus').addEventListener('change', actualizarCamposFraccionadoVenta);
-    [['ventaNombres', formatoMayuscula], ['ventaApellidos', formatoMayuscula], ['ventaComentario', formatoTitulo]].forEach(([id, formato]) => {
+    [['ventaNombres', v => formatoMayuscula(v, true)], ['ventaApellidos', v => formatoMayuscula(v, true)], ['ventaComentario', v => formatoTitulo(v)]].forEach(([id, formato]) => {
         const campo = document.getElementById(id);
         campo.addEventListener('blur', () => { campo.value = formato(campo.value); });
     });
@@ -1636,7 +1646,7 @@ async function cargarVbVenta() {
     const select = document.getElementById('ventaVB');
     const actual = select.value;
     select.innerHTML = '<option value="">-- Seleccionar --</option>' +
-        ventaVbLista.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(formatoTitulo(v))}</option>`).join('');
+        ventaVbLista.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(formatoMayuscula(v))}</option>`).join('');
     select.value = ventaVbLista.includes(actual) ? actual : '';
 }
 
@@ -1680,9 +1690,9 @@ async function precargarVentaExistente() {
     }
     const f = result.fila || {};
     msgEl.textContent = '';
-    if (f.F) document.getElementById('ventaNombres').value = formatoMayuscula(f.F);
-    if (f.G) document.getElementById('ventaApellidos').value = formatoMayuscula(f.G);
-    if (f.W) valorOpcion(document.getElementById('ventaMedioPago'), f.W, formatoTitulo);
+    if (f.F) document.getElementById('ventaNombres').value = formatoMayuscula(f.F, true);
+    if (f.G) document.getElementById('ventaApellidos').value = formatoMayuscula(f.G, true);
+    if (f.W) valorOpcion(document.getElementById('ventaMedioPago'), f.W, formatoMedioPago);
     if (f.X) valorOpcion(document.getElementById('ventaStatus'), f.X, formatoMayuscula);
     if (f.V) document.getElementById('ventaFechaPago').value = f.V;
     document.getElementById('ventaFechaCompromiso').value = f.Z || '';
