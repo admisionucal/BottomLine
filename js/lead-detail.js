@@ -5,7 +5,7 @@ import { getCurrentUser, getSessionToken, cacheGet, cacheSet, cacheRemove, escap
 import { Sidebar, notificar } from '../core/components.js';
 import { construirDatosCC } from './cc-template.js';
 import { buscarDuplicados } from './duplicados-sugeridos.js';
-import { prepararArchivosParaEnvio } from './pdf-cliente.js';
+import { prepararArchivosParaEnvio, archivosDelPortapapelesEvento, archivosDelPortapapelesBoton, esArchivoAceptado } from './pdf-cliente.js';
 
 const state = {
     lead: null,
@@ -93,9 +93,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     document.getElementById('ccSolicitarBtn').addEventListener('click', enviarSolicitudCC);
     document.getElementById('ccTipoDocumento').addEventListener('change', actualizarEtiquetasDocumentoCC);
-    inicializarInputArchivoCC('dni', true);
-    inicializarInputArchivoCC('certificado', false);
-    inicializarInputArchivoCC('boletaProcedencia', false);
+    inicializarInputArchivoCC('dni');
+    inicializarInputArchivoCC('certificado');
+    inicializarInputArchivoCC('boletaProcedencia');
     document.getElementById('ccAgregarCorreoBtn').addEventListener('click', () => {
         const input = document.getElementById('ccNuevoCorreoInput');
         const correo = input.value.trim();
@@ -1111,7 +1111,17 @@ async function normalizarOrientacionImagen(file) {
     }
 }
 
-function inicializarInputArchivoCC(campo, multiple) {
+const CAMPOS_MULTIPLES_CC = new Set(['dni']);
+
+async function agregarArchivosCC(campo, archivos) {
+    const validos = archivos.filter(esArchivoAceptado);
+    if (validos.length === 0) { notificar('Solo imágenes o PDF', 'err'); return; }
+    const normalizados = await Promise.all(validos.map(normalizarOrientacionImagen));
+    ccArchivos[campo] = CAMPOS_MULTIPLES_CC.has(campo) ? ccArchivos[campo].concat(normalizados) : normalizados.slice(0, 1);
+    renderListaArchivosCC(campo);
+}
+
+function inicializarInputArchivoCC(campo) {
     const idBase = idBaseArchivoCC(campo);
     const input = document.getElementById(idBase);
     const btn = document.getElementById(idBase + 'Btn');
@@ -1119,11 +1129,60 @@ function inicializarInputArchivoCC(campo, multiple) {
     input?.addEventListener('change', async () => {
         const seleccionados = Array.from(input.files || []);
         input.value = '';
-        const normalizados = await Promise.all(seleccionados.map(normalizarOrientacionImagen));
-        ccArchivos[campo] = multiple ? ccArchivos[campo].concat(normalizados) : normalizados.slice(0, 1);
-        renderListaArchivosCC(campo);
+        await agregarArchivosCC(campo, seleccionados);
     });
 }
+
+let zonaPegadoActiva = null;
+
+function activarZonaPegado(zona) {
+    document.querySelectorAll('.zona-pegado.zona-activa').forEach(z => z.classList.remove('zona-activa'));
+    zonaPegadoActiva = zona;
+    if (zona) zona.classList.add('zona-activa');
+}
+
+async function pegarEnZona(zona, archivos) {
+    if (!zona || archivos.length === 0) return;
+    if (zona.dataset.zonaCc) await agregarArchivosCC(zona.dataset.zonaCc, archivos);
+    else if (zona.dataset.zonaVenta) await agregarArchivosVenta(zona.dataset.zonaVenta, archivos);
+    notificar('Archivo pegado', 'info');
+}
+
+function modalVisible(id) {
+    return !!document.getElementById(id)?.classList.contains('show');
+}
+
+document.addEventListener('focusin', (e) => {
+    const zona = e.target.closest?.('.zona-pegado');
+    if (zona) activarZonaPegado(zona);
+});
+document.addEventListener('mousedown', (e) => {
+    const zona = e.target.closest?.('.zona-pegado');
+    if (zona) activarZonaPegado(zona);
+});
+document.addEventListener('paste', async (e) => {
+    const modalAbierto = modalVisible('solicitudCCModal') ? 'solicitudCCModal' : modalVisible('ventaModal') ? 'ventaModal' : null;
+    if (!modalAbierto) return;
+    const archivos = archivosDelPortapapelesEvento(e);
+    if (archivos.length === 0) return;
+    e.preventDefault();
+    const modal = document.getElementById(modalAbierto);
+    let zona = e.target.closest?.('.zona-pegado');
+    if (!zona && zonaPegadoActiva && modal.contains(zonaPegadoActiva) && zonaPegadoActiva.offsetParent !== null) zona = zonaPegadoActiva;
+    if (!zona) { notificar('Selecciona un documento para pegar', 'info'); return; }
+    await pegarEnZona(zona, archivos);
+});
+document.addEventListener('click', async (e) => {
+    const boton = e.target.closest('[data-pegar-cc], [data-pegar-venta]');
+    if (!boton) return;
+    const zona = boton.closest('.zona-pegado');
+    activarZonaPegado(zona);
+    try {
+        await pegarEnZona(zona, await archivosDelPortapapelesBoton());
+    } catch (err) {
+        notificar(err?.name === 'NotAllowedError' ? 'Usa Ctrl+V para pegar' : (err?.message || 'No se pudo pegar el archivo'), 'err');
+    }
+});
 
 function renderListaArchivosCC(campo) {
     const cont = document.getElementById(idBaseArchivoCC(campo) + 'Lista');
@@ -1555,7 +1614,13 @@ function asegurarModalVenta() {
         const subir = e.target.closest('[data-venta-subir]');
         if (subir) { document.getElementById('ventaInput_' + subir.dataset.ventaSubir).click(); return; }
         const quitar = e.target.closest('[data-venta-quitar]');
-        if (quitar) { ventaArchivos[quitar.dataset.ventaQuitar] = []; renderDocVenta(quitar.dataset.ventaQuitar); }
+        if (quitar) { ventaArchivos[quitar.dataset.ventaQuitar] = []; renderDocVenta(quitar.dataset.ventaQuitar); return; }
+        const quitarUno = e.target.closest('[data-venta-quitar-uno]');
+        if (quitarUno) {
+            const [campo, indice] = quitarUno.dataset.ventaQuitarUno.split(':');
+            ventaArchivos[campo].splice(Number(indice), 1);
+            renderDocVenta(campo);
+        }
     });
     document.getElementById('ventaDocs').addEventListener('change', async (e) => {
         const input = e.target.closest('[data-venta-input]');
@@ -1564,10 +1629,19 @@ function asegurarModalVenta() {
         const seleccionados = Array.from(input.files || []);
         input.value = '';
         if (seleccionados.length === 0) return;
-        ventaArchivos[campo] = await Promise.all(seleccionados.map(normalizarOrientacionImagen));
-        renderDocVenta(campo);
-        document.getElementById('ventaMsg').textContent = '';
+        await agregarArchivosVenta(campo, seleccionados);
     });
+}
+
+const CAMPOS_MULTIPLES_VENTA = new Set(['dni']);
+
+async function agregarArchivosVenta(campo, archivos) {
+    const validos = archivos.filter(esArchivoAceptado);
+    if (validos.length === 0) { notificar('Solo imágenes o PDF', 'err'); return; }
+    const normalizados = await Promise.all(validos.map(normalizarOrientacionImagen));
+    ventaArchivos[campo] = CAMPOS_MULTIPLES_VENTA.has(campo) ? ventaArchivos[campo].concat(normalizados) : normalizados;
+    renderDocVenta(campo);
+    document.getElementById('ventaMsg').textContent = '';
 }
 
 function actualizarCamposFraccionadoVenta() {
@@ -1599,9 +1673,13 @@ function renderDocVenta(campo) {
         const pdf = nuevos.length === 1 && nuevos[0].type === 'application/pdf';
         preview = pdf
             ? `<iframe src="${URL.createObjectURL(nuevos[0])}" class="venta-doc-frame"></iframe>`
-            : `<div class="venta-doc-thumbs">${nuevos.map(f => (f.type || '').startsWith('image/')
-                ? `<img src="${URL.createObjectURL(f)}" alt="">`
-                : `<span class="material-symbols-outlined" style="font-size:40px; color:#c62828;">description</span>`).join('')}</div>`;
+            : `<div class="venta-doc-thumbs">${nuevos.map((f, i) => `
+                <div class="thumb-item">
+                    ${(f.type || '').startsWith('image/')
+                        ? `<img src="${URL.createObjectURL(f)}" alt="">`
+                        : `<div class="thumb-pdf"><span class="material-symbols-outlined" style="font-size:40px; color:#c62828;">picture_as_pdf</span>${escapeHtml(f.name || 'PDF')}</div>`}
+                    <button type="button" class="thumb-quitar" data-venta-quitar-uno="${campo}:${i}" title="Quitar">×</button>
+                </div>`).join('')}</div>`;
         estado = `<span class="venta-doc-estado nuevo">${existente ? 'Reemplazo' : 'Nuevo'} · ${nuevos.length} archivo(s)</span>`;
     } else if (existente) {
         preview = `<iframe src="https://drive.google.com/file/d/${encodeURIComponent(existente)}/preview" class="venta-doc-frame" allow="autoplay"></iframe>`;
@@ -1619,7 +1697,8 @@ function renderDocVenta(campo) {
         ${preview}
         <div class="venta-doc-acciones">
             <input type="file" id="ventaInput_${campo}" data-venta-input="${campo}" accept=".pdf,.png,.jpg,.jpeg" multiple style="display:none;">
-            <button type="button" class="btn-guardar" data-venta-subir="${campo}" style="padding:5px 12px; font-size:12px;">${existente || nuevos.length ? 'Reemplazar' : 'Subir'}</button>
+            <button type="button" class="btn-guardar" data-venta-subir="${campo}" style="padding:5px 12px; font-size:12px;">${CAMPOS_MULTIPLES_VENTA.has(campo) && nuevos.length ? 'Agregar' : existente || nuevos.length ? 'Reemplazar' : 'Subir'}</button>
+            <button type="button" class="btn-guardar" data-pegar-venta="${campo}" style="padding:5px 12px; font-size:12px; background:#5c6bc0;"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:-2px;">content_paste</span> Pegar</button>
             ${nuevos.length ? `<button type="button" class="btn-guardar" data-venta-quitar="${campo}" style="padding:5px 12px; font-size:12px; background:#777;">${existente ? 'Mantener actual' : 'Quitar'}</button>` : ''}
         </div>
     `;
@@ -1743,7 +1822,7 @@ async function abrirModalVenta(editar = false) {
     actualizarCamposFraccionadoVenta();
 
     ventaArchivos = { comprobante: [], dni: [], conformidad: [], nee: [] };
-    document.getElementById('ventaDocs').innerHTML = DOCS_VENTA.map(doc => `<div class="venta-doc" id="ventaDoc_${doc.campo}"></div>`).join('');
+    document.getElementById('ventaDocs').innerHTML = DOCS_VENTA.map(doc => `<div class="venta-doc zona-pegado" id="ventaDoc_${doc.campo}" data-zona-venta="${doc.campo}" tabindex="0"></div>`).join('');
     DOCS_VENTA.forEach(doc => renderDocVenta(doc.campo));
 
     document.getElementById('ventaModal').classList.add('show');

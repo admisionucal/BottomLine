@@ -1,28 +1,53 @@
-const URL_JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+const URLS_PDF_LIB = [
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js',
+    'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js'
+];
 const LADO_MAXIMO = 1600;
 const CALIDAD_JPEG = 0.8;
 const A4 = { ancho: 595.28, alto: 841.89 };
 const MARGEN = 24;
 const SEPARACION = 10;
+const IMAGENES_POR_PAGINA = 2;
 
-let cargaJsPdf = null;
+let cargaPdfLib = null;
 
-function cargarJsPdf() {
-    if (window.jspdf?.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
-    if (!cargaJsPdf) {
-        cargaJsPdf = new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = URL_JSPDF;
-            script.onload = () => window.jspdf?.jsPDF ? resolve(window.jspdf.jsPDF) : reject(new Error('jsPDF no disponible'));
-            script.onerror = () => { cargaJsPdf = null; reject(new Error('No se pudo cargar jsPDF')); };
-            document.head.appendChild(script);
-        });
+function cargarScript(url) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.onload = resolve;
+        script.onerror = () => { script.remove(); reject(new Error('No se pudo cargar ' + url)); };
+        document.head.appendChild(script);
+    });
+}
+
+function cargarPdfLib() {
+    if (window.PDFLib?.PDFDocument) return Promise.resolve(window.PDFLib);
+    if (!cargaPdfLib) {
+        cargaPdfLib = (async () => {
+            for (const url of URLS_PDF_LIB) {
+                try {
+                    await cargarScript(url);
+                    if (window.PDFLib?.PDFDocument) return window.PDFLib;
+                } catch (e) { }
+            }
+            cargaPdfLib = null;
+            throw new Error('No se pudo cargar la librería de PDF');
+        })();
     }
-    return cargaJsPdf;
+    return cargaPdfLib;
+}
+
+export function esArchivoAceptado(file) {
+    return !!file && (esImagen(file) || esPdf(file));
 }
 
 function esImagen(file) {
     return !!file.type && file.type.startsWith('image/');
+}
+
+function esPdf(file) {
+    return file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
 }
 
 async function abrirImagen(file) {
@@ -54,55 +79,114 @@ async function comprimirImagen(file) {
     ctx.fillRect(0, 0, ancho, alto);
     ctx.drawImage(origen, 0, 0, ancho, alto);
     if (origen.close) origen.close();
-    return { dataUrl: canvas.toDataURL('image/jpeg', CALIDAD_JPEG), ancho, alto };
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', CALIDAD_JPEG));
+    return { bytes: new Uint8Array(await blob.arrayBuffer()), ancho, alto };
 }
 
-function leerBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result).split(',')[1]);
-        reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
-        reader.readAsDataURL(blob);
-    });
+function bytesABase64(bytes) {
+    let binario = '';
+    const bloque = 0x8000;
+    for (let i = 0; i < bytes.length; i += bloque) {
+        binario += String.fromCharCode.apply(null, bytes.subarray(i, i + bloque));
+    }
+    return btoa(binario);
 }
 
-async function imagenesAPdf(imagenes) {
-    const JsPDF = await cargarJsPdf();
-    const doc = new JsPDF({ unit: 'pt', format: 'a4', compress: true });
+function agregarPaginaImagenes(pdf, imagenesEmbebidas) {
+    const pagina = pdf.addPage([A4.ancho, A4.alto]);
     const anchoUtil = A4.ancho - MARGEN * 2;
     const altoUtil = A4.alto - MARGEN * 2;
-    const altoSlot = (altoUtil - SEPARACION * (imagenes.length - 1)) / imagenes.length;
-    imagenes.forEach((img, i) => {
-        const escala = Math.min(anchoUtil / img.ancho, altoSlot / img.alto);
-        const w = img.ancho * escala;
-        const h = img.alto * escala;
+    const n = imagenesEmbebidas.length;
+    const altoSlot = (altoUtil - SEPARACION * (n - 1)) / n;
+    imagenesEmbebidas.forEach((img, i) => {
+        const escala = Math.min(anchoUtil / img.width, altoSlot / img.height);
+        const w = img.width * escala;
+        const h = img.height * escala;
         const x = MARGEN + (anchoUtil - w) / 2;
-        const y = MARGEN + i * (altoSlot + SEPARACION) + (altoSlot - h) / 2;
-        doc.addImage(img.dataUrl, 'JPEG', x, y, w, h, undefined, 'FAST');
+        const yDesdeArriba = MARGEN + i * (altoSlot + SEPARACION) + (altoSlot - h) / 2;
+        pagina.drawImage(img, { x, y: A4.alto - yDesdeArriba - h, width: w, height: h });
     });
-    return doc.output('datauristring').split(',')[1];
+}
+
+async function unirEnPdf(lista) {
+    const { PDFDocument } = await cargarPdfLib();
+    const pdf = await PDFDocument.create();
+    let pendientes = [];
+    const vaciarPendientes = () => {
+        for (let i = 0; i < pendientes.length; i += IMAGENES_POR_PAGINA) {
+            agregarPaginaImagenes(pdf, pendientes.slice(i, i + IMAGENES_POR_PAGINA));
+        }
+        pendientes = [];
+    };
+    for (const file of lista) {
+        if (esPdf(file)) {
+            vaciarPendientes();
+            const origen = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+            const paginas = await pdf.copyPages(origen, origen.getPageIndices());
+            paginas.forEach((p) => pdf.addPage(p));
+        } else {
+            const comprimida = await comprimirImagen(file);
+            pendientes.push(await pdf.embedJpg(comprimida.bytes));
+        }
+    }
+    vaciarPendientes();
+    return bytesABase64(await pdf.save());
 }
 
 export async function prepararArchivosParaEnvio(files, nombreBase = 'documento') {
-    const lista = (files || []).filter(Boolean);
+    const lista = (files || []).filter(esArchivoAceptado);
     if (lista.length === 0) return [];
 
-    const todasImagenes = lista.every(esImagen);
-    if (!todasImagenes) {
-        const primero = lista[0];
-        if (esImagen(primero)) return prepararArchivosParaEnvio([primero], nombreBase);
-        return [{ nombre: primero.name, mimeType: primero.type || 'application/pdf', base64: await leerBase64(primero) }];
+    if (lista.length === 1 && esPdf(lista[0])) {
+        return [{ nombre: lista[0].name || `${nombreBase}.pdf`, mimeType: 'application/pdf', base64: bytesABase64(new Uint8Array(await lista[0].arrayBuffer())) }];
     }
 
-    const imagenes = await Promise.all(lista.map(comprimirImagen));
     try {
-        const base64 = await imagenesAPdf(imagenes);
-        return [{ nombre: `${nombreBase}.pdf`, mimeType: 'application/pdf', base64 }];
+        return [{ nombre: `${nombreBase}.pdf`, mimeType: 'application/pdf', base64: await unirEnPdf(lista) }];
     } catch (e) {
-        return imagenes.map((img, i) => ({
+        const imagenes = lista.filter(esImagen);
+        if (imagenes.length === 0) throw e;
+        const comprimidas = await Promise.all(imagenes.map(comprimirImagen));
+        return comprimidas.map((img, i) => ({
             nombre: `${nombreBase}-${i + 1}.jpg`,
             mimeType: 'image/jpeg',
-            base64: img.dataUrl.split(',')[1]
+            base64: bytesABase64(img.bytes)
         }));
     }
+}
+
+const TIPOS_PEGABLES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif', 'application/pdf'];
+
+function nombrarArchivoPegado(blob, indice) {
+    const extension = blob.type === 'application/pdf' ? 'pdf' : (blob.type.split('/')[1] || 'png');
+    const sello = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+    return new File([blob], `pegado-${sello}-${indice + 1}.${extension}`, { type: blob.type });
+}
+
+export function archivosDelPortapapelesEvento(evento) {
+    const datos = evento.clipboardData;
+    if (!datos) return [];
+    const archivos = [];
+    Array.from(datos.items || []).forEach((item) => {
+        if (item.kind !== 'file') return;
+        const file = item.getAsFile();
+        if (file && TIPOS_PEGABLES.includes(file.type)) archivos.push(file);
+    });
+    if (archivos.length === 0) {
+        Array.from(datos.files || []).forEach((file) => { if (TIPOS_PEGABLES.includes(file.type)) archivos.push(file); });
+    }
+    return archivos.map((f, i) => (f.name && f.name !== 'image.png') ? f : nombrarArchivoPegado(f, i));
+}
+
+export async function archivosDelPortapapelesBoton() {
+    if (!navigator.clipboard?.read) throw new Error('Usa Ctrl+V para pegar');
+    const items = await navigator.clipboard.read();
+    const archivos = [];
+    for (const item of items) {
+        const tipo = item.types.find((t) => TIPOS_PEGABLES.includes(t));
+        if (!tipo) continue;
+        archivos.push(nombrarArchivoPegado(await item.getType(tipo), archivos.length));
+    }
+    if (archivos.length === 0) throw new Error('No hay imagen ni PDF copiado');
+    return archivos;
 }
