@@ -1,6 +1,7 @@
 import type { Client } from 'pg';
 import { jsonOk, jsonError, type JsonBody } from '../types';
 import { exigirSesion } from '../lib/session';
+import { STATUS_EFECTIVO } from '../lib/statusVenta';
 
 function filaASolicitudCCObj(r: any) {
   return {
@@ -63,9 +64,11 @@ export async function getSolicitudesCC(client: Client, body: JsonBody) {
             l.programa as carrera_lead,
             l.modalidad as modalidad_lead,
             l.modalidad_ingreso as modalidad_ingreso_lead,
-            l.telefono2 as celular_lead
+            l.telefono2 as celular_lead,
+            coalesce(${STATUS_EFECTIVO} in ('PAGO COMPLETO', 'PAGO FRACCIONADO'), false) as pagante
        from solicitudes_cc s
        left join leads l on l.id_prometeo = s.id_prometeo and l.campana = s.campana
+       left join leads_pagos p on p.id_prometeo = s.id_prometeo and p.campana = s.campana
       where ${condiciones.join(' and ')}
       order by s.fecha_solicitud desc`,
     params
@@ -78,6 +81,7 @@ export async function getSolicitudesCC(client: Client, body: JsonBody) {
     MODALIDAD_LEAD: r.modalidad_lead || '',
     MODALIDAD_INGRESO_LEAD: r.modalidad_ingreso_lead || '',
     CELULAR_LEAD: r.celular_lead || '',
+    PAGANTE: r.pagante === true,
   }));
 
   return jsonOk({ data });

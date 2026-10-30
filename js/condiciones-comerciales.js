@@ -267,7 +267,7 @@ function renderTablaCC() {
         RECHAZADO: { clase: 'status-perdido', label: 'Rechazado' }
     };
 
-    const headers = ['ID PROMETEO', 'NOMBRE', 'CARRERA', 'ASESOR', 'CAMPAÑA', 'FECHA SOLICITUD', 'ESTADO'];
+    const headers = ['ID PROMETEO', 'NOMBRE', 'CARRERA', 'ASESOR', 'CAMPAÑA', 'FECHA SOLICITUD', 'ESTADO', 'PAGANTE'];
     const rows = pageItems.map(sol => {
         const estado = ESTADO_INFO[sol.STATUS] || ESTADO_INFO.PENDIENTE;
         return [
@@ -280,7 +280,10 @@ function renderTablaCC() {
             escapeHtml(sol.ASESOR_NOMBRE || sol.ASESOR_EMAIL || '-'),
             escapeHtml(sol.CAMPANA || ''),
             escapeHtml(formatearFecha(sol.FECHA_SOLICITUD)),
-            `<span class="status-badge ${estado.clase}">${estado.label}</span>`
+            `<span class="status-badge ${estado.clase}">${estado.label}</span>`,
+            sol.PAGANTE
+                ? '<span class="status-badge status-vp">Sí</span>'
+                : '<span class="status-badge status-sin">No</span>'
         ];
     });
 
@@ -336,7 +339,8 @@ function exportarSolicitudesCCExcel() {
         'CAMPAÑA': sol.CAMPANA || '',
         'FECHA SOLICITUD': formatearFecha(sol.FECHA_SOLICITUD),
         'ESTADO': sol.STATUS || '',
-        'MOTIVO RECHAZO': sol.MOTIVO_RECHAZO || ''
+        'MOTIVO RECHAZO': sol.MOTIVO_RECHAZO || '',
+        'PAGANTE': sol.PAGANTE ? 'SI' : 'NO'
     }));
     const ws = XLSX.utils.json_to_sheet(datos);
     const wb = XLSX.utils.book_new();
