@@ -209,31 +209,39 @@ function agruparSolicitudesPorLead(lista) {
     return Array.from(porLead.values());
 }
 
+const VALOR_FILTRO_CC = {
+    carrera: sol => sol.CARRERA_LEAD || '',
+    asesor: sol => sol.ASESOR_NOMBRE || sol.ASESOR_EMAIL || '',
+    estado: sol => sol.STATUS || '',
+    campana: sol => sol.CAMPANA || '',
+    pagante: sol => sol.PAGANTE ? 'SI' : 'NO'
+};
+
+function pasaFiltrosCC(sol, excluir = null) {
+    for (const [clave, valorDe] of Object.entries(VALOR_FILTRO_CC)) {
+        if (clave === excluir) continue;
+        const seleccion = state.filtros[clave] || [];
+        if (seleccion.length > 0 && !seleccion.includes(valorDe(sol))) return false;
+    }
+    const { fechaDesde, fechaHasta } = state.filtros;
+    if (excluir !== 'fecha' && (fechaDesde || fechaHasta)) {
+        const f = fechaSolicitudISO(sol.FECHA_SOLICITUD);
+        if (!f) return false;
+        if (fechaDesde && f < fechaDesde) return false;
+        if (fechaHasta && f > fechaHasta) return false;
+    }
+    if (state.terminoBusqueda) {
+        const id = String(sol.ID_PROMETEO || '').toLowerCase();
+        const nombre = String(sol.NOMBRE_LEAD || '').toLowerCase();
+        const celular = String(sol.CELULAR_LEAD || '').toLowerCase();
+        if (!id.includes(state.terminoBusqueda) && !nombre.includes(state.terminoBusqueda) && !celular.includes(state.terminoBusqueda)) return false;
+    }
+    return true;
+}
+
 function aplicarFiltrosCC(mantenerPagina = false) {
-    const { carrera, asesor, estado, campana, fechaDesde, fechaHasta } = state.filtros;
-    const pagante = state.filtros.pagante || [];
-
-    state.solicitudesFiltradas = agruparSolicitudesPorLead(state.solicitudes).filter(sol => {
-        if (carrera.length > 0 && !carrera.includes(sol.CARRERA_LEAD || '')) return false;
-        if (asesor.length > 0 && !asesor.includes(sol.ASESOR_NOMBRE || sol.ASESOR_EMAIL || '')) return false;
-        if (estado.length > 0 && !estado.includes(sol.STATUS || '')) return false;
-        if (campana.length > 0 && !campana.includes(sol.CAMPANA || '')) return false;
-        if (pagante.length > 0 && !pagante.includes(sol.PAGANTE ? 'SI' : 'NO')) return false;
-        if (fechaDesde || fechaHasta) {
-            const f = fechaSolicitudISO(sol.FECHA_SOLICITUD);
-            if (!f) return false;
-            if (fechaDesde && f < fechaDesde) return false;
-            if (fechaHasta && f > fechaHasta) return false;
-        }
-
-        if (state.terminoBusqueda) {
-            const id = String(sol.ID_PROMETEO || '').toLowerCase();
-            const nombre = String(sol.NOMBRE_LEAD || '').toLowerCase();
-            const celular = String(sol.CELULAR_LEAD || '').toLowerCase();
-            if (!id.includes(state.terminoBusqueda) && !nombre.includes(state.terminoBusqueda) && !celular.includes(state.terminoBusqueda)) return false;
-        }
-        return true;
-    });
+    state.solicitudesAgrupadas = agruparSolicitudesPorLead(state.solicitudes);
+    state.solicitudesFiltradas = state.solicitudesAgrupadas.filter(sol => pasaFiltrosCC(sol));
 
     state.solicitudesFiltradas.sort((a, b) => {
         const ordenA = ORDEN_ESTADO_CC[a.STATUS] ?? 3;
@@ -248,13 +256,18 @@ function aplicarFiltrosCC(mantenerPagina = false) {
     populateFiltrosCC();
 }
 
+function opcionesFiltroCC(clave) {
+    const base = state.solicitudesAgrupadas || agruparSolicitudesPorLead(state.solicitudes);
+    const valores = base.filter(sol => pasaFiltrosCC(sol, clave)).map(VALOR_FILTRO_CC[clave]).filter(v => v && String(v).trim() !== '');
+    return Array.from(new Set([...valores, ...(state.filtros[clave] || [])]));
+}
+
 function populateFiltrosCC() {
-    const getValues = (campo) => state.solicitudes.map(s => s[campo] || '').filter(v => v && String(v).trim() !== '');
-    createMultiSelect('filterCCCarrera', getValues('CARRERA_LEAD'), state.filtros.carrera, 'Todas');
-    createMultiSelect('filterCCAsesor', state.solicitudes.map(s => s.ASESOR_NOMBRE || s.ASESOR_EMAIL || ''), state.filtros.asesor, 'Todos');
-    createMultiSelect('filterCCEstado', getValues('STATUS'), state.filtros.estado, 'Todos');
-    createMultiSelect('filterCCCampana', getValues('CAMPANA'), state.filtros.campana, 'Todas');
-    createMultiSelect('filterCCPagante', ['SI', 'NO'], state.filtros.pagante || [], 'Todos', { SI: 'Sí', NO: 'No' });
+    createMultiSelect('filterCCCarrera', opcionesFiltroCC('carrera'), state.filtros.carrera, 'Todas');
+    createMultiSelect('filterCCAsesor', opcionesFiltroCC('asesor'), state.filtros.asesor, 'Todos');
+    createMultiSelect('filterCCEstado', opcionesFiltroCC('estado'), state.filtros.estado, 'Todos');
+    createMultiSelect('filterCCCampana', opcionesFiltroCC('campana'), state.filtros.campana, 'Todas');
+    createMultiSelect('filterCCPagante', opcionesFiltroCC('pagante'), state.filtros.pagante || [], 'Todos', { SI: 'Sí', NO: 'No' });
 }
 
 function renderTablaCC() {
