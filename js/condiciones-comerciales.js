@@ -29,7 +29,7 @@ const state = {
     solicitudes: [],
     solicitudesFiltradas: [],
     terminoBusqueda: '',
-    filtros: { carrera: [], asesor: [], estado: ['PENDIENTE'], campana: [], fechaDesde: '', fechaHasta: '' },
+    filtros: { carrera: [], asesor: [], estado: ['PENDIENTE'], campana: [], pagante: [], fechaDesde: '', fechaHasta: '' },
     currentPage: 1,
     pageSize: 11,
     pagesPerBlock: 20,
@@ -97,7 +97,7 @@ function initCC() {
         document.getElementById('filterCCFechaDesde')?.addEventListener('change', cambioFecha);
         document.getElementById('filterCCFechaHasta')?.addEventListener('change', cambioFecha);
         window.addEventListener('multiselect-change', (e) => {
-            const mapaClaves = { cccarrera: 'carrera', ccasesor: 'asesor', ccestado: 'estado', cccampana: 'campana' };
+            const mapaClaves = { cccarrera: 'carrera', ccasesor: 'asesor', ccestado: 'estado', cccampana: 'campana', ccpagante: 'pagante' };
             const filtroKey = mapaClaves[e.detail.key];
             if (filtroKey && Object.prototype.hasOwnProperty.call(state.filtros, filtroKey)) {
                 state.filtros[filtroKey] = e.detail.values;
@@ -199,12 +199,14 @@ function fechaSolicitudISO(valor) {
 
 function aplicarFiltrosCC(mantenerPagina = false) {
     const { carrera, asesor, estado, campana, fechaDesde, fechaHasta } = state.filtros;
+    const pagante = state.filtros.pagante || [];
 
     state.solicitudesFiltradas = state.solicitudes.filter(sol => {
         if (carrera.length > 0 && !carrera.includes(sol.CARRERA_LEAD || '')) return false;
         if (asesor.length > 0 && !asesor.includes(sol.ASESOR_NOMBRE || sol.ASESOR_EMAIL || '')) return false;
         if (estado.length > 0 && !estado.includes(sol.STATUS || '')) return false;
         if (campana.length > 0 && !campana.includes(sol.CAMPANA || '')) return false;
+        if (pagante.length > 0 && !pagante.includes(sol.PAGANTE ? 'SI' : 'NO')) return false;
         if (fechaDesde || fechaHasta) {
             const f = fechaSolicitudISO(sol.FECHA_SOLICITUD);
             if (!f) return false;
@@ -240,6 +242,7 @@ function populateFiltrosCC() {
     createMultiSelect('filterCCAsesor', state.solicitudes.map(s => s.ASESOR_NOMBRE || s.ASESOR_EMAIL || ''), state.filtros.asesor, 'Todos');
     createMultiSelect('filterCCEstado', getValues('STATUS'), state.filtros.estado, 'Todos');
     createMultiSelect('filterCCCampana', getValues('CAMPANA'), state.filtros.campana, 'Todas');
+    createMultiSelect('filterCCPagante', ['SI', 'NO'], state.filtros.pagante || [], 'Todos', { SI: 'Sí', NO: 'No' });
 }
 
 function renderTablaCC() {
