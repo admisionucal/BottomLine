@@ -197,11 +197,23 @@ function fechaSolicitudISO(valor) {
     return d.toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
 }
 
+function agruparSolicitudesPorLead(lista) {
+    const porLead = new Map();
+    lista.forEach(sol => {
+        const clave = `${sol.ID_PROMETEO || ''}|${sol.CAMPANA || ''}`;
+        const actual = porLead.get(clave);
+        const total = (actual?.TOTAL_SOLICITUDES || 0) + 1;
+        const esMasReciente = !actual || new Date(sol.FECHA_SOLICITUD || 0) > new Date(actual.FECHA_SOLICITUD || 0);
+        porLead.set(clave, { ...(esMasReciente ? sol : actual), TOTAL_SOLICITUDES: total });
+    });
+    return Array.from(porLead.values());
+}
+
 function aplicarFiltrosCC(mantenerPagina = false) {
     const { carrera, asesor, estado, campana, fechaDesde, fechaHasta } = state.filtros;
     const pagante = state.filtros.pagante || [];
 
-    state.solicitudesFiltradas = state.solicitudes.filter(sol => {
+    state.solicitudesFiltradas = agruparSolicitudesPorLead(state.solicitudes).filter(sol => {
         if (carrera.length > 0 && !carrera.includes(sol.CARRERA_LEAD || '')) return false;
         if (asesor.length > 0 && !asesor.includes(sol.ASESOR_NOMBRE || sol.ASESOR_EMAIL || '')) return false;
         if (estado.length > 0 && !estado.includes(sol.STATUS || '')) return false;
@@ -283,7 +295,8 @@ function renderTablaCC() {
             escapeHtml(sol.ASESOR_NOMBRE || sol.ASESOR_EMAIL || '-'),
             escapeHtml(sol.CAMPANA || ''),
             escapeHtml(formatearFecha(sol.FECHA_SOLICITUD)),
-            `<span class="status-badge ${estado.clase}">${estado.label}</span>`,
+            `<span class="status-badge ${estado.clase}">${estado.label}</span>` +
+                (sol.TOTAL_SOLICITUDES > 1 ? ` <span class="cc-total-solicitudes" title="Este lead tiene ${sol.TOTAL_SOLICITUDES} solicitudes; se muestra la más reciente">${sol.TOTAL_SOLICITUDES} solicitudes</span>` : ''),
             sol.PAGANTE
                 ? '<span class="status-badge status-vp">Sí</span>'
                 : '<span class="status-badge status-sin">No</span>'
@@ -343,7 +356,8 @@ function exportarSolicitudesCCExcel() {
         'FECHA SOLICITUD': formatearFecha(sol.FECHA_SOLICITUD),
         'ESTADO': sol.STATUS || '',
         'MOTIVO RECHAZO': sol.MOTIVO_RECHAZO || '',
-        'PAGANTE': sol.PAGANTE ? 'SI' : 'NO'
+        'PAGANTE': sol.PAGANTE ? 'SI' : 'NO',
+        'SOLICITUDES': sol.TOTAL_SOLICITUDES || 1
     }));
     const ws = XLSX.utils.json_to_sheet(datos);
     const wb = XLSX.utils.book_new();
