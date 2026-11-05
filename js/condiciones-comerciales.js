@@ -4,7 +4,7 @@ import {
     cacheGet, cacheSet, cacheRemove,
     escapeHtml, formatearFecha, getEspecializacionETU
 } from '../core/utils.js';
-import { Sidebar, renderTable, notificar, createMultiSelect, crearSelectorRango } from '../core/components.js';
+import { Sidebar, renderTable, notificar, createMultiSelect, crearSelectorRango, conCargaAccion, mostrarCarga, actualizarCarga, ocultarCarga } from '../core/components.js';
 import { construirDatosCC, renderPlantillaCC, renderPlantillaCCPreview, detectarTipoReferido, precargarLogoCC, setConfigCampanas } from './cc-template.js';
 import { buscarDuplicados, limpiarCacheDuplicados } from './duplicados-sugeridos.js';
 import { unificarLeads } from './unificar-core.js';
@@ -998,6 +998,8 @@ async function enviarCC() {
     btn.disabled = true;
     msg.style.color = '#555';
     msg.textContent = esReenvio ? 'Reenviando...' : 'Enviando...';
+    mostrarCarga('Preparando condiciones…');
+    let cargaOk = false;
 
     try {
         const datosCC = construirDatosCC(state.leadActual, state.solicitudActual.CAMPANA, state.overrides);
@@ -1021,6 +1023,7 @@ async function enviarCC() {
             terminosReferidoNombre = ref.nombre; terminosReferidoBase64 = ref.base64;
         }
 
+        actualizarCarga(esReenvio ? 'Reenviando condiciones…' : 'Enviando condiciones…');
         const result = await callAPI('enviarCC', {
             idSolicitud: state.solicitudActual.ID_SOLICITUD,
             reenvio: esReenvio,
@@ -1044,6 +1047,7 @@ async function enviarCC() {
         });
 
         if (result.success) {
+            cargaOk = true;
             const mensajeExito = esReenvio ? 'Condiciones Comerciales reenviadas correctamente' : 'Condiciones Comerciales enviadas correctamente';
             notificar(mensajeExito);
             state.solicitudActual.STATUS = 'ENVIADO';
@@ -1061,6 +1065,8 @@ async function enviarCC() {
         msg.textContent = 'Error de conexión: ' + e.message;
         notificar('Error de conexión: ' + e.message, 'err');
         btn.disabled = false;
+    } finally {
+        ocultarCarga(cargaOk);
     }
 }
 
@@ -1105,6 +1111,10 @@ async function rechazarCC() {
 }
 
 async function callAPI(action, data = {}) {
+    return conCargaAccion(action, () => callAPIBase(action, data));
+}
+
+async function callAPIBase(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {
         const response = await fetch(API_URL, {

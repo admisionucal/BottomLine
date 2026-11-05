@@ -2,7 +2,7 @@ import { API_URL, esRolSupervisorOAdmision } from '../core/constants.js';
 
 import { getCurrentUser, getSessionToken, escapeHtml, minutosAHora, diffHoras, horasLabel, fechaDDMMYYYY, hoyDDMMYYYY, nowPeru, formato12h, normalizarUrlFoto, calcularDistanciaMetros } from '../core/utils.js';
 
-import { Sidebar, startClock, createMultiSelect, crearSelectorRango, notificar } from '../core/components.js';
+import { Sidebar, startClock, createMultiSelect, crearSelectorRango, notificar, conCargaAccion } from '../core/components.js';
 
 const state = {
     user: null,
@@ -1598,6 +1598,10 @@ async function guardarCampanasAsesor(usuario, campanas) {
 window.toggleColabActivo = toggleColabActivo;
 
 async function callAPI(action, data = {}) {
+    return conCargaAccion(action, () => callAPIBase(action, data));
+}
+
+async function callAPIBase(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {
         const response = await fetch(API_URL, {

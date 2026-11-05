@@ -1,9 +1,14 @@
 import { API_URL, puedeVerPropuestaIA } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml, getUserCampanas } from '../core/utils.js';
+import { conCargaAccion } from '../core/components.js';
 
 const estado = { campana: null, cargando: false, abiertos: new Set(), ultimo: null, puedeGenerar: false };
 
 async function callAPI(action, data = {}) {
+    return conCargaAccion(action, () => callAPIBase(action, data));
+}
+
+async function callAPIBase(action, data = {}) {
     try {
         const resp = await fetch(API_URL, {
             method: 'POST',

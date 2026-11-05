@@ -1,12 +1,16 @@
 import { API_URL, esRolSupervisorOAdmision } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml } from '../core/utils.js';
-import { Sidebar, notificar } from '../core/components.js';
+import { Sidebar, notificar, conCargaAccion } from '../core/components.js';
 
 let modoEmbebido = false;
 
 let __asesoresCache = null;
 
 async function callAPI(action, data = {}) {
+    return conCargaAccion(action, () => callAPIBase(action, data));
+}
+
+async function callAPIBase(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {
         const response = await fetch(API_URL, {

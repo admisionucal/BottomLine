@@ -1,6 +1,6 @@
 import { API_URL, esRolSupervisorOAdmision, puedeVerCapacitacionIA } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml, formatearFecha } from '../core/utils.js';
-import { Sidebar, renderTable, Toast, crearSelectorRango } from '../core/components.js';
+import { Sidebar, renderTable, Toast, crearSelectorRango, conCargaAccion } from '../core/components.js';
 import { crearAvatar } from './avatar-2d.js';
 
 const ESPERA_ANTES_DE_RESPONDER_MS = 2500;
@@ -37,6 +37,10 @@ const video = { avatar: null, stream: null, camaraEncendida: true };
 const voz = { activa: false, rec: null, escuchando: false, pausado: false, hablando: false, bloqueado: false, buffer: '', parcial: '', timer: null, voz: null };
 
 async function callAPI(action, data = {}) {
+    return conCargaAccion(action, () => callAPIBase(action, data));
+}
+
+async function callAPIBase(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {
         const response = await fetch(API_URL, {

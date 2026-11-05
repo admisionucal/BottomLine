@@ -257,6 +257,151 @@ export function notificar(mensaje, tipo = 'ok') {
     toastGlobal.show(mensaje, tipo);
 }
 
+// ── Pantalla de carga global ────────────────────────────────────────────────
+// Cubre toda la pantalla con una barra de progreso mientras se guarda,
+// actualiza o unifica. Al terminar muestra "Listo" un instante.
+
+export const MENSAJES_CARGA = {
+    saveBottom: 'Guardando cambios…',
+    addComment: 'Guardando comentario…',
+    createSolicitud: 'Enviando solicitud…',
+    cancelarSolicitud: 'Cancelando solicitud…',
+    resolveSolicitud: 'Actualizando solicitud…',
+    solicitarCC: 'Solicitando condiciones…',
+    cancelarSolicitudCC: 'Cancelando solicitud…',
+    enviarCC: 'Enviando condiciones…',
+    rechazarCC: 'Rechazando solicitud…',
+    registrarVenta: 'Registrando venta…',
+    asignarLeadProvisional: 'Asignando lead…',
+    unifyIds: 'Unificando leads…',
+    guardarCampana: 'Guardando campaña…',
+    toggleCampanaActiva: 'Actualizando campaña…',
+    subirArchivoCampana: 'Subiendo archivo…',
+    eliminarArchivoCampana: 'Eliminando archivo…',
+    actualizarCampanasAsesor: 'Actualizando campañas…',
+    actualizarEstadoAsesor: 'Actualizando asesor…',
+    crearUsuario: 'Creando usuario…',
+    guardarVentanaEvaluacion: 'Guardando evaluación…',
+    guardarAsignacionesEvaluacion: 'Guardando asignaciones…',
+    simGuardarEscenario: 'Guardando escenario…',
+    simGuardarAsignaciones: 'Guardando asignaciones…',
+    simFinalizar: 'Guardando resultado…',
+    marcarAsistencia: 'Registrando asistencia…',
+    generarPropuestaIA: 'Generando propuesta…',
+    generarPropuestaAbordajeAhora: 'Generando propuesta…'
+};
+
+const carga = { nivel: 0, el: null, texto: null, barra: null, progreso: 0, intervalo: null, cierre: null, huboError: false };
+
+function elementoCarga() {
+    if (carga.el && document.body.contains(carga.el)) return carga.el;
+    const el = document.createElement('div');
+    el.className = 'carga-global';
+    el.setAttribute('role', 'alert');
+    el.setAttribute('aria-live', 'assertive');
+    el.innerHTML = '<div class="carga-global-caja">'
+        + '<span class="carga-global-spinner"></span>'
+        + '<span class="material-symbols-outlined carga-global-check">check_circle</span>'
+        + '<div class="carga-global-texto"></div>'
+        + '<div class="carga-global-pista"><div class="carga-global-barra"></div></div>'
+        + '<div class="carga-global-nota">No cierres ni recargues la página</div>'
+        + '</div>';
+    document.body.appendChild(el);
+    carga.el = el;
+    carga.texto = el.querySelector('.carga-global-texto');
+    carga.barra = el.querySelector('.carga-global-barra');
+    return el;
+}
+
+function pintarProgreso() {
+    if (carga.barra) carga.barra.style.width = carga.progreso.toFixed(1) + '%';
+}
+
+export function mostrarCarga(mensaje = 'Guardando…') {
+    const el = elementoCarga();
+    carga.nivel++;
+    if (carga.nivel === 1 || mensaje) carga.texto.textContent = mensaje || 'Guardando…';
+    if (carga.cierre) { clearTimeout(carga.cierre); carga.cierre = null; }
+    if (carga.nivel === 1) {
+        carga.huboError = false;
+        carga.progreso = 4;
+        el.classList.remove('listo');
+        pintarProgreso();
+        el.classList.add('show');
+        if (carga.intervalo) clearInterval(carga.intervalo);
+        carga.intervalo = setInterval(() => {
+            carga.progreso += (92 - carga.progreso) * 0.035;
+            pintarProgreso();
+        }, 150);
+    }
+}
+
+export function actualizarCarga(mensaje) {
+    if (carga.nivel > 0 && carga.texto && mensaje) carga.texto.textContent = mensaje;
+}
+
+export function marcarErrorCarga() {
+    carga.huboError = true;
+}
+
+// exito: true/false decide el cierre; sin valor, se usa lo ocurrido dentro
+// (si alguna acción anidada falló, se cierra sin "¡Listo!").
+export function ocultarCarga(exito) {
+    if (carga.nivel === 0) return;
+    carga.nivel--;
+    if (carga.nivel > 0) {
+        if (exito === false) carga.huboError = true;
+        return;
+    }
+    if (exito !== undefined) carga.huboError = !exito;
+    if (carga.intervalo) { clearInterval(carga.intervalo); carga.intervalo = null; }
+    const el = carga.el;
+    if (!el) return;
+    if (carga.huboError) {
+        el.classList.remove('show', 'listo');
+        return;
+    }
+    carga.progreso = 100;
+    pintarProgreso();
+    el.classList.add('listo');
+    carga.texto.textContent = '¡Listo!';
+    carga.cierre = setTimeout(() => {
+        carga.cierre = null;
+        if (carga.nivel === 0) el.classList.remove('show', 'listo');
+    }, 650);
+}
+
+// Ejecuta fn mostrando la pantalla de carga. Si fn devuelve { success:false }
+// o lanza error, se cierra sin el "¡Listo!".
+export async function conCarga(mensaje, fn) {
+    mostrarCarga(mensaje);
+    let exito = true;
+    try {
+        const r = await fn();
+        if (r && typeof r === 'object' && r.success === false) exito = false;
+        if (r === false) exito = false;
+        return r;
+    } catch (e) {
+        exito = false;
+        throw e;
+    } finally {
+        ocultarCarga(exito);
+    }
+}
+
+// Para los callAPI de cada página: solo muestra la carga en acciones que guardan.
+// Si ya hay una carga abierta, no apila otra: solo precisa el mensaje genérico
+// y anota si la acción falló.
+export async function conCargaAccion(action, fn) {
+    const mensaje = MENSAJES_CARGA[action];
+    if (!mensaje) return fn();
+    if (carga.nivel === 0) return conCarga(mensaje, fn);
+    if (carga.texto && carga.texto.textContent === 'Guardando…') carga.texto.textContent = mensaje;
+    const r = await fn();
+    if (r && typeof r === 'object' && r.success === false) carga.huboError = true;
+    return r;
+}
+
 export function renderTable(containerId, headers, rows, options = {}) {
     const container = document.getElementById(containerId);
     if (!container) return;

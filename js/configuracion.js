@@ -1,6 +1,6 @@
 import { API_URL, esRolAdmision } from '../core/constants.js';
 import { getCurrentUser, getSessionToken, escapeHtml } from '../core/utils.js';
-import { Sidebar, notificar } from '../core/components.js';
+import { Sidebar, notificar, conCargaAccion } from '../core/components.js';
 import { createMultiSelect } from '../core/components.js';
 
 const TIPOS_ARCHIVO = [
@@ -21,6 +21,10 @@ const state = {
 let modoEmbebido = false;
 
 async function callAPI(action, data = {}) {
+    return conCargaAccion(action, () => callAPIBase(action, data));
+}
+
+async function callAPIBase(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {
         const response = await fetch(API_URL, {

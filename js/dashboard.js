@@ -2,7 +2,7 @@ import { API_URL, COLUMNAS, STATUS, STATUS_LABELS, CACHE_KEYS, esRolSupervisorOA
 
 import { getCurrentUser, getUserCampanas, getSessionToken, cacheGet, cacheSet, escapeHtml, parsearFechaFlexible, fechaAClaveISO, limpiarEspacios, sumarCategoria } from '../core/utils.js';
 
-import { Sidebar, Toast, createMultiSelect, toggleMultiSelect, renderTable, crearCalendarioRango, fechasEnRango, formatoRangoFechas } from '../core/components.js';
+import { Sidebar, Toast, createMultiSelect, toggleMultiSelect, renderTable, crearCalendarioRango, fechasEnRango, formatoRangoFechas, conCargaAccion, conCarga, notificar } from '../core/components.js';
 import { buscarDuplicados, limpiarCacheDuplicados } from './duplicados-sugeridos.js';
 import { unificarLeads } from './unificar-core.js';
 
@@ -94,7 +94,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     cargarLeadsIndicadores().catch(() => {});
     await cargarLeadsCalendario();
 
-    document.getElementById('btnActualizar')?.addEventListener('click', () => loadLeads(true));
+    document.getElementById('btnActualizar')?.addEventListener('click', async () => {
+        const ok = await conCarga('Actualizando leads…', () => loadLeads(true));
+        if (ok) notificar('Leads actualizados');
+        else notificar('No se pudieron actualizar los leads', 'err');
+    });
     document.getElementById('btnExportar')?.addEventListener('click', exportarExcel);
     document.getElementById('filtrosToggleBtn')?.addEventListener('click', toggleFiltrosPanel);
     document.getElementById('calVpPpToggleBtn')?.addEventListener('click', toggleCalVpPpPanel);
@@ -399,11 +403,14 @@ async function loadLeads(forceRefresh = false) {
             applyFilters();
             actualizarCalendario();
             mostrarUltimaActualizacion();
+            return true;
         } else {
             if (container) container.innerHTML = `<div class="loading">Error: ${result.error || 'No se pudieron cargar los leads'}</div>`;
+            return false;
         }
     } catch (error) {
         if (container) container.innerHTML = `<div class="loading">Error de conexión: ${error.message}</div>`;
+        return false;
     }
 }
 
@@ -1406,7 +1413,10 @@ async function actualizarCalendarioLeads() {
         btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">refresh</span> Actualizando…';
     }
     try {
-        await cargarLeadsCalendario(true);
+        await conCarga('Actualizando calendario…', () => cargarLeadsCalendario(true));
+        notificar('Calendario actualizado');
+    } catch (e) {
+        notificar('No se pudo actualizar el calendario', 'err');
     } finally {
         if (btn) {
             btn.disabled = false;
@@ -2342,6 +2352,10 @@ function mostrarUltimaActualizacion() {
 }
 
 async function callAPI(action, data = {}) {
+    return conCargaAccion(action, () => callAPIBase(action, data));
+}
+
+async function callAPIBase(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {
         const response = await fetch(API_URL, {

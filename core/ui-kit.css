@@ -952,3 +952,39 @@ table tbody tr:hover { background: #fafbff; }
 .selector-rango-panel { display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 60; background: white; border: 1px solid var(--color-border); border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.14); padding: 12px; }
 .selector-rango-panel.open { display: block; }
 .filter-group .selector-rango, .filter-group .selector-rango-btn { width: 100%; }
+
+/* ── Pantalla de carga global ───────────────────────────── */
+.carga-global {
+    position: fixed; inset: 0; z-index: 1900;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(15, 23, 42, .45);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    font-family: var(--font-family);
+}
+.carga-global.show { display: flex; animation: carga-aparecer .18s ease-out; }
+.carga-global-caja {
+    background: white; border-radius: 16px; padding: 28px 34px 22px;
+    width: min(380px, calc(100vw - 32px)); box-sizing: border-box;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.25); text-align: center;
+}
+.carga-global-spinner {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: 4px solid #e5e7eb; border-top-color: var(--color-primary, #2563eb);
+    animation: carga-girar .8s linear infinite;
+}
+.carga-global-check { display: none; font-size: 42px; color: var(--color-success, #16a34a); }
+.carga-global-texto { font-size: 15px; font-weight: 600; color: #1f2937; text-transform: none; }
+.carga-global-pista { width: 100%; height: 8px; background: #e5e7eb; border-radius: 99px; overflow: hidden; }
+.carga-global-barra {
+    height: 100%; width: 0; border-radius: 99px;
+    background: var(--color-primary, #2563eb); transition: width .2s linear;
+}
+.carga-global-nota { font-size: 12px; color: #6b7280; }
+.carga-global.listo .carga-global-spinner { display: none; }
+.carga-global.listo .carga-global-check { display: block; }
+.carga-global.listo .carga-global-barra { background: var(--color-success, #16a34a); }
+.carga-global.listo .carga-global-texto { color: var(--color-success, #16a34a); }
+.carga-global.listo .carga-global-nota { visibility: hidden; }
+@keyframes carga-girar { to { transform: rotate(360deg); } }
+@keyframes carga-aparecer { from { opacity: 0; } to { opacity: 1; } }

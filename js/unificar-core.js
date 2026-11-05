@@ -1,7 +1,12 @@
 import { API_URL } from '../core/constants.js';
 import { getSessionToken } from '../core/utils.js';
+import { conCargaAccion } from '../core/components.js';
 
 async function callAPI(action, data = {}) {
+    return conCargaAccion(action, () => callAPIBase(action, data));
+}
+
+async function callAPIBase(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {
         const response = await fetch(API_URL, {

@@ -2,7 +2,7 @@ import { API_URL, ROLES, tipoDocumentoPorNumero, etiquetaTipoDocumento, digitosT
 
 import { getCurrentUser, getSessionToken, cacheGet, cacheSet, cacheRemove, escapeHtml, normalizarTexto, parseNumero, getEspecializacionETU } from '../core/utils.js';
 
-import { Sidebar, notificar } from '../core/components.js';
+import { Sidebar, notificar, conCargaAccion, mostrarCarga, actualizarCarga, ocultarCarga } from '../core/components.js';
 import { construirDatosCC } from './cc-template.js';
 import { buscarDuplicados } from './duplicados-sugeridos.js';
 import { prepararArchivosParaEnvio, archivosDelPortapapelesEvento, archivosDelPortapapelesBoton, esArchivoAceptado } from './pdf-cliente.js';
@@ -1317,6 +1317,8 @@ async function enviarSolicitudCC() {
     btn.disabled = true;
     msgEl.style.color = '#666';
     msgEl.textContent = 'Enviando solicitud...';
+    mostrarCarga('Preparando documentos…');
+    let cargaOk = false;
 
     try {
         const [dniArchivos, certificadoArchivos, boletaProcedenciaArchivos] = await Promise.all([
@@ -1324,6 +1326,7 @@ async function enviarSolicitudCC() {
             armarArchivosCC('certificado'),
             armarArchivosCC('boletaProcedencia')
         ]);
+        actualizarCarga('Solicitando condiciones…');
 
         const result = await callAPI('solicitarCC', {
             idPrometeo: id,
@@ -1343,6 +1346,7 @@ async function enviarSolicitudCC() {
         });
 
         if (result.success) {
+            cargaOk = true;
             state.solicitudCC = {
                 ID_SOLICITUD: result.idSolicitud,
                 TIPO_DOCUMENTO: tipoDocumento,
@@ -1361,6 +1365,7 @@ async function enviarSolicitudCC() {
         msgEl.style.color = '#d32f2f';
         msgEl.textContent = 'Error: ' + e.message;
     } finally {
+        ocultarCarga(cargaOk);
         btn.disabled = false;
     }
 }
@@ -1888,10 +1893,13 @@ async function registrarVenta() {
     btn.disabled = true;
     msgEl.style.color = '#666';
     msgEl.textContent = 'Preparando documentos...';
+    mostrarCarga('Preparando documentos…');
+    let cargaOk = false;
 
     try {
         const [comprobante, dni, conformidad, nee] = await Promise.all(['comprobante', 'dni', 'conformidad', 'nee'].map(armarArchivosVenta));
         msgEl.textContent = ventaModoEdicion ? 'Guardando cambios...' : 'Registrando venta...';
+        actualizarCarga(ventaModoEdicion ? 'Guardando cambios de la venta…' : 'Registrando venta…');
         const payload = {
             idSolicitud: state.solicitudCC.ID_SOLICITUD,
             idPrometeo: d.D,
@@ -1913,6 +1921,7 @@ async function registrarVenta() {
         }
 
         if (!result || !result.success) return error('Error: ' + (result?.error || 'No se pudo registrar la venta'));
+        cargaOk = true;
 
         Object.assign(state.solicitudCC, result.archivos || {}, { VENTA_REGISTRADA_EN: result.ventaRegistradaEn || new Date().toISOString() });
         if (result.statusProvisional) state.lead[COLUMNAS.STATUS_GESTION] = result.statusProvisional;
@@ -1928,6 +1937,7 @@ async function registrarVenta() {
     } catch (e) {
         error('Error: ' + e.message);
     } finally {
+        ocultarCarga(cargaOk);
         btn.disabled = false;
     }
 }
@@ -2847,11 +2857,15 @@ function sincronizarCache() {
 }
 
 function mostrarOverlay(show) {
-    const el = document.getElementById('overlayGuardando');
-    if (el) el.classList.toggle('show', show);
+    if (show) mostrarCarga('Guardando…');
+    else ocultarCarga();
 }
 
 async function callAPI(action, data = {}) {
+    return conCargaAccion(action, () => callAPIBase(action, data));
+}
+
+async function callAPIBase(action, data = {}) {
     const payload = { action, sessionToken: getSessionToken(), ...data };
     try {
         const response = await fetch(API_URL, {
