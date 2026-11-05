@@ -4,7 +4,7 @@ import {
     cacheGet, cacheSet, cacheRemove,
     escapeHtml, formatearFecha, getEspecializacionETU
 } from '../core/utils.js';
-import { Sidebar, renderTable, notificar, createMultiSelect, crearSelectorRango, conCargaAccion, mostrarCarga, actualizarCarga, ocultarCarga } from '../core/components.js';
+import { Sidebar, renderTable, notificar, createMultiSelect, crearSelectorRango, conCargaAccion, conCarga, mostrarCarga, actualizarCarga, ocultarCarga } from '../core/components.js';
 import { construirDatosCC, renderPlantillaCC, renderPlantillaCCPreview, detectarTipoReferido, precargarLogoCC, setConfigCampanas } from './cc-template.js';
 import { buscarDuplicados, limpiarCacheDuplicados } from './duplicados-sugeridos.js';
 import { unificarLeads } from './unificar-core.js';
@@ -80,7 +80,11 @@ function initCC() {
     }
 
     if (!__ccListenersAtados) {
-        document.getElementById('btnActualizarCC')?.addEventListener('click', () => cargarSolicitudesCC(true));
+        document.getElementById('btnActualizarCC')?.addEventListener('click', async () => {
+            const ok = await conCarga('Actualizando solicitudes…', () => cargarSolicitudesCC(true));
+            if (ok) notificar('Solicitudes actualizadas');
+            else notificar('No se pudieron actualizar las solicitudes', 'err');
+        });
         document.getElementById('btnExportarCC')?.addEventListener('click', exportarSolicitudesCCExcel);
         document.getElementById('filtrosToggleBtnCC')?.addEventListener('click', () => {
             document.getElementById('navFiltrosPanelCC')?.classList.toggle('open');
@@ -147,11 +151,11 @@ async function cargarSolicitudesCC(forceRefresh = false) {
             campanas: getUserCampanas(),
             estados: ['PENDIENTE', 'PROCESANDO']
         });
-        if (cargaId !== __cargaCCId) return;
+        if (cargaId !== __cargaCCId) return true;
 
         if (!result.success) {
             wrap.innerHTML = `<div class="loading">Error: ${escapeHtml(result.error || 'No se pudieron cargar las solicitudes')}</div>`;
-            return;
+            return false;
         }
 
         state.solicitudes = result.data || [];
@@ -159,9 +163,11 @@ async function cargarSolicitudesCC(forceRefresh = false) {
         state.cargandoResueltas = true;
         aplicarFiltrosCC();
 
-        cargarResueltasCC(cargaId, cacheKey);
+        await cargarResueltasCC(cargaId, cacheKey);
+        return true;
     } catch (e) {
         wrap.innerHTML = `<div class="loading">Error de conexión: ${escapeHtml(e.message)}</div>`;
+        return false;
     }
 }
 

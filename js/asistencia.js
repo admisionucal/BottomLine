@@ -2,7 +2,7 @@ import { API_URL, esRolSupervisorOAdmision } from '../core/constants.js';
 
 import { getCurrentUser, getSessionToken, escapeHtml, minutosAHora, diffHoras, horasLabel, fechaDDMMYYYY, hoyDDMMYYYY, nowPeru, formato12h, normalizarUrlFoto, calcularDistanciaMetros } from '../core/utils.js';
 
-import { Sidebar, startClock, createMultiSelect, crearSelectorRango, notificar, conCargaAccion } from '../core/components.js';
+import { Sidebar, startClock, createMultiSelect, crearSelectorRango, notificar, conCargaAccion, conCarga } from '../core/components.js';
 
 const state = {
     user: null,
@@ -244,7 +244,9 @@ async function initPanelAnalisis() {
     document.getElementById('fechaHasta').addEventListener('change', () => cargarAnalisis());
     document.getElementById('fEmpAnalisis').addEventListener('change', () => cargarAnalisis());
     document.getElementById('fCampanaAnalisis').addEventListener('change', () => { filtrarEmpleadosAnalisis(); cargarAnalisis(); });
-    document.getElementById('btnActualizarAnalisis').addEventListener('click', () => cargarAnalisis(true));
+    document.getElementById('btnActualizarAnalisis').addEventListener('click', async () => {
+        if (await conCarga('Actualizando asistencia…', () => cargarAnalisis(true))) notificar('Asistencia actualizada');
+    });
 
     if (await ensureEmpleadosCache()) {
         poblarSelectEmpleados('fEmpAnalisis', 'fCampanaAnalisis', 'Todos los empleados');
@@ -1479,9 +1481,11 @@ async function cargarAnalisis(forzarRecarga = false) {
                 <div style="font-size:16px;font-weight:700;color:${color};">${pct}%</div></div>`;
         });
         document.getElementById('rankingPuntualidad').innerHTML = rankingHTML || '<div class="empty-state">Sin datos para mostrar</div>';
+        return true;
     } catch (e) {
         console.error('cargarAnalisis:', e);
         showToast('Error al cargar análisis', 'err');
+        return false;
     }
 }
 

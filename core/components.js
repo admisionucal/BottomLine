@@ -288,7 +288,8 @@ export const MENSAJES_CARGA = {
     simFinalizar: 'Guardando resultado…',
     marcarAsistencia: 'Registrando asistencia…',
     generarPropuestaIA: 'Generando propuesta…',
-    generarPropuestaAbordajeAhora: 'Generando propuesta…'
+    generarPropuestaAbordajeAhora: 'Generando propuesta…',
+    generarPreviewPDF: 'Generando vista previa…'
 };
 
 const carga = { nivel: 0, el: null, texto: null, barra: null, progreso: 0, intervalo: null, cierre: null, huboError: false };
